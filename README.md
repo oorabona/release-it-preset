@@ -488,6 +488,7 @@ You can override any configuration in your project's `.release-it.json`:
 6. Execute `pnpm release` (alias for the default preset) to perform the real release
   - This bumps the version, moves changelog entries, creates the release commit + tag, pushes to origin, and creates the GitHub release locally
   - **Note:** npm publish is skipped locally; the publish workflow handles it after the tag push
+  - Want to add narrative paragraphs to the changelog? When the prompt asks `Commit (release: bump vX.Y.Z)?`, answer **No**, edit/stage `CHANGELOG.md`, then re-run `pnpm release -- --retry` (or simply restart the command). The preset now passes `--allow-same-version` to `npm version`, so retrying with the same version no longer fails. Once satisfied, confirm the commit so the amended changelog is captured before the tag is created.
 
 ```mermaid
 flowchart TD
@@ -746,6 +747,10 @@ Common issues:
 - Working directory not clean → commit or stash changes, or use `--allow-dirty`
 - [Unreleased] section empty → run `pnpm release-it-preset update`
 - Not on required branch → checkout correct branch or update `GIT_REQUIRE_BRANCH`
+
+### `npm error Version not changed`
+
+This can appear if you interrupt a release, tweak `CHANGELOG.md`, then retry with the same version. The preset automatically passes `--allow-same-version` to `npm version`, so simply re-run `pnpm release` (or `pnpm release-it-preset default --retry`) and select the same version—`npm` will no longer abort.
 
 ## License
 

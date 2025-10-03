@@ -1,6 +1,6 @@
 {
   "name": "@oorabona/release-it-preset",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Shared release-it configuration and scripts for the organisation",
   "type": "module",
   "keywords": [

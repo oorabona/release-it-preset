@@ -28,6 +28,7 @@ const config = {
   npm: {
     skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
     publish: process.env.NPM_PUBLISH !== 'false',
+    versionArgs: ['--allow-same-version'],
     publishArgs: [
       '--provenance',
       '--access',
