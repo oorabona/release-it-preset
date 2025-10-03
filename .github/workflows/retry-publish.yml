@@ -1,0 +1,119 @@
+name: Retry Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Git tag to republish (leave empty for latest tag)'
+        required: false
+        type: string
+      npm_only:
+        description: 'Publish to npm only (skip GitHub Release)'
+        required: false
+        type: boolean
+        default: false
+      github_only:
+        description: 'Create GitHub Release only (skip npm)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  retry-publish:
+    name: Retry Publishing
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine tag to publish
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag_name }}" ]; then
+            TAG="${{ inputs.tag_name }}"
+          else
+            TAG=$(git describe --tags --abbrev=0)
+          fi
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+          echo "📌 Publishing tag: $TAG"
+
+      - name: Verify tag exists
+        run: |
+          if ! git rev-parse ${{ steps.tag.outputs.tag }} >/dev/null 2>&1; then
+            echo "❌ Tag ${{ steps.tag.outputs.tag }} does not exist"
+            exit 1
+          fi
+          echo "✅ Tag ${{ steps.tag.outputs.tag }} exists"
+
+      - name: Checkout tag
+        run: |
+          git checkout ${{ steps.tag.outputs.tag }}
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build compiled scripts
+        run: pnpm build
+
+      - name: Run pre-flight checks
+        run: node dist/scripts/retry-publish.js
+
+      - name: Publish to npm
+        if: inputs.github_only == false
+        run: pnpm publish --provenance --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Extract changelog for release notes
+        if: inputs.npm_only == false
+        id: changelog
+        run: |
+          NOTES=$(node dist/scripts/extract-changelog.js ${{ steps.tag.outputs.version }} || echo "Release ${{ steps.tag.outputs.tag }}")
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create or update GitHub Release
+        if: inputs.npm_only == false
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Release ${{ steps.tag.outputs.tag }}
+          body: ${{ steps.changelog.outputs.notes }}
+          draft: false
+          prerelease: false
+
+      - name: Display result
+        run: |
+          echo "✅ Retry publish completed"
+          echo "Tag: ${{ steps.tag.outputs.tag }}"
+          echo "Version: ${{ steps.tag.outputs.version }}"
+          echo ""
+          if [ "${{ inputs.npm_only }}" == "true" ]; then
+            echo "📦 Published to npm only"
+          elif [ "${{ inputs.github_only }}" == "true" ]; then
+            echo "🏷️  Created GitHub Release only"
+          else
+            echo "📦 Published to npm"
+            echo "🏷️  Created GitHub Release"
+          fi

@@ -1,0 +1,4 @@
+{
+  "*.{ts,tsx,js,jsx}": ["pnpm run lint"],
+  "*.{json,md,yml,yaml}": ["pnpm run lint"]
+}

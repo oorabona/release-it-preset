@@ -1,0 +1,122 @@
+---
+name: reusable-verify
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node.js version to use
+        type: string
+        default: '20'
+      run-tests:
+        description: Run `pnpm test` after compilation
+        type: boolean
+        default: false
+      base-ref:
+        description: Base ref (e.g. origin/main) used for diff comparisons
+        type: string
+        default: ''
+      head-ref:
+        description: Head ref (defaults to HEAD)
+        type: string
+        default: 'HEAD'
+      install-args:
+        description: Additional arguments for `pnpm install`
+        type: string
+        default: '--frozen-lockfile'
+      fetch-depth:
+        description: Fetch depth for checkout
+        type: number
+        default: 0
+    outputs:
+      release_validation:
+        description: "'true' when release validation passes"
+        value: ${{ jobs.verify.outputs.release_validation }}
+      changelog_status:
+        description: "Changelog status (updated/skipped/missing)"
+        value: ${{ jobs.verify.outputs.changelog_status }}
+      skip_changelog:
+        description: "'true' when [skip-changelog] detected"
+        value: ${{ jobs.verify.outputs.skip_changelog }}
+      conventional_commits:
+        description: "'true' when conventional commits detected"
+        value: ${{ jobs.verify.outputs.conventional_commits }}
+      commit_messages:
+        description: Base64 encoded JSON array of commit messages analysed
+        value: ${{ jobs.verify.outputs.commit_messages }}
+      changed_files:
+        description: Base64 encoded JSON array of files changed in the diff
+        value: ${{ jobs.verify.outputs.changed_files }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release_validation: ${{ steps.release_validation.outputs.passed }}
+      changelog_status: ${{ steps.pr_check.outputs.changelog_status }}
+      skip_changelog: ${{ steps.pr_check.outputs.skip_changelog }}
+      conventional_commits: ${{ steps.pr_check.outputs.conventional_commits }}
+      commit_messages: ${{ steps.pr_check.outputs.commit_messages }}
+      changed_files: ${{ steps.pr_check.outputs.changed_files }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ inputs.fetch-depth }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Determine pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: |
+          set -eo pipefail
+          echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs['node-version'] }}
+
+      - name: Install dependencies
+        run: pnpm install ${{ inputs.install-args }}
+
+      - name: Check TypeScript compilation
+        run: pnpm tsc --noEmit
+
+      - name: Run tests
+        if: inputs.run-tests == true
+        run: pnpm test --run
+
+      - name: Run release validation (allow dirty)
+        id: release_validation
+        shell: bash
+        run: |
+          set +e
+          pnpm tsx scripts/validate-release.ts --allow-dirty
+          exit_code=$?
+          if [ "$exit_code" -eq 0 ]; then
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Evaluate PR hygiene
+        id: pr_check
+        env:
+          PR_BASE_REF: ${{ inputs.base-ref }}
+          PR_HEAD_REF: ${{ inputs.head-ref }}
+        run: pnpm tsx scripts/check-pr-status.ts

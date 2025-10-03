@@ -1,0 +1,193 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      increment:
+        description: 'Version increment type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check TypeScript compilation
+        run: pnpm tsc --noEmit
+
+      - name: Build compiled scripts
+        run: pnpm build
+
+      - name: Validate configuration files
+        run: |
+          echo "✅ Checking config files exist..."
+          test -f config/default.js
+          test -f config/hotfix.js
+          test -f config/changelog-only.js
+          test -f config/no-changelog.js
+          test -f config/republish.js
+          test -f config/retry-publish.js
+          echo "✅ All config files present"
+
+      - name: Validate script files
+        run: |
+          echo "✅ Checking script files exist..."
+          test -f scripts/populate-unreleased-changelog.ts
+          test -f scripts/extract-changelog.ts
+          test -f scripts/republish-changelog.ts
+          test -f scripts/retry-publish.ts
+          test -f scripts/init-project.ts
+          test -f scripts/validate-release.ts
+          test -f scripts/check-config.ts
+          echo "✅ All script files present"
+
+      - name: Run unit tests
+        run: pnpm test
+
+      - name: Run tests with coverage
+        run: pnpm test:coverage
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  test-cli:
+    name: Test CLI
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch'
+    needs: validate
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test CLI help
+        run: node bin/cli.js --help
+
+      - name: Test CLI unknown command
+        run: |
+          if node bin/cli.js unknown-command 2>&1 | grep -q "Unknown command"; then
+            echo "✅ CLI properly rejects unknown commands"
+          else
+            echo "❌ CLI should reject unknown commands"
+            exit 1
+          fi
+
+      - name: Test check command
+        run: node dist/scripts/check-config.js
+
+      - name: Test validate command (allow dirty)
+        run: node dist/scripts/validate-release.js --allow-dirty
+
+      - name: Test init command in temp directory
+        run: |
+          mkdir -p /tmp/test-init
+          cd /tmp/test-init
+          git init
+          git config user.name "Test User"
+          git config user.email "test@example.com"
+          node $GITHUB_WORKSPACE/bin/cli.js init --yes
+          test -f CHANGELOG.md
+          test -f .release-it.json
+          echo "✅ Init command created expected files"
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Update changelog
+        run: node dist/scripts/populate-unreleased-changelog.js
+
+      - name: Validate release readiness
+        run: node dist/scripts/validate-release.js
+
+      - name: Run release
+        run: node bin/cli.js default --ci --increment ${{ inputs.increment }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_PUBLISH: 'false'  # npm publish handled by publish.yml
+
+      - name: Display release info
+        run: |
+          echo "✅ Release completed successfully"
+          echo "Tag created: $(git describe --tags --abbrev=0)"
+          echo "Commit: $(git rev-parse HEAD)"

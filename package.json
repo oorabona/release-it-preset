@@ -1,0 +1,91 @@
+{
+  "name": "@oorabona/release-it-preset",
+  "version": "0.0.0",
+  "description": "Shared release-it configuration and scripts for the organisation",
+  "type": "module",
+  "keywords": [
+    "release-it",
+    "release",
+    "version",
+    "changelog",
+    "conventional-commits",
+    "keep-a-changelog"
+  ],
+  "author": "Olivier Orabona",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oorabona/release-it-preset.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oorabona/release-it-preset/issues"
+  },
+  "homepage": "https://github.com/oorabona/release-it-preset#readme",
+  "bin": {
+    "release-it-preset": "./bin/cli.js"
+  },
+  "exports": {
+    "./config/default": "./config/default.js",
+    "./config/hotfix": "./config/hotfix.js",
+    "./config/changelog-only": "./config/changelog-only.js",
+    "./config/no-changelog": "./config/no-changelog.js",
+    "./config/republish": "./config/republish.js",
+    "./config/retry-publish": "./config/retry-publish.js",
+    "./scripts/*": {
+      "types": "./dist/types/*.d.ts",
+      "default": "./dist/scripts/*.js"
+    }
+  },
+  "files": [
+    "bin",
+    "config",
+    "dist/scripts",
+    "dist/types",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "release-it-preset": "node ./bin/cli.js",
+    "release": "pnpm run release:default",
+    "release:default": "node ./bin/cli.js default",
+    "release:default:dry-run": "node ./bin/cli.js default --dry-run",
+    "release:no-changelog": "node ./bin/cli.js no-changelog",
+    "release:changelog-only": "node ./bin/cli.js changelog-only",
+    "release:hotfix": "node ./bin/cli.js hotfix",
+    "release:republish": "node ./bin/cli.js republish",
+    "release:retry-publish": "node ./bin/cli.js retry-publish",
+    "release:update": "node ./bin/cli.js update",
+    "release:validate": "node ./bin/cli.js validate",
+    "release:validate:allow-dirty": "node ./bin/cli.js validate --allow-dirty",
+    "release:check": "node ./bin/cli.js check",
+    "build": "tsc -p tsconfig.json",
+    "clean": "rimraf dist || rm -rf dist",
+    "lint": "biome check --write .",
+    "lint:check": "biome check .",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit/*.test.ts",
+    "test:unit:watch": "vitest tests/unit/*.test.ts",
+    "test:unit:coverage": "vitest run tests/unit/*.test.ts --coverage",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "prepublishOnly": "pnpm build && echo 'Running prepublish checks...' && test -f README.md && test -f LICENSE"
+  },
+  "peerDependencies": {
+    "release-it": "^19.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.5",
+    "@types/node": "^22.10.5",
+    "@vitest/coverage-v8": "^3.2.4",
+    "nano-staged": "^0.8.0",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "pnpm@10.17.1"
+}
