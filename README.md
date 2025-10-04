@@ -2,6 +2,13 @@
 
 Shared [release-it](https://github.com/release-it/release-it) configuration and scripts for automated versioning, changelog generation, and package publishing.
 
+[![codecov](https://codecov.io/github/oorabona/release-it-preset/graph/badge.svg?token=6RMN34Z7TX)](https://codecov.io/github/oorabona/release-it-preset)
+[![CI](https://github.com/oorabona/release-it-preset/actions/workflows/ci.yml/badge.svg)](https://github.com/oorabona/release-it-preset/actions/workflows/ci.yml)
+[![NPM Version](https://img.shields.io/npm/v/release-it-preset.svg)](https://npmjs.org/package/@oorabona/release-it-preset)
+[![NPM Downloads](https://img.shields.io/npm/dm/release-it-preset.svg)](https://npmjs.org/package/@oorabona/release-it-preset)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## Features
 
 - 📦 Multiple release configurations for different scenarios
@@ -608,7 +615,7 @@ jobs:
       - name: Update GitHub release and publish to npm
         run: pnpm release-it-preset retry-publish --ci
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_PUBLISH: 'true'
           GITHUB_RELEASE: 'true'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -619,7 +626,7 @@ jobs:
 - `GITHUB_TOKEN` is provided automatically by GitHub Actions (no manual secret needed)
 
 **Required Permissions (locally):**
-- Set `GITHUB_RELEASE=true` and/or `NPM_PUBLISH=true` only when you explicitly want to perform those actions from your machine. Provide `GITHUB_TOKEN`/`NODE_AUTH_TOKEN` as needed.
+- Set `GITHUB_RELEASE=true` and/or `NPM_PUBLISH=true` only when you explicitly want to perform those actions from your machine. Provide `GITHUB_TOKEN`/`NPM_TOKEN` as needed.
 
 ### Alternative: Full CI Release
 
@@ -648,7 +655,7 @@ jobs:
       - run: pnpm release-it-preset default --ci --increment ${{ inputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_RELEASE: 'true'
           NPM_PUBLISH: 'true'
 ```

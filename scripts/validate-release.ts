@@ -201,7 +201,7 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
       message: `Logged in as: ${username}`,
     };
   } catch (error) {
-    const tokenEnvVars = ['NPM_TOKEN', 'NODE_AUTH_TOKEN', 'NPM_CONFIG__AUTH', 'NPM_CONFIG_TOKEN'];
+    const tokenEnvVars = ['NPM_TOKEN', 'NPM_TOKEN', 'NPM_CONFIG__AUTH', 'NPM_CONFIG_TOKEN'];
     const hasAutomationToken = tokenEnvVars.some((name) => {
       const value = deps.getEnv(name);
       return typeof value === 'string' && value.trim().length > 0;

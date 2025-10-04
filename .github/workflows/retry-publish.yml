@@ -106,7 +106,7 @@ jobs:
         if: inputs.github_only == false
         run: pnpm publish --provenance --access public --no-git-checks
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Extract changelog for release notes
         if: inputs.npm_only == false
