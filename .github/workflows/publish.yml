@@ -4,6 +4,15 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Override tag (optional, auto-detected)'
+        type: string
+        required: false  # Auto detected via github.ref_name
+    secrets:
+      NPM_TOKEN:
+        required: true
 
 permissions:
   contents: write
@@ -11,9 +20,10 @@ permissions:
 
 jobs:
   build-dist:
-    uses: ./.github/workflows/build-dist.yml
+    uses: oorabona/release-it-preset/.github/workflows/build-dist.yml@main
     with:
       artifact_name: dist-build
+    secrets: inherit
 
   publish:
     runs-on: ubuntu-latest
