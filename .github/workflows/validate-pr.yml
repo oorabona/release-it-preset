@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   validate:
-    uses: ./.github/workflows/reusable-verify.yml
+    # Allows reusing the same validation logic across multiple repositories
+    uses: oorabona/release-it-preset/.github/workflows/reusable-verify.yml@main # Adjust branch if needed
     with:
       node-version: '20'
       base-ref: origin/${{ github.base_ref }}
