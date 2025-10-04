@@ -1,19 +1,248 @@
-# CI Integration Examples
+# CI/CD Integration Examples
 
-Examples of integrating `@oorabona/release-it-preset` with CI/CD pipelines.
+Modern examples of integrating `@oorabona/release-it-preset` with various CI/CD platforms.
+
+## Table of Contents
+
+- [GitHub Actions](#github-actions)
+  - [Standard TypeScript/Node.js Project](#standard-typescriptnodejs-project)
+  - [Monorepo Setup](#monorepo-setup)
+  - [Private npm Package](#private-npm-package)
+- [GitLab CI](#gitlab-ci)
+- [CircleCI](#circleci)
+- [Best Practices](#best-practices)
 
 ## GitHub Actions
 
-### Automatic Release on Tag
+### Standard TypeScript/Node.js Project
+
+Complete setup for a typical TypeScript project with PR validation, automated releases, and npm publishing.
+
+#### 1. PR Validation
+
+**.github/workflows/validate-pr.yml**:
+```yaml
+name: Validate PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    uses: oorabona/release-it-preset/.github/workflows/reusable-verify.yml@main
+    with:
+      node-version: '20'
+      base-ref: origin/${{ github.base_ref }}
+      head-ref: ${{ github.sha }}
+      run-tests: true
+    secrets: inherit
+
+  comment:
+    needs: validate
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const validation = '${{ needs.validate.outputs.release_validation }}' === 'true';
+            const changelog = '${{ needs.validate.outputs.changelog_status }}';
+            const conventional = '${{ needs.validate.outputs.conventional_commits }}' === 'true';
+
+            let summary = '## 📋 PR Validation Summary\n\n';
+            summary += `${validation ? '✅' : '⚠️'} **Release validation**\n`;
+            summary += `${changelog === 'updated' ? '✅' : 'ℹ️'} **Changelog**: ${changelog}\n`;
+            summary += `${conventional ? '✅' : 'ℹ️'} **Conventional commits**\n`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('PR Validation Summary')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: summary,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: summary,
+              });
+            }
+```
+
+#### 2. Release Workflow
 
 **.github/workflows/release.yml**:
 ```yaml
 name: Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      increment:
+        description: 'Version increment'
+        required: true
+        type: choice
+        options: [patch, minor, major]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update changelog
+        run: pnpm release-it-preset update
+
+      - name: Validate release
+        run: pnpm release-it-preset validate
+
+      - name: Create release
+        run: pnpm release-it-preset default --ci --increment ${{ inputs.increment }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_PUBLISH: 'false'  # Let publish.yml handle this
+```
+
+#### 3. Automated Publish on Tag
+
+**.github/workflows/publish.yml**:
+```yaml
+name: Publish
+
+on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    uses: oorabona/release-it-preset/.github/workflows/publish.yml@main
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
+
+Or copy the full workflow for customization:
+
+```yaml
+name: Publish Package
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build:
+    uses: oorabona/release-it-preset/.github/workflows/build-dist.yml@main
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: dist
+
+      - name: Publish
+        run: pnpm release-it-preset retry-publish --ci
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_PUBLISH: 'true'
+          GITHUB_RELEASE: 'true'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+#### 4. Required Secrets
+
+Add these secrets to your repository (Settings → Secrets and variables → Actions):
+
+- **`NPM_TOKEN`**: Automation token from npmjs.com
+  - Go to npmjs.com → Access Tokens → Generate New Token
+  - Select "Automation" type
+  - Copy token and add as repository secret
+
+### Monorepo Setup
+
+For monorepos using workspaces (pnpm/npm/yarn):
+
+**.github/workflows/release-package.yml**:
+```yaml
+name: Release Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to release'
+        required: true
+        type: choice
+        options:
+          - packages/core
+          - packages/utils
+          - packages/cli
+      increment:
+        description: 'Version increment'
+        required: true
+        type: choice
+        options: [patch, minor, major]
 
 permissions:
   contents: write
@@ -32,148 +261,88 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm test
-
-      - run: pnpm build
-
-      - run: pnpm publish --provenance --access public --no-git-checks
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create GitHub Release
+      - name: Configure Git
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          pnpm tsx node_modules/@oorabona/release-it-preset/scripts/extract-changelog.ts $VERSION > RELEASE_NOTES.md
-          gh release create v$VERSION --notes-file RELEASE_NOTES.md
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Release package
+        working-directory: ${{ inputs.package }}
+        run: |
+          pnpm release-it-preset update
+          pnpm release-it-preset validate
+          pnpm release-it-preset default --ci --increment ${{ inputs.increment }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_TAG_NAME: "${{ inputs.package }}/v\${version}"
+          GIT_COMMIT_MESSAGE: "release(${{ inputs.package }}): bump v\${version}"
 ```
 
-### Changelog Validation in PRs
+### Private npm Package
 
-**.github/workflows/pr-check.yml**:
+For private packages published to npm or GitHub Packages:
+
+**.github/workflows/publish-private.yml**:
 ```yaml
-name: PR Checks
-
-on:
-  pull_request:
-    branches:
-      - main
-
-jobs:
-  changelog:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-
-      - run: pnpm install
-
-      - name: Check changelog
-        run: |
-          pnpm tsx node_modules/@oorabona/release-it-preset/scripts/populate-unreleased-changelog.ts
-          if git diff --exit-code CHANGELOG.md; then
-            echo "✅ Changelog is up to date"
-          else
-            echo "❌ Changelog needs updating"
-            git diff CHANGELOG.md
-            exit 1
-          fi
-
-### Reusable PR Validation Workflow
-
-Call the reusable workflow published by this package to run TypeScript compilation, optional tests, release validation, and PR hygiene checks with a single include:
-
-```yaml
-name: PR Checks
-
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-
-jobs:
-  validate:
-    uses: oorabona/release-it-preset/.github/workflows/reusable-verify.yml@main
-    with:
-      base-ref: origin/${{ github.base_ref }}
-      head-ref: ${{ github.sha }}
-      run-tests: true
-    secrets: inherit
-
-  summarize:
-    needs: validate
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - uses: actions/github-script@v7
-        with:
-          script: |
-            const releaseValidation = '${{ needs.validate.outputs.release_validation }}';
-            const changelogStatus = '${{ needs.validate.outputs.changelog_status }}';
-            const conventional = '${{ needs.validate.outputs.conventional_commits }}' === 'true';
-            core.summary.addHeading('PR Validation Summary');
-            core.summary.addRaw(`Release validation: ${releaseValidation === 'true' ? '✅ Passed' : '⚠️  Issues detected'}`);
-            core.summary.addRaw(`Changelog status: ${changelogStatus}`);
-            core.summary.addRaw(`Conventional commits: ${conventional ? '✅ Yes' : 'ℹ️  Not detected'}`);
-            await core.summary.write();
-```
-```
-
-### Automated Releases on Main
-
-**.github/workflows/auto-release.yml**:
-```yaml
-name: Auto Release
+name: Publish Private Package
 
 on:
   push:
-    branches:
-      - main
+    tags: ['v*']
 
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
+  packages: write
+  id-token: write
 
 jobs:
-  release:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@yourorg'
           cache: 'pnpm'
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
-      - run: pnpm test
+      - run: pnpm build
 
-      - name: Release
-        run: pnpm release --ci --no-git.requireCleanWorkingDir
+      - name: Publish to GitHub Packages
+        run: pnpm release-it-preset retry-publish --ci
         env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_PUBLISH: 'true'
+          GITHUB_RELEASE: 'true'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_ACCESS: 'restricted'
+```
+
+For private npm registry packages:
+
+```yaml
+- uses: actions/setup-node@v4
+  with:
+    node-version: 20
+    registry-url: 'https://registry.npmjs.org'
+
+- run: pnpm release-it-preset retry-publish --ci
+  env:
+    NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    NPM_PUBLISH: 'true'
+    NPM_ACCESS: 'restricted'  # For private packages
 ```
 
 ## GitLab CI
@@ -181,36 +350,62 @@ jobs:
 **.gitlab-ci.yml**:
 ```yaml
 stages:
-  - test
+  - validate
   - release
+  - publish
 
 variables:
   FF_USE_FASTZIP: "true"
+  PNPM_CACHE_FOLDER: .pnpm-store
 
-test:
-  stage: test
+cache:
+  key:
+    files:
+      - pnpm-lock.yaml
+  paths:
+    - .pnpm-store
+
+.node_setup: &node_setup
   image: node:20
   before_script:
     - corepack enable
+    - pnpm config set store-dir $PNPM_CACHE_FOLDER
     - pnpm install --frozen-lockfile
+
+validate:
+  <<: *node_setup
+  stage: validate
   script:
+    - pnpm tsc --noEmit
     - pnpm test
-    - pnpm lint
+    - pnpm release-it-preset validate --allow-dirty
 
 release:
+  <<: *node_setup
   stage: release
-  image: node:20
+  only:
+    - main
+  when: manual
+  script:
+    - git config user.name "GitLab CI"
+    - git config user.email "ci@gitlab.com"
+    - pnpm release-it-preset update
+    - pnpm release-it-preset default --ci --increment patch
+  artifacts:
+    reports:
+      dotenv: release.env
+
+publish:
+  <<: *node_setup
+  stage: publish
   only:
     - tags
-  before_script:
-    - corepack enable
-    - pnpm install --frozen-lockfile
   script:
     - pnpm build
-    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
-    - pnpm publish --provenance --access public --no-git-checks
-  after_script:
-    - rm -f .npmrc
+    - pnpm release-it-preset retry-publish --ci
+  environment:
+    name: production
+    url: https://www.npmjs.com/package/$CI_PROJECT_NAME
 ```
 
 ## CircleCI
@@ -219,16 +414,25 @@ release:
 ```yaml
 version: 2.1
 
+orbs:
+  node: circleci/node@5.1.0
+
 workflows:
   test-and-release:
     jobs:
-      - test:
+      - validate:
           filters:
             tags:
               only: /.*/
       - release:
           requires:
-            - test
+            - validate
+          filters:
+            branches:
+              only: main
+      - publish:
+          requires:
+            - validate
           filters:
             tags:
               only: /^v.*/
@@ -236,88 +440,102 @@ workflows:
               ignore: /.*/
 
 jobs:
-  test:
+  validate:
     docker:
       - image: cimg/node:20.11
     steps:
       - checkout
-      - restore_cache:
-          keys:
-            - pnpm-{{ checksum "pnpm-lock.yaml" }}
-      - run: corepack enable
-      - run: pnpm install --frozen-lockfile
-      - save_cache:
-          key: pnpm-{{ checksum "pnpm-lock.yaml" }}
-          paths:
-            - ~/.pnpm-store
+      - node/install-packages:
+          pkg-manager: pnpm
+      - run: pnpm tsc --noEmit
       - run: pnpm test
+      - run: pnpm release-it-preset validate --allow-dirty
 
   release:
     docker:
       - image: cimg/node:20.11
     steps:
       - checkout
-      - run: corepack enable
-      - run: pnpm install --frozen-lockfile
+      - node/install-packages:
+          pkg-manager: pnpm
+      - run:
+          name: Configure Git
+          command: |
+            git config user.name "CircleCI"
+            git config user.email "ci@circleci.com"
+      - run: pnpm release-it-preset update
+      - run: pnpm release-it-preset default --ci --increment patch
+
+  publish:
+    docker:
+      - image: cimg/node:20.11
+    steps:
+      - checkout
+      - node/install-packages:
+          pkg-manager: pnpm
       - run: pnpm build
-      - run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
-      - run: pnpm publish --provenance --access public --no-git-checks
+      - run:
+          name: Publish
+          command: pnpm release-it-preset retry-publish --ci
+          environment:
+            NPM_PUBLISH: 'true'
+            GITHUB_RELEASE: 'true'
 ```
 
-## Jenkins
+## Best Practices
 
-**Jenkinsfile**:
-```groovy
-pipeline {
-  agent any
+### 1. Secrets Management
 
-  environment {
-    NODE_VERSION = '20'
-  }
+- **Never commit tokens** to repository
+- Use CI platform's secrets management
+- Rotate tokens periodically
+- Use automation tokens (not personal tokens)
 
-  stages {
-    stage('Install') {
-      steps {
-        sh 'corepack enable'
-        sh 'pnpm install --frozen-lockfile'
-      }
-    }
+### 2. Dependency Caching
 
-    stage('Test') {
-      steps {
-        sh 'pnpm test'
-      }
-    }
+- Cache `node_modules` or pnpm store
+- Use lockfile-based cache keys
+- Restore caches before install
 
-    stage('Release') {
-      when {
-        tag pattern: "v\\d+\\.\\d+\\.\\d+", comparator: "REGEXP"
-      }
-      steps {
-        sh 'pnpm build'
-        withCredentials([string(credentialsId: 'npm-token', variable: 'NPM_TOKEN')]) {
-          sh 'echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc'
-          sh 'pnpm publish --provenance --access public --no-git-checks'
-        }
-      }
-    }
-  }
+### 3. Build Artifacts
 
-  post {
-    always {
-      sh 'rm -f .npmrc'
-    }
-  }
-}
+- Reuse built artifacts across jobs
+- Upload/download using artifact actions
+- Avoid rebuilding multiple times
+
+### 4. Git Configuration
+
+- Configure git user for CI commits
+- Use service account or bot user
+- Set consistent commit messages
+
+### 5. Provenance
+
+- Enable npm provenance with `id-token: write`
+- Requires Node.js 20+ and npm 9.5+
+- Provides supply chain transparency
+
+### 6. Validation
+
+- Run validation in PRs
+- Use `--allow-dirty` in CI validation
+- Check changelog before release
+
+### 7. Environment Variables
+
+Customize behavior per environment:
+
+```yaml
+env:
+  GIT_REQUIRE_BRANCH: 'main'
+  GIT_REQUIRE_CLEAN: 'true'
+  CHANGELOG_FILE: 'CHANGELOG.md'
+  NPM_ACCESS: 'public'  # or 'restricted' for private
 ```
 
-## Best Practices for CI
+### 8. Workflow Triggers
 
-1. **Use `--frozen-lockfile`** to ensure consistent dependencies
-2. **Run tests before publishing** to catch issues early
-3. **Use secrets management** for NPM_TOKEN and GITHUB_TOKEN
-4. **Enable provenance** for npm packages (`--provenance`)
-5. **Cache dependencies** to speed up builds
-6. **Use `--no-git-checks`** when publishing in CI (git operations already done)
-7. **Clean up credentials** in post steps
-8. **Validate changelog** in PR checks
+- **PR validation**: Run on every PR
+- **Release creation**: Manual trigger or automated on merge
+- **Publishing**: Automated on tag push
+- **Hotfixes**: Manual trigger with specific commit

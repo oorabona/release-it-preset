@@ -9,6 +9,24 @@ Shared [release-it](https://github.com/release-it/release-it) configuration and 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Available Configurations](#available-configurations)
+- [CLI Usage](#cli-usage)
+- [Scripts](#scripts)
+- [Environment Variables](#environment-variables)
+- [Configuration Override](#configuration-override)
+- [Borrowing Scripts & Workflows](#borrowing-scripts--workflows)
+- [Release Workflow](#release-workflow)
+- [GitHub Actions Workflows](#github-actions-workflows)
+  - [Reusable Workflows](#reusable-workflows)
+  - [Workflow Reference](#workflow-reference)
+- [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
+
 ## Features
 
 - 📦 Multiple release configurations for different scenarios
@@ -87,8 +105,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## GitHub Actions
 
-- Reuse the PR validation workflow from this package:
+### Quick Start: Reusable Workflows
 
+Import pre-configured workflows into your repository:
+
+**PR Validation:**
 ```yaml
 name: PR Checks
 
@@ -96,16 +117,40 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   validate:
     uses: oorabona/release-it-preset/.github/workflows/reusable-verify.yml@main
     with:
       base-ref: origin/${{ github.base_ref }}
       head-ref: ${{ github.sha }}
+      run-tests: true
     secrets: inherit
 ```
 
-Pair it with a follow-up job to post a summary comment using the outputs exposed by the reusable workflow (see `.github/workflows/validate-pr.yml` in this repo for a full example).
+**Publish on Tag:**
+```yaml
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    uses: oorabona/release-it-preset/.github/workflows/publish.yml@main
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
+
+📖 **[Full Reusable Workflows Documentation](examples/reusable-workflows.md)** | 📚 **[CI/CD Integration Examples](examples/ci-integration.md)**
 
 ## Available Configurations
 
@@ -665,18 +710,154 @@ jobs:
 
 This repository includes several GitHub Actions workflows for automated CI/CD and release management.
 
-### Available Workflows
+### Reusable Workflows
 
-You can copy these files into your own repository (adjusting names, branches, and secrets to match your context). They are designed to work as-is with the release-it-preset CLI defaults but feel free to trim the jobs that you don’t need.
+Two workflows are designed for reuse in your own projects:
 
-#### 1. **CI** (`.github/workflows/ci.yml`)
+#### 🔄 `reusable-verify.yml` - PR Validation & Hygiene Checks
 
-**Triggers:** Push to main, Pull Requests, Manual (workflow_dispatch)
+Validates TypeScript compilation, runs tests, checks release readiness, and evaluates PR hygiene (changelog updates, conventional commits).
+
+**When to use:** Import this workflow in your PR validation to ensure code quality and release readiness.
+
+**Inputs:**
+
+| Input | Type | Default | Description |
+|-------|------|---------|-------------|
+| `node-version` | string | `'20'` | Node.js version to use |
+| `run-tests` | boolean | `false` | Run `pnpm test` after compilation |
+| `base-ref` | string | `''` | Base ref for diff comparisons (e.g., `origin/main`) |
+| `head-ref` | string | `'HEAD'` | Head ref for comparisons |
+| `install-args` | string | `'--frozen-lockfile'` | Additional pnpm install arguments |
+| `fetch-depth` | number | `0` | Git fetch depth for checkout |
+
+**Outputs:**
+
+| Output | Description |
+|--------|-------------|
+| `release_validation` | `'true'` when release validation passes |
+| `changelog_status` | Changelog status: `updated`, `skipped`, or `missing` |
+| `skip_changelog` | `'true'` when `[skip-changelog]` detected in commits |
+| `conventional_commits` | `'true'` when conventional commits detected |
+| `commit_messages` | Base64 encoded JSON array of analyzed commit messages |
+| `changed_files` | Base64 encoded JSON array of changed files |
+
+**Example usage in your project:**
+
+```yaml
+# .github/workflows/validate-pr.yml
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    uses: oorabona/release-it-preset/.github/workflows/reusable-verify.yml@main
+    with:
+      node-version: '20'
+      base-ref: origin/${{ github.base_ref }}
+      head-ref: ${{ github.sha }}
+      run-tests: true
+    secrets: inherit
+
+  comment:
+    needs: validate
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = `## 📋 PR Validation
+
+            ${needs.validate.outputs.release_validation === 'true' ? '✅' : '⚠️'} Release validation
+            ${needs.validate.outputs.changelog_status === 'updated' ? '✅' : 'ℹ️'} Changelog: ${needs.validate.outputs.changelog_status}
+            ${needs.validate.outputs.conventional_commits === 'true' ? '✅' : 'ℹ️'} Conventional commits
+            `;
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
+```
+
+#### 🔄 `build-dist.yml` - Build Compiled Distribution
+
+Builds TypeScript sources to `dist/` and uploads as artifact for reuse in other jobs.
+
+**When to use:** When you need compiled outputs across multiple jobs without rebuilding.
+
+**Inputs:**
+
+| Input | Type | Default | Description |
+|-------|------|---------|-------------|
+| `artifact_name` | string | `'dist-build'` | Name for the uploaded dist artifact |
+| `ref` | string | (current) | Optional git ref to checkout before building |
+
+**Outputs:**
+
+| Output | Description |
+|--------|-------------|
+| `artifact_name` | Name of the uploaded dist artifact |
+
+**Example usage in your project:**
+
+```yaml
+# .github/workflows/ci.yml
+jobs:
+  build:
+    uses: oorabona/release-it-preset/.github/workflows/build-dist.yml@main
+    with:
+      artifact_name: my-dist
+      ref: ${{ github.sha }}
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: dist
+      - run: pnpm test
+```
+
+### Workflow Reference
+
+#### Overview Table
+
+| Workflow | Type | Trigger | Purpose |
+|----------|------|---------|---------|
+| 🔄 [reusable-verify.yml](#-reusable-verifyyml---pr-validation--hygiene-checks) | Reusable | `workflow_call` | PR validation & hygiene checks |
+| 🔄 [build-dist.yml](#-build-distyml---build-compiled-distribution) | Reusable | `workflow_call` | Build TypeScript distribution |
+| ⚙️ [ci.yml](#1-️-ci-github-workflowsciyml) | Standalone | Push, PR, Manual | Continuous Integration |
+| ✅ [validate-pr.yml](#2--validate-pr-github-workflowsvalidate-pryml) | Standalone | PR | Pull request validation |
+| 🚨 [hotfix.yml](#3--hotfix-release-github-workflowshotfixyml) | Manual | `workflow_dispatch` | Emergency hotfix releases |
+| 🔄 [retry-publish.yml](#4--retry-publish-github-workflowsretry-publishyml) | Manual | `workflow_dispatch` | Retry failed publishing |
+| ⚠️ [republish.yml](#5-️-republish-exceptional-github-workflowsrepublishyml) | Manual | `workflow_dispatch` | Republish existing version |
+| 📦 [publish.yml](#6--publish-github-workflowspublishyml) | Reusable | Tag push, `workflow_call` | Automated publishing |
+
+You can copy these workflows into your own repository (adjusting names, branches, and secrets to match your context). They work with the release-it-preset CLI defaults.
+
+#### 1. ⚙️ **CI** (`.github/workflows/ci.yml`)
+
+**Triggers:**
+- Push to `main`
+- Pull Requests to `main`
+- Manual (`workflow_dispatch`)
 
 **Jobs:**
-- **validate** - Validates TypeScript compilation and file structure
-- **test-cli** - Tests all CLI commands (help, check, validate, init)
-- **release** - Manual release creation (workflow_dispatch only)
+- `build-dist` - Builds compiled distribution using reusable workflow
+- `tests` - Runs unit tests with coverage
+- `test-cli` - Tests all CLI commands (help, check, validate, init)
+- `release` - Manual release creation (workflow_dispatch only)
 
 **Manual Release:**
 ```bash
@@ -684,88 +865,249 @@ You can copy these files into your own repository (adjusting names, branches, an
 # Select increment type: patch, minor, or major
 ```
 
-#### 2. **Validate PR** (`.github/workflows/validate-pr.yml`)
+**Secrets required:**
+- `NPM_TOKEN` - npm automation token (for release job)
+- `CODECOV_TOKEN` - Codecov upload token (optional)
 
-**Trigger:** Pull Request opened/updated
+#### 2. ✅ **Validate PR** (`.github/workflows/validate-pr.yml`)
 
-**What it does:**
-- Validates TypeScript compilation
-- Runs release validation checks
-- Checks if CHANGELOG.md was updated
-- Validates conventional commits format
-- Posts summary comment on PR
+**Triggers:**
+- Pull Request `opened`, `synchronize`, `reopened`
+- Can be called as reusable workflow (`workflow_call`)
 
-**Helpful for:**
-- Ensuring PRs follow best practices
-- Catching issues before merge
-- Promoting conventional commits usage
+**Jobs:**
+- `validate` - Uses `reusable-verify.yml` for hygiene checks
+- `summarize` - Posts validation summary comment on PR
 
-#### 3. **Hotfix Release** (`.github/workflows/hotfix.yml`)
+**What it checks:**
+- ✅ TypeScript compilation
+- ✅ Release validation (with `--allow-dirty`)
+- ✅ CHANGELOG.md updates (or `[skip-changelog]` marker)
+- ✅ Conventional commits format
+- ✅ Commit messages analysis
 
-**Trigger:** Manual (workflow_dispatch)
+**Permissions required:**
+```yaml
+permissions:
+  contents: read
+  pull-requests: write  # For posting comments
+```
 
-**Inputs:**
-- `increment` - patch or minor (required)
-- `commit` - Specific commit SHA (optional)
-- `dry_run` - Test without publishing (boolean)
+**No secrets required** (uses `GITHUB_TOKEN` automatically)
 
-**What it does:**
-- Validates code
-- Creates emergency hotfix release
-- Uses `release-it-preset hotfix` config
-- Auto-generates changelog from commits
+#### 3. 🚨 **Hotfix Release** (`.github/workflows/hotfix.yml`)
 
-**When to use:**
-Critical bugs that need immediate patch release.
-
-#### 4. **Retry Publish** (`.github/workflows/retry-publish.yml`)
-
-**Trigger:** Manual (workflow_dispatch)
+**Trigger:** Manual (`workflow_dispatch`)
 
 **Inputs:**
-- `tag_name` - Tag to republish (defaults to latest)
-- `npm_only` - Publish to npm only
-- `github_only` - Create GitHub Release only
+
+| Input | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `increment` | choice | ✅ | `patch` | Version bump: `patch` or `minor` |
+| `commit` | string | ❌ | latest | Specific commit SHA to release |
+| `dry_run` | boolean | ❌ | `false` | Test without actual publishing |
+
+**Jobs:**
+- `validate` - Validates TypeScript compilation and builds
+- `hotfix` - Creates emergency hotfix release and publishes
 
 **What it does:**
-- Republishes existing tag to npm and/or GitHub
-- Runs pre-flight checks
-- Extracts changelog for release notes
+1. Validates code at specified commit
+2. Auto-generates changelog from recent commits
+3. Creates hotfix release (patch/minor bump)
+4. Pushes git tag
+5. **Publishes to npm with provenance**
+6. **Creates GitHub Release**
 
-**When to use:**
-When previous publish failed (network issue, auth problem, etc.)
+**When to use:** Critical bugs needing immediate patch release
 
-#### 5. **Republish (EXCEPTIONAL)** (`.github/workflows/republish.yml`)
+**Permissions required:**
+```yaml
+permissions:
+  contents: write  # For git operations
+  id-token: write  # For npm provenance
+```
 
-**Trigger:** Manual (workflow_dispatch)
+**Secrets required:**
+- `NPM_TOKEN` - npm automation token
+- `GITHUB_TOKEN` - Provided automatically
+
+#### 4. 🔄 **Retry Publish** (`.github/workflows/retry-publish.yml`)
+
+**Trigger:** Manual (`workflow_dispatch`)
 
 **Inputs:**
-- `version` - Version to republish (e.g., 1.2.3)
-- `confirmation` - Must type "I understand the risks"
+
+| Input | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `tag_name` | string | ❌ | latest tag | Git tag to republish |
+| `npm_only` | boolean | ❌ | `false` | Publish to npm only (skip GitHub Release) |
+| `github_only` | boolean | ❌ | `false` | Create GitHub Release only (skip npm) |
+
+**Jobs:**
+- `determine-tag` - Validates and determines which tag to publish
+- `build-dist` - Builds distribution using reusable workflow
+- `retry-publish` - Republishes to npm and/or GitHub
 
 **What it does:**
-⚠️ **DANGER**: Moves existing git tag (breaks semver immutability)
-- Pre-flight safety checks
-- 10-second delay before execution
-- Validates code
-- Moves git tag to current commit
-- Updates changelog
-- Republishes to npm
-- Updates GitHub Release
-- Creates audit trail document
+1. Verifies git tag exists
+2. Runs pre-flight checks (`retry-publish.js` script)
+3. Republishes to selected destination(s)
+4. Uses existing changelog for release notes
 
-**When to use:**
-ONLY for exceptional cases where a published version has critical issues and must be replaced.
+**When to use:** Previous publish failed (network issue, auth problem, etc.)
 
-#### 6. **Publish** (`.github/workflows/publish.yml`)
+**Permissions required:**
+```yaml
+permissions:
+  contents: write  # For GitHub releases
+  id-token: write  # For npm provenance
+```
 
-**Trigger:** Tag push (v*)
+**Secrets required:**
+- `NPM_TOKEN` - npm automation token (if npm publish enabled)
+- `GITHUB_TOKEN` - Provided automatically
+
+#### 5. ⚠️ **Republish (EXCEPTIONAL)** (`.github/workflows/republish.yml`)
+
+**Trigger:** Manual (`workflow_dispatch`)
+
+**⚠️ DANGER:** Moves existing git tag (breaks semver immutability)
+
+**Inputs:**
+
+| Input | Type | Required | Description |
+|-------|------|----------|-------------|
+| `version` | string | ✅ | Version to republish (e.g., `1.2.3`) |
+| `confirmation` | string | ✅ | Must type exactly `"I understand the risks"` |
+
+**Jobs:**
+- `pre-flight-checks` - Validates confirmation, version format, and tag existence
+- `build-dist` - Builds distribution using reusable workflow
+- `validate` - Validates TypeScript compilation
+- `republish` - Moves git tag and republishes
 
 **What it does:**
-- Runs `release-it-preset retry-publish --ci` to refresh the GitHub release notes and publish to npm with provenance
-- Triggered automatically when release-it creates and pushes a tag
+1. **Pre-flight safety checks:**
+   - Validates confirmation phrase
+   - Checks version format
+   - Verifies tag exists
+   - Displays warning message
+   - **10-second safety delay** ⏰
+2. Validates code compilation
+3. **Moves git tag to current commit** (⚠️ breaks immutability)
+4. Updates changelog for current version
+5. Republishes to npm with provenance
+6. Updates GitHub Release
+7. Creates audit trail document
 
-**Note:** The workflow exports `GITHUB_RELEASE=true` and `NPM_PUBLISH=true`, so both actions happen together in CI.
+**When to use:** ONLY for exceptional emergencies where a published version has critical security issues
+
+**Permissions required:**
+```yaml
+permissions:
+  contents: write  # For git tag operations
+  id-token: write  # For npm provenance
+```
+
+**Secrets required:**
+- `NPM_TOKEN` - npm automation token
+- `GITHUB_TOKEN` - Provided automatically
+
+**Concurrency:** Prevents parallel republish operations for same version
+
+#### 6. 📦 **Publish** (`.github/workflows/publish.yml`)
+
+**Triggers:**
+- Tag push matching `v*` pattern
+- Can be called as reusable workflow (`workflow_call`)
+
+**Inputs (for `workflow_call`):**
+
+| Input | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tag` | string | ❌ | Override tag (auto-detected from `github.ref_name`) |
+
+**Jobs:**
+- `build-dist` - Builds distribution using reusable workflow
+- `publish` - Updates GitHub release and publishes to npm
+
+**What it does:**
+1. Builds compiled distribution
+2. Runs `release-it-preset retry-publish --ci`
+3. Creates/updates GitHub Release with changelog
+4. Publishes to npm with provenance attestation
+
+**When it runs:** Automatically triggered when a tag is pushed (e.g., by `default` or `hotfix` workflows)
+
+**Permissions required:**
+```yaml
+permissions:
+  contents: write  # For GitHub releases
+  id-token: write  # For npm provenance attestation
+```
+
+**Secrets required (for `workflow_call`):**
+- `NPM_TOKEN` - npm automation token (must be passed explicitly)
+
+**Secrets required (for tag push):**
+- `NPM_TOKEN` - npm automation token (repository secret)
+- `GITHUB_TOKEN` - Provided automatically
+
+**Environment variables set:**
+- `GITHUB_RELEASE=true` - Enables GitHub release creation
+- `NPM_PUBLISH=true` - Enables npm publishing
+
+---
+
+### Workflows Summary Diagram
+
+```mermaid
+graph TB
+    subgraph "Reusable Workflows"
+        RV[🔄 reusable-verify.yml<br/>PR validation & hygiene]
+        BD[🔄 build-dist.yml<br/>Build TypeScript dist]
+    end
+
+    subgraph "Development Flow"
+        PR[Pull Request] --> VPR[✅ validate-pr.yml]
+        VPR --> RV
+        VPR --> Comment[Post PR comment]
+    end
+
+    subgraph "Release Flow"
+        Manual[Manual Trigger] --> CI[⚙️ ci.yml]
+        CI --> BD
+        CI --> Tag[Create Tag]
+        Tag --> PUB[📦 publish.yml]
+        PUB --> BD
+        PUB --> NPM[npm publish]
+        PUB --> GH[GitHub Release]
+    end
+
+    subgraph "Emergency Flow"
+        Critical[Critical Bug] --> HF[🚨 hotfix.yml]
+        HF --> BD
+        HF --> Tag
+    end
+
+    subgraph "Recovery Flow"
+        Failed[Failed Publish] --> RP[🔄 retry-publish.yml]
+        RP --> BD
+        RP --> Decision{Retry What?}
+        Decision -->|npm only| NPM
+        Decision -->|GitHub only| GH
+        Decision -->|Both| Both[npm + GitHub]
+    end
+
+    style RV fill:#e1f5fe
+    style BD fill:#e1f5fe
+    style VPR fill:#c8e6c9
+    style CI fill:#fff9c4
+    style HF fill:#ffccbc
+    style RP fill:#b2ebf2
+    style PUB fill:#d1c4e9
+```
 
 ## Best Practices
 
