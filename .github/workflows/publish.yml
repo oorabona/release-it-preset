@@ -7,9 +7,9 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: 'Override tag (optional, auto-detected)'
+        description: 'Tag to publish (optional, defaults to latest tag from git describe)'
         type: string
-        required: false  # Auto detected via github.ref_name
+        required: false
     secrets:
       NPM_TOKEN:
         required: true
