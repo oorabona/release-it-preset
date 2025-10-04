@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-10-04
+
+### Fixed
+- update release validation to allow dirty working directory after changelog population and document why (workflows) ([3433ff0](https://github.com/oorabona/release-it-preset/commit/3433ff0))
+- reorder changelog population step in release process (workflows) ([3ec97bf](https://github.com/oorabona/release-it-preset/commit/3ec97bf))
+- update changelog and release validation steps to use release-it-preset commands (workflows) ([ed40bf6](https://github.com/oorabona/release-it-preset/commit/ed40bf6))
+- add workflow_call trigger to validate PR workflow (workflows) ([7dab860](https://github.com/oorabona/release-it-preset/commit/7dab860))
+- enable publish workflow to reusability, include tag input and NPM_TOKEN secret for workflow_call trigger (workflows) ([18a6b84](https://github.com/oorabona/release-it-preset/commit/18a6b84))
+- update reusable verify workflow reference for clarity (workflows) ([25c89d8](https://github.com/oorabona/release-it-preset/commit/25c89d8))
+- standardize npm auth and use release-it-preset commands (workflows) ([ea85a6a](https://github.com/oorabona/release-it-preset/commit/ea85a6a))
+- set fetch-depth to 0 for full history and tags in checkout steps ([cd2b75f](https://github.com/oorabona/release-it-preset/commit/cd2b75f))
+
+### Changed
+- add comprehensive guide for reusable workflows in CI/CD ([a9f6af5](https://github.com/oorabona/release-it-preset/commit/a9f6af5))
+- update CI/CD integration examples with modern workflows and best practices ([45a9e72](https://github.com/oorabona/release-it-preset/commit/45a9e72))
+- enhance README with reusable workflows section and detailed examples ([30a4ebd](https://github.com/oorabona/release-it-preset/commit/30a4ebd))
+- Set package-ecosystem to 'npm' in dependabot config ([89eeda0](https://github.com/oorabona/release-it-preset/commit/89eeda0))
+- add YAML document separator to build-dist.yml ([43bc7a0](https://github.com/oorabona/release-it-preset/commit/43bc7a0))
+
 ## [0.4.0] - 2025-10-04
 
 ### Added
@@ -43,7 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.5.0...HEAD
 [v0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [v0.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.2.0
@@ -52,3 +71,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.3.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.3.0
 [v0.4.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.4.0
 [0.4.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.4.0
+[v0.5.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.5.0
+[0.5.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.5.0
