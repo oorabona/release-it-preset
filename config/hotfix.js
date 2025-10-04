@@ -5,7 +5,8 @@
  * - Forces patch version increment
  * - Generates changelog from git log
  * - Populates unreleased section before bump
- * - Creates GitHub release with extracted notes
+ * - Optionally creates GitHub release with extracted notes (set GITHUB_RELEASE=true)
+ * - Optionally publishes to npm with provenance (set NPM_PUBLISH=true)
  *
  * Usage:
  * ```bash
@@ -32,12 +33,12 @@ const config = {
     ],
   },
   github: {
-    release: process.env.GITHUB_RELEASE !== 'false',
+    release: process.env.GITHUB_RELEASE === 'true',
     releaseNotes: createReleaseNotesGenerator(),
   },
   npm: {
     skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
-    publish: process.env.NPM_PUBLISH !== 'false',
+    publish: process.env.NPM_PUBLISH === 'true',
     versionArgs: ['--allow-same-version'],
     publishArgs: [
       '--provenance',

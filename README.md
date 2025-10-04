@@ -7,8 +7,8 @@ Shared [release-it](https://github.com/release-it/release-it) configuration and 
 - 📦 Multiple release configurations for different scenarios
 - 📝 Automatic changelog generation using [Keep a Changelog](https://keepachangelog.com/) format
 - 🤖 Conventional commits parsing and categorization
-- 🏷️ Git tagging and GitHub releases
-- 🚀 npm publishing with provenance
+- 🏷️ Git tagging with optional GitHub release automation
+- 🚀 npm publishing with provenance (opt-in, ideal for CI)
 - 🔄 Republish and retry mechanisms for failed releases
 - ⚡ Hotfix release support
 - 🎯 Environment variable configuration
@@ -104,7 +104,7 @@ Pair it with a follow-up job to post a summary comment using the outputs exposed
 
 ### `default` - Standard Release
 
-Full-featured release with changelog, git operations, GitHub releases, and npm publishing.
+Full-featured release with changelog, git operations, and optional GitHub/npm publishing.
 
 **CLI:**
 ```bash
@@ -122,12 +122,12 @@ Features:
 - ✅ Version bumping (interactive)
 - ✅ Automatic changelog population from conventional commits
 - ✅ Git commit, tag, and push
-- ✅ GitHub release creation
-- ✅ npm publishing with provenance
+- ☑️ GitHub release creation (set `GITHUB_RELEASE=true`)
+- ☑️ npm publishing with provenance (set `NPM_PUBLISH=true`)
 
 ### `hotfix` - Emergency Hotfix
 
-For urgent patches that need quick changelog generation from git log.
+For urgent patches that need quick changelog generation from git log (GitHub/npm remain opt-in).
 
 **CLI:**
 ```bash
@@ -145,7 +145,8 @@ Features:
 - ✅ Forced patch version increment
 - ✅ Automatic changelog from recent commits
 - ✅ Pre-bump unreleased section population
-- ✅ GitHub release with extracted notes
+- ☑️ GitHub release with extracted notes (set `GITHUB_RELEASE=true`)
+- ☑️ npm publishing with provenance (set `NPM_PUBLISH=true`)
 
 ### `changelog-only` - Changelog Preparation
 
@@ -172,7 +173,7 @@ Features:
 ### `manual-changelog` - Manual Changelog Release
 
 For releases where you've manually edited the [Unreleased] section in CHANGELOG.md.
-Skips automatic changelog generation but performs full release.
+Skips automatic changelog generation while keeping GitHub/npm steps opt-in.
 
 **Workflow:**
 ```bash
@@ -197,13 +198,13 @@ Features:
 - ✅ Preserves manual [Unreleased] edits
 - ✅ Moves [Unreleased] to versioned section
 - ✅ Git commit, tag, and push
-- ✅ GitHub release creation
-- ✅ npm publishing with provenance
+- ☑️ GitHub release creation (set `GITHUB_RELEASE=true`)
+- ☑️ npm publishing with provenance (set `NPM_PUBLISH=true`)
 - ❌ Skips automatic changelog population
 
 ### `no-changelog` - Quick Release
 
-Standard release without changelog updates.
+Standard release without changelog updates; GitHub/npm steps remain opt-in.
 
 **CLI:**
 ```bash
@@ -220,15 +221,15 @@ pnpm release-it-preset no-changelog
 Features:
 - ✅ Version bumping
 - ✅ Git operations
-- ✅ GitHub releases
-- ✅ npm publishing
+- ☑️ GitHub releases (set `GITHUB_RELEASE=true`)
+- ☑️ npm publishing (set `NPM_PUBLISH=true`)
 - ❌ No changelog updates
 
 ### `republish` - Version Republishing
 
 ⚠️ **DANGER**: Republishes existing version by moving the git tag (breaks semver immutability).
 
-Only use when you need to fix a broken release.
+Only use when you need to fix a broken release. Publishing back to npm/GitHub still requires enabling the corresponding environment flags.
 
 **CLI:**
 ```bash
@@ -245,12 +246,12 @@ pnpm release-it-preset republish
 Features:
 - ⚠️ Moves existing git tag
 - ✅ Updates changelog for current version
-- ✅ Republishes to npm
-- ✅ Updates GitHub release
+- ☑️ Republishes to npm (set `NPM_PUBLISH=true`)
+- ☑️ Updates GitHub release (set `GITHUB_RELEASE=true`)
 
 ### `retry-publish` - Retry Failed Publishing
 
-Retries npm/GitHub publishing for an existing tag without modifying git history.
+Retries npm/GitHub publishing for an existing tag without modifying git history; opt in to each surface via `NPM_PUBLISH` and `GITHUB_RELEASE`.
 
 **CLI:**
 ```bash
@@ -271,8 +272,8 @@ pnpm release-it-preset retry-publish
 ```
 
 Features:
-- ✅ Republishes to npm
-- ✅ Updates GitHub release
+- ☑️ Republishes to npm (set `NPM_PUBLISH=true`)
+- ☑️ Updates GitHub release (set `GITHUB_RELEASE=true`)
 - ❌ No version increment
 - ❌ No git operations
 
@@ -470,13 +471,15 @@ Customize behavior with environment variables:
 - `GIT_REMOTE` - Git remote name (default: `origin`)
 
 ### GitHub
-- `GITHUB_RELEASE` - Enable GitHub releases (default: `true`)
+- `GITHUB_RELEASE` - Enable GitHub releases (default: `false`)
 - `GITHUB_REPOSITORY` - Repository in `owner/repo` format (auto-detected from git remote)
 
 ### npm
-- `NPM_PUBLISH` - Enable npm publishing (default: `true`)
+- `NPM_PUBLISH` - Enable npm publishing (default: `false`)
 - `NPM_SKIP_CHECKS` - Skip npm checks (default: `false`)
 - `NPM_ACCESS` - npm access level (default: `public`)
+
+> ℹ️  By default, the presets skip GitHub releases and npm publishing. Set `GITHUB_RELEASE=true` and/or `NPM_PUBLISH=true` in the environment (typically in CI) when you are ready to perform those steps.
 
 ### Example
 
@@ -532,11 +535,11 @@ You can override any configuration in your project's `.release-it.json`:
    - Execute `pnpm run release:manual-changelog` to release
      - This skips changelog regeneration, preserving your edits
      - Bumps version, moves [Unreleased] to versioned section
-     - Creates release commit + tag, pushes to origin, creates GitHub release
+    - Creates release commit + tag and pushes to origin (GitHub release happens later if `GITHUB_RELEASE=true` in CI)
 
    **If you change your mind mid-release:** If you started with Option A but want to add manual edits when prompted `Commit (release: bump vX.Y.Z)?`, answer **No**, then press Ctrl+C to abort. Edit your `CHANGELOG.md`, then run `pnpm run release:manual-changelog` instead. Alternatively, re-run `pnpm release` and select the same version again (the preset's `--allow-same-version` makes this safe).
 
-4. **Note:** npm publish is skipped locally; the publish workflow handles it after the tag push
+4. **Note:** GitHub releases and npm publish are skipped locally by default. Enable them with environment variables or let the `publish.yml` workflow handle both steps after the tag push.
 
 ```mermaid
 flowchart TD
@@ -563,10 +566,10 @@ flowchart TD
 
 ### Why This Workflow?
 
-- **GitHub release created by release-it** (locally) - Uses GITHUB_TOKEN with proper permissions
-- **npm publish done by CI** - Uses NPM_TOKEN with provenance attestation
-- **Separation of concerns** - Version control (git) vs package distribution (npm)
-- **Better security** - CI has minimal permissions, only publish to npm
+- **Single CI entry point** - Tag pushes run the `retry-publish` preset, which updates the GitHub release and publishes to npm with provenance in one command.
+- **Local runs stay safe** - Without `GITHUB_RELEASE=true` or `NPM_PUBLISH=true`, the presets only handle changelog updates, commits, and tags.
+- **Better security** - Publishing requires CI credentials (GITHUB_TOKEN + NPM_TOKEN), keeping local environments token-free by default.
+- **Predictable outputs** - Release notes are regenerated from the committed changelog, avoiding drift between local runs and CI.
 
 ### GitHub Actions Setup
 
@@ -581,7 +584,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write
   id-token: write  # For npm provenance
 
 jobs:
@@ -600,16 +603,23 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm publish --provenance --access public --no-git-checks
+      - run: pnpm build
+
+      - name: Update GitHub release and publish to npm
+        run: pnpm release-it-preset retry-publish --ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_PUBLISH: 'true'
+          GITHUB_RELEASE: 'true'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 **Required Secrets:**
 - `NPM_TOKEN` - Automation token from npmjs.com (Settings → Access Tokens → Generate New Token → Automation)
+- `GITHUB_TOKEN` is provided automatically by GitHub Actions (no manual secret needed)
 
 **Required Permissions (locally):**
-- `GITHUB_TOKEN` environment variable with `repo` scope for creating GitHub releases
+- Set `GITHUB_RELEASE=true` and/or `NPM_PUBLISH=true` only when you explicitly want to perform those actions from your machine. Provide `GITHUB_TOKEN`/`NODE_AUTH_TOKEN` as needed.
 
 ### Alternative: Full CI Release
 
@@ -639,6 +649,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_RELEASE: 'true'
+          NPM_PUBLISH: 'true'
 ```
 
 ## GitHub Actions Workflows
@@ -742,10 +754,10 @@ ONLY for exceptional cases where a published version has critical issues and mus
 **Trigger:** Tag push (v*)
 
 **What it does:**
-- Publishes package to npm with provenance
+- Runs `release-it-preset retry-publish --ci` to refresh the GitHub release notes and publish to npm with provenance
 - Triggered automatically when release-it creates and pushes a tag
 
-**Note:** GitHub Release is created by release-it locally, not by this workflow.
+**Note:** The workflow exports `GITHUB_RELEASE=true` and `NPM_PUBLISH=true`, so both actions happen together in CI.
 
 ## Best Practices
 
@@ -754,8 +766,8 @@ ONLY for exceptional cases where a published version has critical issues and mus
 3. **Validate before releasing** - Run `pnpm release-it-preset validate` to catch issues early
 4. **Test releases** - Use `--dry-run` flag to test without publishing
 5. **Protect main branch** - Require PR reviews before merging
-6. **Use CI for npm publish** - Let GitHub Actions handle npm publishing with provenance
-7. **Separate concerns** - Create releases locally (git/GitHub), publish to npm in CI
+6. **Use CI for publishing** - Let GitHub Actions handle GitHub releases and npm publishing with provenance
+7. **Local runs are for prep** - Keep local runs focused on changelog, versioning, and tagging unless you explicitly opt in to publish
 
 ## Troubleshooting
 
@@ -768,9 +780,9 @@ pnpm release-it-preset update
 
 ### GitHub releases failing
 
-Ensure you have a `GITHUB_TOKEN` with `repo` scope:
+Ensure you have a `GITHUB_TOKEN` with `repo` scope and opt in to GitHub releases:
 ```bash
-GITHUB_TOKEN=your_token pnpm release-it-preset default
+GITHUB_RELEASE=true GITHUB_TOKEN=your_token pnpm release-it-preset default
 ```
 
 Or use GitHub CLI authentication:
@@ -786,6 +798,8 @@ Check that:
 2. Token is an **automation token** (not a publish token)
 3. Token has permission to publish the package
 4. Package name is available (not already taken)
+
+Remember to export `NPM_PUBLISH=true` (and `GITHUB_RELEASE=true` if you expect a GitHub release) in the workflow or shell where you invoke release-it.
 
 Test locally:
 ```bash

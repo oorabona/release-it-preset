@@ -4,8 +4,8 @@
  * This configuration retries publishing an existing version that failed:
  * - No version increment
  * - No git operations
- * - Only npm publish
- * - Updates GitHub release
+ * - Optionally runs npm publish with provenance (set NPM_PUBLISH=true)
+ * - Optionally updates GitHub release (set GITHUB_RELEASE=true)
  *
  * Usage:
  * First run the retry script to checkout the tag:
@@ -22,7 +22,7 @@ const config = {
   git: false,
   npm: {
     skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
-    publish: process.env.NPM_PUBLISH !== 'false',
+    publish: process.env.NPM_PUBLISH === 'true',
     versionArgs: ['--allow-same-version'],
     publishArgs: [
       '--provenance',
@@ -31,7 +31,7 @@ const config = {
     ],
   },
   github: {
-    release: process.env.GITHUB_RELEASE !== 'false',
+    release: process.env.GITHUB_RELEASE === 'true',
     update: true,
     releaseNotes: createReleaseNotesGenerator(),
   },

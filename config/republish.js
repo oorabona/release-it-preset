@@ -8,6 +8,10 @@
  * - Fix a broken release
  * - Republish with corrected artifacts
  *
+ * Publishing steps remain opt-in:
+ * - Set GITHUB_RELEASE=true to update the GitHub release
+ * - Set NPM_PUBLISH=true to republish to npm with provenance
+ *
  * Usage:
  * ```bash
  * pnpm release-it --config node_modules/@oorabona/release-it-preset/config/republish.js
@@ -38,7 +42,7 @@ const config = {
   },
   npm: {
     skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
-    publish: process.env.NPM_PUBLISH !== 'false',
+      publish: process.env.NPM_PUBLISH === 'true',
     versionArgs: ['--allow-same-version'],
     publishArgs: [
       '--provenance',
@@ -47,7 +51,7 @@ const config = {
     ],
   },
   github: {
-    release: process.env.GITHUB_RELEASE !== 'false',
+      release: process.env.GITHUB_RELEASE === 'true',
     update: true,
     releaseNotes: createReleaseNotesGenerator(),
   },

@@ -4,8 +4,8 @@
  * This configuration disables changelog generation for quick releases:
  * - Skips changelog updates
  * - Still performs git operations
- * - Still publishes to npm
- * - Still creates GitHub releases
+ * - Optionally publishes to npm (set NPM_PUBLISH=true)
+ * - Optionally creates GitHub releases (set GITHUB_RELEASE=true)
  *
  * Usage:
  * ```bash
@@ -23,11 +23,11 @@ const config = {
     requireCleanWorkingDir: process.env.GIT_REQUIRE_CLEAN === 'true',
   },
   github: {
-    release: process.env.GITHUB_RELEASE !== 'false',
+    release: process.env.GITHUB_RELEASE === 'true',
   },
   npm: {
     skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
-    publish: process.env.NPM_PUBLISH !== 'false',
+    publish: process.env.NPM_PUBLISH === 'true',
     versionArgs: ['--allow-same-version'],
     publishArgs: [
       '--provenance',

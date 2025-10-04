@@ -111,9 +111,9 @@ export function getEnvironmentVariables(deps: CheckConfigDeps): Record<string, s
     ['GIT_REQUIRE_UPSTREAM', 'false'],
     ['GIT_REQUIRE_CLEAN', 'false'],
     ['GIT_REMOTE', 'origin'],
-    ['GITHUB_RELEASE', 'true'],
+  ['GITHUB_RELEASE', 'false'],
     ['GITHUB_REPOSITORY'],
-    ['NPM_PUBLISH', 'true'],
+  ['NPM_PUBLISH', 'false'],
     ['NPM_SKIP_CHECKS', 'false'],
     ['NPM_ACCESS', 'public'],
   ];

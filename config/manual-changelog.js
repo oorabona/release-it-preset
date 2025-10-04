@@ -6,8 +6,8 @@
  * - Skips automatic changelog population (no before:bump hook)
  * - Moves your manual [Unreleased] content to the version section (after:bump)
  * - Creates git commit, tag, and push
- * - Creates GitHub release with your manual changelog
- * - Publishes to npm with provenance
+ * - Optionally creates GitHub release with your manual changelog (set GITHUB_RELEASE=true)
+ * - Optionally publishes to npm with provenance (set NPM_PUBLISH=true)
  *
  * Typical workflow:
  * 1. Run `pnpm release-it-preset update` to generate initial changelog
@@ -46,12 +46,12 @@ const config = {
     ],
   },
   github: {
-    release: process.env.GITHUB_RELEASE !== 'false',
+    release: process.env.GITHUB_RELEASE === 'true',
     releaseNotes: createReleaseNotesGenerator(),
   },
   npm: {
     skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
-    publish: process.env.NPM_PUBLISH !== 'false',
+    publish: process.env.NPM_PUBLISH === 'true',
     versionArgs: ['--allow-same-version'],
     publishArgs: [
       '--provenance',

@@ -4,8 +4,8 @@
  * This configuration provides a complete release workflow with:
  * - Keep a Changelog format
  * - Git commit, tag, and push
- * - GitHub releases
- * - npm publishing with provenance
+ * - Optional GitHub releases (set GITHUB_RELEASE=true)
+ * - Optional npm publishing with provenance (set NPM_PUBLISH=true)
  *
  * Usage in client project:
  * ```json
@@ -36,12 +36,12 @@ const config = {
     ],
   },
   github: {
-    release: process.env.GITHUB_RELEASE !== 'false',
+    release: process.env.GITHUB_RELEASE === 'true',
     releaseNotes: createReleaseNotesGenerator(),
   },
   npm: {
     skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
-    publish: process.env.NPM_PUBLISH !== 'false',
+    publish: process.env.NPM_PUBLISH === 'true',
     versionArgs: ['--allow-same-version'],
     publishArgs: [
       '--provenance',
