@@ -909,13 +909,15 @@ permissions:
 
 **Jobs:**
 - `validate` - Validates TypeScript compilation and builds
-- `hotfix` - Creates emergency hotfix release using `release-it-preset hotfix`
+- `hotfix` - Creates emergency hotfix release and publishes
 
 **What it does:**
 1. Validates code at specified commit
 2. Auto-generates changelog from recent commits
 3. Creates hotfix release (patch/minor bump)
-4. Pushes git tag (GitHub release + npm publish via `publish.yml`)
+4. Pushes git tag
+5. **Publishes to npm with provenance**
+6. **Creates GitHub Release**
 
 **When to use:** Critical bugs needing immediate patch release
 
