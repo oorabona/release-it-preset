@@ -21,10 +21,16 @@ permissions:
   contents: read
 
 jobs:
-  validate:
-    name: Validate
+  build-dist:
+    uses: ./.github/workflows/build-dist.yml
+    with:
+      artifact_name: dist-build
+
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
     if: github.event_name != 'workflow_dispatch'
+    needs: build-dist
 
     steps:
       - name: Checkout code
@@ -42,37 +48,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check TypeScript compilation
-        run: pnpm tsc --noEmit
-
-      - name: Build compiled scripts
-        run: pnpm build
-
-      - name: Validate configuration files
-        run: |
-          echo "✅ Checking config files exist..."
-          test -f config/default.js
-          test -f config/hotfix.js
-          test -f config/changelog-only.js
-          test -f config/no-changelog.js
-          test -f config/republish.js
-          test -f config/retry-publish.js
-          echo "✅ All config files present"
-
-      - name: Validate script files
-        run: |
-          echo "✅ Checking script files exist..."
-          test -f scripts/populate-unreleased-changelog.ts
-          test -f scripts/extract-changelog.ts
-          test -f scripts/republish-changelog.ts
-          test -f scripts/retry-publish.ts
-          test -f scripts/init-project.ts
-          test -f scripts/validate-release.ts
-          test -f scripts/check-config.ts
-          echo "✅ All script files present"
-
-      - name: Run unit tests
-        run: pnpm test
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-dist.outputs.artifact_name }}
+          path: .
 
       - name: Run tests with coverage
         run: pnpm test:coverage
@@ -92,7 +72,7 @@ jobs:
     name: Test CLI
     runs-on: ubuntu-latest
     if: github.event_name != 'workflow_dispatch'
-    needs: validate
+    needs: [build-dist, tests]
 
     steps:
       - name: Checkout code
@@ -109,6 +89,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-dist.outputs.artifact_name }}
+          path: .
 
       - name: Test CLI help
         run: node bin/cli.js --help
@@ -144,6 +130,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
+    needs: build-dist
     permissions:
       contents: write
       id-token: write
@@ -172,6 +159,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-dist.outputs.artifact_name }}
+          path: .
 
       - name: Update changelog
         run: node dist/scripts/populate-unreleased-changelog.js

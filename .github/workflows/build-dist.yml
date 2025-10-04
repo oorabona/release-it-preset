@@ -1,0 +1,60 @@
+name: Build Distribution Artifact
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: Name used for the uploaded dist artifact
+        required: false
+        default: dist-build
+        type: string
+      ref:
+        description: Optional git ref to checkout before building
+        required: false
+        type: string
+    outputs:
+      artifact_name:
+        description: Name of the uploaded dist artifact
+        value: ${{ jobs.build.outputs.artifact_name }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_name: ${{ steps.set-artifact-name.outputs.value }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build distribution
+        run: pnpm build
+
+      - name: Set artifact name
+        id: set-artifact-name
+        run: echo "value=${{ inputs.artifact_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: dist
+          if-no-files-found: error

@@ -23,9 +23,12 @@ permissions:
   id-token: write
 
 jobs:
-  retry-publish:
-    name: Retry Publishing
+  determine-tag:
+    name: Determine Tag
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
 
     steps:
       - name: Checkout code
@@ -54,10 +57,24 @@ jobs:
           fi
           echo "✅ Tag ${{ steps.tag.outputs.tag }} exists"
 
+  build-dist:
+    uses: ./.github/workflows/build-dist.yml
+    needs: determine-tag
+    with:
+      artifact_name: dist-build
+      ref: ${{ needs.determine-tag.outputs.tag }}
+
+  retry-publish:
+    name: Retry Publishing
+    runs-on: ubuntu-latest
+    needs: [determine-tag, build-dist]
+
+    steps:
       - name: Checkout tag
-        run: |
-          git checkout ${{ steps.tag.outputs.tag }}
-          echo "Current commit: $(git rev-parse HEAD)"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.determine-tag.outputs.tag }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -72,8 +89,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build compiled scripts
-        run: pnpm build
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-dist.outputs.artifact_name }}
+          path: .
+
+      - name: Show current commit
+        run: |
+          echo "Current commit: $(git rev-parse HEAD)"
 
       - name: Run pre-flight checks
         run: node dist/scripts/retry-publish.js
@@ -88,7 +112,7 @@ jobs:
         if: inputs.npm_only == false
         id: changelog
         run: |
-          NOTES=$(node dist/scripts/extract-changelog.js ${{ steps.tag.outputs.version }} || echo "Release ${{ steps.tag.outputs.tag }}")
+          NOTES=$(node dist/scripts/extract-changelog.js ${{ needs.determine-tag.outputs.version }} || echo "Release ${{ needs.determine-tag.outputs.tag }}")
           echo "notes<<EOF" >> $GITHUB_OUTPUT
           echo "$NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -97,8 +121,8 @@ jobs:
         if: inputs.npm_only == false
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: Release ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ needs.determine-tag.outputs.tag }}
+          name: Release ${{ needs.determine-tag.outputs.tag }}
           body: ${{ steps.changelog.outputs.notes }}
           draft: false
           prerelease: false
@@ -106,8 +130,8 @@ jobs:
       - name: Display result
         run: |
           echo "✅ Retry publish completed"
-          echo "Tag: ${{ steps.tag.outputs.tag }}"
-          echo "Version: ${{ steps.tag.outputs.version }}"
+          echo "Tag: ${{ needs.determine-tag.outputs.tag }}"
+          echo "Version: ${{ needs.determine-tag.outputs.version }}"
           echo ""
           if [ "${{ inputs.npm_only }}" == "true" ]; then
             echo "📦 Published to npm only"

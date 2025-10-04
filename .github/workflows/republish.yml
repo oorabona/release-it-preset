@@ -82,10 +82,17 @@ jobs:
           sleep 10
           echo "✅ Proceeding with republish operation"
 
+  build-dist:
+    name: Build Dist Artifact
+    needs: pre-flight-checks
+    uses: ./.github/workflows/build-dist.yml
+    with:
+      artifact_name: dist-build
+
   validate:
     name: Validate Code
     runs-on: ubuntu-latest
-    needs: pre-flight-checks
+    needs: [pre-flight-checks, build-dist]
 
     steps:
       - name: Checkout code
@@ -106,13 +113,10 @@ jobs:
       - name: Check TypeScript compilation
         run: pnpm tsc --noEmit
 
-      - name: Build compiled scripts
-        run: pnpm build
-
   republish:
     name: Republish Version
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [validate, build-dist]
 
     steps:
       - name: Checkout code
@@ -138,6 +142,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-dist.outputs.artifact_name }}
+          path: .
 
       - name: Update package.json version
         run: |

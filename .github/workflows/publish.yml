@@ -10,8 +10,14 @@ permissions:
   id-token: write
 
 jobs:
+  build-dist:
+    uses: ./.github/workflows/build-dist.yml
+    with:
+      artifact_name: dist-build
+
   publish:
     runs-on: ubuntu-latest
+    needs: build-dist
 
     steps:
       - name: Checkout code
@@ -30,8 +36,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build scripts
-        run: pnpm build
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-dist.outputs.artifact_name }}
+          path: .
 
       - name: Update GitHub release and publish to npm
         run: pnpm release-it-preset retry-publish --ci
