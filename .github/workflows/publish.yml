@@ -40,7 +40,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ needs.build-dist.outputs.artifact_name }}
-          path: .
+          path: dist
 
       - name: Update GitHub release and publish to npm
         run: pnpm release-it-preset retry-publish --ci

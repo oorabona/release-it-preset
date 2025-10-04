@@ -147,7 +147,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ needs.build-dist.outputs.artifact_name }}
-          path: .
+          path: dist
 
       - name: Update package.json version
         run: |

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-10-04
+
+### Changed
+- CI now compiles release scripts once and shares the `dist` artifact across jobs to avoid redundant builds and keep CLI tests aligned with published output. ([ca2d289](https://github.com/oorabona/release-it-preset/commit/ca2d289))
+
 ## [0.2.0] - 2025-10-04
 
 ### Added
@@ -26,8 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.3.0...HEAD
 [v0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [v0.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.2.0
 [0.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.2.0
+[v0.3.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.3.0
+[0.3.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.3.0

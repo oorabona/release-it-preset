@@ -52,7 +52,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ needs.build-dist.outputs.artifact_name }}
-          path: .
+          path: dist
 
       - name: Run tests with coverage
         run: pnpm test:coverage
@@ -94,7 +94,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ needs.build-dist.outputs.artifact_name }}
-          path: .
+          path: dist
 
       - name: Test CLI help
         run: node bin/cli.js --help
@@ -164,7 +164,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ needs.build-dist.outputs.artifact_name }}
-          path: .
+          path: dist
 
       - name: Update changelog
         run: node dist/scripts/populate-unreleased-changelog.js
