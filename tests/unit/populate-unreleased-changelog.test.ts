@@ -207,6 +207,27 @@ describe('populate-unreleased-changelog (with DI)', () => {
       expect(result).toContain('Just a random commit message')
     })
 
+    it('should ignore release commits parsed as conventional', () => {
+      const gitOutput = 'abc1234|release: bump version|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toBe('No changes yet.')
+    })
+
+    it('should ignore release commits without conventional formatting', () => {
+      const gitOutput = 'abc1234|Release v0.3.0|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toBe('No changes yet.')
+    })
+
+    it('should ignore release-please commits with dash in prefix', () => {
+      const gitOutput = 'abc1234|release-please: cut release v0.4.0|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toBe('No changes yet.')
+    })
+
     it('should return "No changes yet" when no valid commits', () => {
       const gitOutput = 'abc1234|ci: update workflow|||END|||'
       const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
