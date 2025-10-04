@@ -187,11 +187,14 @@ jobs:
           name: ${{ needs.build-dist.outputs.artifact_name }}
           path: dist
 
-      - name: Update changelog
-        run: node dist/scripts/populate-unreleased-changelog.js
+      - name: Run pnpm release-it-preset check
+        run: pnpm release-it-preset check
 
+      - name: Populate changelog
+        run: pnpm release-it-preset update
+        
       - name: Validate release readiness
-        run: node dist/scripts/validate-release.js
+        run: pnpm release-it-preset validate
 
       - name: Run release
         run: pnpm release-it-preset default --ci --increment ${{ inputs.increment }}
