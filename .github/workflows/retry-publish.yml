@@ -83,8 +83,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
+
+      - name: Configure npm authentication
+        run: npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -102,30 +106,24 @@ jobs:
       - name: Run pre-flight checks
         run: node dist/scripts/retry-publish.js
 
-      - name: Publish to npm
-        if: inputs.github_only == false
-        run: pnpm publish --provenance --access public --no-git-checks
+      - name: Retry publish with release-it-preset
+        run: |
+          if [ "${{ inputs.github_only }}" == "true" ]; then
+            export NPM_PUBLISH=false
+          else
+            export NPM_PUBLISH=true
+          fi
+
+          if [ "${{ inputs.npm_only }}" == "true" ]; then
+            export GITHUB_RELEASE=false
+          else
+            export GITHUB_RELEASE=true
+          fi
+
+          pnpm release-it-preset retry-publish --ci
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Extract changelog for release notes
-        if: inputs.npm_only == false
-        id: changelog
-        run: |
-          NOTES=$(node dist/scripts/extract-changelog.js ${{ needs.determine-tag.outputs.version }} || echo "Release ${{ needs.determine-tag.outputs.tag }}")
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Create or update GitHub Release
-        if: inputs.npm_only == false
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.determine-tag.outputs.tag }}
-          name: Release ${{ needs.determine-tag.outputs.tag }}
-          body: ${{ steps.changelog.outputs.notes }}
-          draft: false
-          prerelease: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Display result
         run: |

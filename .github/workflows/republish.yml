@@ -132,8 +132,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
+
+      - name: Configure npm authentication
+        run: npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Configure Git
         run: |
@@ -149,62 +153,13 @@ jobs:
           name: ${{ needs.build-dist.outputs.artifact_name }}
           path: dist
 
-      - name: Update package.json version
-        run: |
-          npm version ${{ inputs.version }} --no-git-tag-version
-          echo "✅ Updated package.json to version ${{ inputs.version }}"
-
-      - name: Run republish changelog script
-        run: node dist/scripts/republish-changelog.js
-
-      - name: Commit changelog changes
-        run: |
-          git add CHANGELOG.md package.json
-          git commit -m "chore: republish v${{ inputs.version }}" || echo "No changes to commit"
-
-      - name: Move git tag
-        run: |
-          TAG="v${{ inputs.version }}"
-          OLD_COMMIT=$(git rev-parse $TAG)
-          NEW_COMMIT=$(git rev-parse HEAD)
-
-          echo "Moving tag $TAG from $OLD_COMMIT to $NEW_COMMIT"
-
-          git tag -d $TAG
-          git tag -a $TAG -m "Release $TAG (republished)"
-          git push origin :refs/tags/$TAG
-          git push origin $TAG --force
-
-          echo "✅ Tag moved successfully"
-
-      - name: Publish to npm
-        run: pnpm publish --provenance --access public --no-git-checks
+      - name: Republish with release-it-preset
+        run: pnpm release-it-preset republish --ci
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Extract changelog for release notes
-        id: changelog
-        run: |
-          NOTES=$(node dist/scripts/extract-changelog.js ${{ inputs.version }} || echo "Release v${{ inputs.version }}")
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Update GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ inputs.version }}
-          name: Release v${{ inputs.version }}
-          body: |
-            ${{ steps.changelog.outputs.notes }}
-
-            ---
-            ⚠️ **This version was republished (timestamp will appear in audit trail)**
-
-            Republished by: @${{ github.actor }}
-            Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          draft: false
-          prerelease: false
+          NPM_PUBLISH: 'true'
+          GITHUB_RELEASE: 'true'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create audit trail
         run: |
