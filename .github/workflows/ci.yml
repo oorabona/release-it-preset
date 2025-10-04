@@ -202,15 +202,18 @@ jobs:
       - name: Validate release readiness
         run: pnpm release-it-preset validate --allow-dirty
 
-      - name: Run release
+      - name: Run release and publish
         run: pnpm release-it-preset default --ci --increment ${{ inputs.increment }}
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_PUBLISH: 'false'  # npm publish handled by publish.yml
+          NPM_PUBLISH: 'true'      # ✅ Publish to npm with provenance
+          GITHUB_RELEASE: 'true'   # ✅ Create GitHub Release
 
-      - name: Display release info
+      - name: Display release and publish info
         run: |
-          echo "✅ Release completed successfully"
-          echo "Tag created: $(git describe --tags --abbrev=0)"
-          echo "Commit: $(git rev-parse HEAD)"
+          echo "✅ Release and publish completed successfully"
+          echo "Version: $(node -p \"require('./package.json').version\")"
+          echo "Tag: $(git describe --tags --abbrev=0)"
+          echo "npm: https://www.npmjs.com/package/@oorabona/release-it-preset"
+          echo "GitHub: https://github.com/${{ github.repository }}/releases/tag/$(git describe --tags --abbrev=0)"
