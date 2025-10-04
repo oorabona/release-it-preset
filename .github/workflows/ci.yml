@@ -111,20 +111,33 @@ jobs:
       - name: Test check command
         run: node dist/scripts/check-config.js
 
-      - name: Test validate command (allow dirty)
-        run: node dist/scripts/validate-release.js --allow-dirty
-
-      - name: Test init command in temp directory
+      - name: Test init and validate commands in temp project
         run: |
-          mkdir -p /tmp/test-init
-          cd /tmp/test-init
+          PROJECT_DIR=$(mktemp -d)
+          pushd "$PROJECT_DIR" >/dev/null
+
           git init
           git config user.name "Test User"
           git config user.email "test@example.com"
+
+          cat <<'PKG' > package.json
+          {
+            "name": "ci-fixture",
+            "version": "0.0.0",
+            "private": true
+          }
+          PKG
+
           node $GITHUB_WORKSPACE/bin/cli.js init --yes
+
           test -f CHANGELOG.md
           test -f .release-it.json
-          echo "✅ Init command created expected files"
+
+          NPM_TOKEN=dummy-ci-token node $GITHUB_WORKSPACE/dist/scripts/validate-release.js --allow-dirty
+
+          popd >/dev/null
+
+          echo "✅ Init and validate commands succeeded in temp project"
 
   release:
     name: Release
