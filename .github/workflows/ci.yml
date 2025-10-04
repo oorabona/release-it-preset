@@ -190,12 +190,18 @@ jobs:
       - name: Run pnpm release-it-preset check
         run: pnpm release-it-preset check
 
-      - name: Validate release readiness
-        run: pnpm release-it-preset validate
-        
+      # We populate the changelog before validation to ensure [Unreleased] section is not empty
+      # which would cause validate to fail
       - name: Populate changelog
         run: pnpm release-it-preset update
-          
+
+      # But since changelog population creates a modification, the working directory
+      # is no longer clean, so we need to validate with --allow-dirty
+      # Alternatively, we could commit the changelog update, but that would create noise
+      # in the commit history for every release
+      - name: Validate release readiness
+        run: pnpm release-it-preset validate --allow-dirty
+
       - name: Run release
         run: pnpm release-it-preset default --ci --increment ${{ inputs.increment }}
         env:
