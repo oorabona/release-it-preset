@@ -18,11 +18,12 @@
  * ```
  */
 
-import { createReleaseNotesGenerator, runScriptCommand } from './helpers.js';
+import { createReleaseNotesGenerator, getGitChangelogCommand, runScriptCommand } from './helpers.js';
 
 const config = {
   increment: false,
   git: {
+    changelog: getGitChangelogCommand(),
     commitMessage: process.env.GIT_COMMIT_MESSAGE || 'chore: republish v${version}',
     tagName: process.env.GIT_TAG_NAME || 'v${version}',
     tagAnnotation: 'Release ${version} (republished)',

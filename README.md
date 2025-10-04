@@ -476,6 +476,7 @@ Customize behavior with environment variables:
 - `GIT_REQUIRE_UPSTREAM` - Require upstream tracking (default: `false`)
 - `GIT_REQUIRE_CLEAN` - Require clean working directory (default: `false`)
 - `GIT_REMOTE` - Git remote name (default: `origin`)
+- `GIT_CHANGELOG_COMMAND` - Override the git log command used for previews (default filters out release/hotfix/ci commits)
 
 ### GitHub
 - `GITHUB_RELEASE` - Enable GitHub releases (default: `false`)

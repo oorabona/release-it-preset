@@ -14,12 +14,12 @@
  * ```
  */
 
-import { createReleaseNotesGenerator, runScriptCommand } from './helpers.js';
+import { createReleaseNotesGenerator, getGitChangelogCommand, runScriptCommand } from './helpers.js';
 
 const config = {
   increment: process.env.HOTFIX_INCREMENT || 'patch',
   git: {
-    changelog: 'git log --pretty=format:"- %s" ${latestTag}..HEAD',
+    changelog: getGitChangelogCommand(),
     commitMessage: process.env.GIT_COMMIT_MESSAGE || 'hotfix: bump v${version}',
     tagName: process.env.GIT_TAG_NAME || 'v${version}',
     requireBranch: process.env.GIT_REQUIRE_BRANCH || 'main',

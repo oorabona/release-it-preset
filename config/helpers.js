@@ -5,6 +5,20 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const RUN_SCRIPT_PATH = join(__dirname, '..', 'bin', 'run-script.js');
+const DEFAULT_CHANGELOG_COMMAND = [
+  'git log',
+  '--pretty=format:"* %s (%h)"',
+  '${from}..${to}',
+  '--grep="^release"',
+  '--grep="^Release"',
+  '--grep="^release-"',
+  '--grep="^Release-"',
+  '--grep="^hotfix"',
+  '--grep="^Hotfix"',
+  '--grep="^ci"',
+  '--grep="^CI"',
+  '--invert-grep',
+].join(' ');
 
 const DOUBLE_QUOTE = /["\\]/g;
 
@@ -49,4 +63,8 @@ export function createReleaseNotesGenerator() {
     const output = result.stdout?.trim();
     return output ? `${output}\n` : fallbackReleaseNotes(version);
   };
+}
+
+export function getGitChangelogCommand() {
+  return process.env.GIT_CHANGELOG_COMMAND || DEFAULT_CHANGELOG_COMMAND;
 }
