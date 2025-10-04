@@ -22,7 +22,7 @@
   },
   "homepage": "https://github.com/oorabona/release-it-preset#readme",
   "bin": {
-    "release-it-preset": "./bin/cli.js"
+    "release-it-preset": "bin/cli.js"
   },
   "exports": {
     "./config/default": "./config/default.js",

@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2025-10-03
+## [0.1.0] - 2025-10-04
 
 ### Added
-- update README and configuration to support retrying releases with the same version ([fe6df16](https://github.com/oorabona/release-it-preset/commit/fe6df16))
+- add manual changelog release configuration and update CLI commands ([5f9d4b7](https://github.com/oorabona/release-it-preset/commit/5f9d4b7))
+- update README and configuration to support retrying releases with the same version ([cd4c0d8](https://github.com/oorabona/release-it-preset/commit/cd4c0d8))
 - add unit tests for retry-publish, semver-utils, and validate-release (tests) ([6679e79](https://github.com/oorabona/release-it-preset/commit/6679e79))
     - Implemented unit tests for the retry-publish script, covering various scenarios including readiness checks, error handling, and logging.
     - Added tests for semver-utils to validate and normalize semantic versioning.
@@ -18,8 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Introduced TypeScript configuration for better type checking and module resolution.
     - Set up Vitest configuration for testing with coverage reporting.
 
-### Changed
-- Initial commit ([356db20](https://github.com/oorabona/release-it-preset/commit/356db20))
+
 
 [Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.1.0...HEAD
 [v0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
