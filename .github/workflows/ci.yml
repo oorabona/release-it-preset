@@ -213,7 +213,7 @@ jobs:
       - name: Display release and publish info
         run: |
           echo "✅ Release and publish completed successfully"
-          echo "Version: $(node -p \"require('./package.json').version\")"
+          echo "Version: `node -p \"require('./package.json').version"`"
           echo "Tag: $(git describe --tags --abbrev=0)"
           echo "npm: https://www.npmjs.com/package/@oorabona/release-it-preset"
           echo "GitHub: https://github.com/${{ github.repository }}/releases/tag/$(git describe --tags --abbrev=0)"
