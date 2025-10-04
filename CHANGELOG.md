@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2025-10-04
+
+### Fixed
+- update hotfix job description to clarify publishing and GitHub release steps (docs) ([c2203d2](https://github.com/oorabona/release-it-preset/commit/c2203d2))
+- update release step to enable publishing and enhance output details (workflows) ([389471d](https://github.com/oorabona/release-it-preset/commit/389471d))
+- enhance hotfix release step to include publishing and detailed output (workflows) ([ad0fdaf](https://github.com/oorabona/release-it-preset/commit/ad0fdaf))
+- update tag description in publish workflow for clarity (workflows) ([9bdfb96](https://github.com/oorabona/release-it-preset/commit/9bdfb96))
+
 ## [0.5.0] - 2025-10-04
 
 ### Fixed
@@ -62,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.5.1...HEAD
 [v0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [v0.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.2.0
@@ -73,3 +81,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.4.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.4.0
 [v0.5.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.5.0
 [0.5.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.5.0
+[v0.5.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.5.1
+[0.5.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.5.1
