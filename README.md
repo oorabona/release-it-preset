@@ -120,7 +120,7 @@ pnpm release-it-preset default
 
 Features:
 - ✅ Version bumping (interactive)
-- ✅ Changelog generation with @release-it/keep-a-changelog
+- ✅ Automatic changelog population from conventional commits
 - ✅ Git commit, tag, and push
 - ✅ GitHub release creation
 - ✅ npm publishing with provenance
@@ -168,6 +168,38 @@ Features:
 - ❌ No version bump
 - ❌ No git operations
 - ❌ No publishing
+
+### `manual-changelog` - Manual Changelog Release
+
+For releases where you've manually edited the [Unreleased] section in CHANGELOG.md.
+Skips automatic changelog generation but performs full release.
+
+**Workflow:**
+```bash
+# 1. Generate initial changelog
+pnpm release-it-preset update
+
+# 2. Manually edit CHANGELOG.md [Unreleased] section
+
+# 3. Release without regenerating changelog
+pnpm release-it-preset manual-changelog
+```
+
+**Extends:**
+```json
+{
+  "extends": "@oorabona/release-it-preset/config/manual-changelog"
+}
+```
+
+Features:
+- ✅ Version bumping (interactive)
+- ✅ Preserves manual [Unreleased] edits
+- ✅ Moves [Unreleased] to versioned section
+- ✅ Git commit, tag, and push
+- ✅ GitHub release creation
+- ✅ npm publishing with provenance
+- ❌ Skips automatic changelog population
 
 ### `no-changelog` - Quick Release
 
@@ -260,6 +292,7 @@ pnpm release-it-preset --help
 pnpm release-it-preset default --dry-run
 pnpm release-it-preset hotfix --verbose
 pnpm release-it-preset changelog-only --ci
+pnpm release-it-preset manual-changelog
 ```
 
 All additional arguments are passed through to release-it.
@@ -350,6 +383,7 @@ The root `package.json` defines helper scripts that wrap the CLI so you can run 
 - `pnpm run release:default:dry-run` → dry-run the default release configuration
 - `pnpm run release:no-changelog` → publish without touching the changelog
 - `pnpm run release:changelog-only` → update only the changelog
+- `pnpm run release:manual-changelog` → release with manually edited changelog (skip auto-generation)
 - `pnpm run release:hotfix` → execute the hotfix workflow
 - `pnpm run release:republish` → trigger the republish workflow (dangerous flow)
 - `pnpm run release:retry-publish` → retry npm/GitHub publishing for an existing tag
@@ -480,25 +514,48 @@ You can override any configuration in your project's `.release-it.json`:
 ### Recommended Workflow
 
 **Local (Developer):**
-1. Make changes and commit with conventional commits (amend afterwards to fold the changelog update if desired)
+1. Make changes and commit with conventional commits
 2. Run `pnpm run release:update` to populate the `[Unreleased]` section from commits
-3. Review `CHANGELOG.md`, stage it, and if you want `git commit --amend` to update with last changes
-4. Run `pnpm run release:validate` (or `pnpm run release:validate:allow-dirty`) to verify readiness
-5. Dry-run the release with `pnpm run release:default:dry-run`
-6. Execute `pnpm release` (alias for the default preset) to perform the real release
-  - This bumps the version, moves changelog entries, creates the release commit + tag, pushes to origin, and creates the GitHub release locally
-  - **Note:** npm publish is skipped locally; the publish workflow handles it after the tag push
-  - Want to add narrative paragraphs to the changelog? When the prompt asks `Commit (release: bump vX.Y.Z)?`, answer **No**, edit/stage `CHANGELOG.md`, then re-run `pnpm release -- --retry` (or simply restart the command). The preset now passes `--allow-same-version` to `npm version`, so retrying with the same version no longer fails. Once satisfied, confirm the commit so the amended changelog is captured before the tag is created.
+3. Review `CHANGELOG.md` - you have two options here:
+
+   **Option A: Quick release with auto-generated changelog**
+   - Stage `CHANGELOG.md` as-is
+   - Run `pnpm run release:validate` to verify readiness
+   - Dry-run with `pnpm run release:default:dry-run`
+   - Execute `pnpm release` to perform the real release
+
+   **Option B: Manual changelog editing (recommended for detailed release notes)**
+   - Manually edit `CHANGELOG.md` [Unreleased] section (add narrative, reorganize, etc.)
+   - No need to stage or commit
+   - Run `pnpm run release:validate` (or `pnpm run release:validate:allow-dirty`)
+   - Dry-run with `pnpm run release:manual-changelog --dry-run`
+   - Execute `pnpm run release:manual-changelog` to release
+     - This skips changelog regeneration, preserving your edits
+     - Bumps version, moves [Unreleased] to versioned section
+     - Creates release commit + tag, pushes to origin, creates GitHub release
+
+   **If you change your mind mid-release:** If you started with Option A but want to add manual edits when prompted `Commit (release: bump vX.Y.Z)?`, answer **No**, then press Ctrl+C to abort. Edit your `CHANGELOG.md`, then run `pnpm run release:manual-changelog` instead. Alternatively, re-run `pnpm release` and select the same version again (the preset's `--allow-same-version` makes this safe).
+
+4. **Note:** npm publish is skipped locally; the publish workflow handles it after the tag push
 
 ```mermaid
 flowchart TD
   A[Conventional commits] --> B[pnpm run release:update]
-  B --> C[Review changelog \u0026 stage changes]
-  C --> D[pnpm run release:validate]
-  D --> E[pnpm run release:default:dry-run]
-  E --> F[pnpm release]
-  F --> G[Push commit \u0026 tag]
-  G --> H[Publish workflow runs in CI]
+  B --> C{Want to edit<br/>changelog manually?}
+
+  C -->|No - Auto changelog| D[Stage CHANGELOG.md]
+  D --> E[pnpm run release:validate]
+  E --> F[pnpm run release:default:dry-run]
+  F --> G[pnpm release]
+
+  C -->|Yes - Manual editing| H[Edit CHANGELOG.md manually]
+  H --> I[pnpm run release:validate --allow-dirty]
+  I --> J[pnpm run release:manual-changelog --dry-run]
+  J --> K[pnpm run release:manual-changelog]
+
+  G --> L[Push commit \u0026 tag]
+  K --> L
+  L --> M[Publish workflow runs in CI]
 ```
 
 **CI (GitHub Actions):**

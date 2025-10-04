@@ -32,6 +32,7 @@ const RELEASE_CONFIGS = {
   default: 'config/default.js',
   hotfix: 'config/hotfix.js',
   'changelog-only': 'config/changelog-only.js',
+  'manual-changelog': 'config/manual-changelog.js',
   'no-changelog': 'config/no-changelog.js',
   republish: 'config/republish.js',
   'retry-publish': 'config/retry-publish.js',
@@ -53,6 +54,7 @@ Release Commands:
   default          Full release with changelog, git, GitHub, and npm
   hotfix           Emergency hotfix with auto-changelog from commits
   changelog-only   Update changelog only, no release
+  manual-changelog Release with manually edited changelog (skip auto-generation)
   no-changelog     Release without changelog updates
   republish        Republish existing version (moves git tag)
   retry-publish    Retry failed npm/GitHub publish
