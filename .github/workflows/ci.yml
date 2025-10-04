@@ -190,12 +190,12 @@ jobs:
       - name: Run pnpm release-it-preset check
         run: pnpm release-it-preset check
 
-      - name: Populate changelog
-        run: pnpm release-it-preset update
-        
       - name: Validate release readiness
         run: pnpm release-it-preset validate
-
+        
+      - name: Populate changelog
+        run: pnpm release-it-preset update
+          
       - name: Run release
         run: pnpm release-it-preset default --ci --increment ${{ inputs.increment }}
         env:
