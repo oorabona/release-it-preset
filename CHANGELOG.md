@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-10-04
+
+### Added
+- add GIT_CHANGELOG_COMMAND environment variable to customize changelog command ([f3389e3](https://github.com/oorabona/release-it-preset/commit/f3389e3))
+
+### Fixed
+- add cases to ignore release commits in changelog population ([1a3bb6c](https://github.com/oorabona/release-it-preset/commit/1a3bb6c))
+- standardize NPM token environment variable name across workflows and documentation ([3149c10](https://github.com/oorabona/release-it-preset/commit/3149c10))
+
+### Changed
+- enhance CLI command tests by validating init and validate commands in a temporary project (test) ([45502e1](https://github.com/oorabona/release-it-preset/commit/45502e1))
+
 ## [0.3.0] - 2025-10-04
 
 ### Changed
@@ -31,10 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.4.0...HEAD
 [v0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [v0.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.2.0
 [0.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.2.0
 [v0.3.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.3.0
 [0.3.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.3.0
+[v0.4.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.4.0
+[0.4.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.4.0
