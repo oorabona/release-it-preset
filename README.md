@@ -308,9 +308,9 @@ Retries npm/GitHub publishing for an existing tag without modifying git history;
 **CLI:**
 ```bash
 # Step 1: Run pre-flight checks (optional)
-node node_modules/@oorabona/release-it-preset/dist/scripts/retry-publish.js
-# or during local development (TypeScript sources):
-pnpm tsx scripts/retry-publish.ts
+pnpm release-it-preset retry-publish-preflight
+# Advanced (direct compiled call)
+# node node_modules/@oorabona/release-it-preset/dist/scripts/retry-publish.js
 
 # Step 2: Retry the publish
 pnpm release-it-preset retry-publish
@@ -428,6 +428,26 @@ pnpm release-it-preset check
 
 Useful for debugging release issues.
 
+#### `check-pr` - Pull Request Hygiene
+
+Evaluates PR readiness by analysing commits and changelog changes. Designed for CI usage but safe locally when the required environment variables are set (`PR_BASE_REF`, `PR_HEAD_REF`).
+
+```bash
+PR_BASE_REF=origin/main PR_HEAD_REF=HEAD pnpm release-it-preset check-pr
+```
+
+Outputs JSON summaries for workflows (base64 encoded) and prints a human-readable report.
+
+#### `retry-publish-preflight` - Retry Safety Checks
+
+Runs the retry publish pre-flight script with the same CLI convenience wrapper as other utilities. Verifies that the latest tag exists, matches `package.json`, and that there are no unexpected workspace changes before attempting a retry.
+
+```bash
+pnpm release-it-preset retry-publish-preflight
+```
+
+Use this before calling `pnpm release-it-preset retry-publish` when recovering from a failed publish.
+
 ### pnpm Script Shortcuts
 
 The root `package.json` defines helper scripts that wrap the CLI so you can run the most common flows with `pnpm run`:
@@ -439,6 +459,7 @@ The root `package.json` defines helper scripts that wrap the CLI so you can run 
 - `pnpm run release:manual-changelog` → release with manually edited changelog (skip auto-generation)
 - `pnpm run release:hotfix` → execute the hotfix workflow
 - `pnpm run release:republish` → trigger the republish workflow (dangerous flow)
+- `pnpm run release:retry-preflight` → run retry publish safety checks
 - `pnpm run release:retry-publish` → retry npm/GitHub publishing for an existing tag
 - `pnpm run release:update` → populate the `[Unreleased]` section
 - `pnpm run release:validate` → run release validation checks
@@ -498,12 +519,10 @@ node node_modules/@oorabona/release-it-preset/dist/scripts/republish-changelog.j
 Performs pre-flight checks before retrying a failed publish.
 
 ```bash
-# Preferred
-pnpm run release:retry-publish
-# or
-pnpm release-it-preset retry-publish
+# Preferred (CLI)
+pnpm release-it-preset retry-publish-preflight
 
-# Advanced
+# Advanced (call compiled output directly)
 node node_modules/@oorabona/release-it-preset/dist/scripts/retry-publish.js
 ```
 

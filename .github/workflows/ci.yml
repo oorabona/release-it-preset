@@ -101,11 +101,11 @@ jobs:
           path: dist
 
       - name: Test CLI help
-        run: node bin/cli.js --help
+        run: pnpm exec release-it-preset --help
 
       - name: Test CLI unknown command
         run: |
-          if node bin/cli.js unknown-command 2>&1 | grep -q "Unknown command"; then
+          if pnpm exec release-it-preset unknown-command 2>&1 | grep -q "Unknown command"; then
             echo "✅ CLI properly rejects unknown commands"
           else
             echo "❌ CLI should reject unknown commands"
@@ -113,7 +113,7 @@ jobs:
           fi
 
       - name: Test check command
-        run: node dist/scripts/check-config.js
+        run: pnpm exec release-it-preset check
 
       - name: Test init and validate commands in temp project
         run: |
@@ -137,7 +137,7 @@ jobs:
           test -f CHANGELOG.md
           test -f .release-it.json
 
-          NPM_TOKEN=dummy-ci-token node $GITHUB_WORKSPACE/dist/scripts/validate-release.js --allow-dirty
+          NPM_TOKEN=dummy-ci-token node $GITHUB_WORKSPACE/bin/cli.js validate --allow-dirty
 
           popd >/dev/null
 
@@ -187,23 +187,23 @@ jobs:
           name: ${{ needs.build-dist.outputs.artifact_name }}
           path: dist
 
-      - name: Run pnpm release-it-preset check
-        run: pnpm release-it-preset check
+      - name: Run release-it-preset check
+        run: pnpm exec release-it-preset check
 
       # We populate the changelog before validation to ensure [Unreleased] section is not empty
       # which would cause validate to fail
       - name: Populate changelog
-        run: pnpm release-it-preset update
+        run: pnpm exec release-it-preset update
 
       # But since changelog population creates a modification, the working directory
       # is no longer clean, so we need to validate with --allow-dirty
       # Alternatively, we could commit the changelog update, but that would create noise
       # in the commit history for every release
       - name: Validate release readiness
-        run: pnpm release-it-preset validate --allow-dirty
+        run: pnpm exec release-it-preset validate --allow-dirty
 
       - name: Run release and publish
-        run: pnpm release-it-preset default --ci --increment ${{ inputs.increment }}
+        run: pnpm exec release-it-preset default --ci --increment ${{ inputs.increment }}
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

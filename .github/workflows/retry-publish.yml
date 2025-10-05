@@ -104,7 +104,7 @@ jobs:
           echo "Current commit: $(git rev-parse HEAD)"
 
       - name: Run pre-flight checks
-        run: node dist/scripts/retry-publish.js
+        run: pnpm exec release-it-preset retry-publish-preflight
 
       - name: Retry publish with release-it-preset
         run: |
@@ -120,7 +120,7 @@ jobs:
             export GITHUB_RELEASE=true
           fi
 
-          pnpm release-it-preset retry-publish --ci
+          pnpm exec release-it-preset retry-publish --ci
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

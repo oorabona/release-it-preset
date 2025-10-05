@@ -19,6 +19,8 @@
  *   release-it-preset update
  *   release-it-preset validate [--allow-dirty]
  *   release-it-preset check
+ *   release-it-preset check-pr
+ *   release-it-preset retry-publish-preflight
  */
 
 import { spawn } from 'node:child_process';
@@ -44,6 +46,8 @@ const UTILITY_COMMANDS = {
   update: 'populate-unreleased-changelog',
   validate: 'validate-release',
   check: 'check-config',
+  'check-pr': 'check-pr-status',
+  'retry-publish-preflight': 'retry-publish',
 };
 
 function showHelp() {
@@ -64,6 +68,8 @@ Utility Commands:
   update                 Update [Unreleased] section from commits
   validate [--allow-dirty]  Validate project is ready for release
   check                  Display configuration and project status
+  check-pr               Evaluate PR hygiene (branch diff, changelog status, conventions)
+  retry-publish-preflight  Run retry publish safety checks without executing release
 
 Examples:
   # Release commands
@@ -76,6 +82,8 @@ Examples:
   release-it-preset update
   release-it-preset validate
   release-it-preset check
+  release-it-preset check-pr
+  release-it-preset retry-publish-preflight
 
 For release-it options, see: https://github.com/release-it/release-it
 For environment variables, see: https://github.com/oorabona/release-it-preset#environment-variables

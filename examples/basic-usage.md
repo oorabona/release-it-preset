@@ -59,7 +59,7 @@ git commit -m "docs: update API documentation"
 Before release, populate the [Unreleased] section:
 
 ```bash
-pnpm tsx node_modules/@oorabona/release-it-preset/scripts/populate-unreleased-changelog.ts
+pnpm release-it-preset update
 ```
 
 This will parse your commits and update CHANGELOG.md automatically.

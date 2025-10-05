@@ -10,7 +10,7 @@
  * Usage:
  * First run the retry script to checkout the tag:
  * ```bash
- * node node_modules/@oorabona/release-it-preset/dist/scripts/retry-publish.js
+ * pnpm release-it-preset retry-publish-preflight
  * pnpm release-it --config node_modules/@oorabona/release-it-preset/config/retry-publish.js
  * ```
  */
