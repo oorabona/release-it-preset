@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-10-05
+
+### Fixed
+- remove 'exec' from pnpm commands for consistency (workflows) ([f9c65d8](https://github.com/oorabona/release-it-preset/commit/f9c65d8))
+
+### Changed
+- update CLI commands to use 'pnpm exec release-it-preset' for consistency (workflows) ([56fbf58](https://github.com/oorabona/release-it-preset/commit/56fbf58))
+- enhance README and examples with new CLI commands and usage instructions ([56fbf58](https://github.com/oorabona/release-it-preset/commit/56fbf58))
+- bump @types/node from 22.18.8 to 24.6.2 (deps-dev) ([5692a52](https://github.com/oorabona/release-it-preset/commit/5692a52))
+- Merge branch 'main' into dependabot/npm_and_yarn/types/node-24.6.2 ([09a3f65](https://github.com/oorabona/release-it-preset/commit/09a3f65))
+- bump @types/node from 22.18.8 to 24.6.2 (deps-dev) ([492f0c8](https://github.com/oorabona/release-it-preset/commit/492f0c8))
+
 ## [0.5.2] - 2025-10-04
 
 ### Fixed
@@ -75,7 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.6.0...HEAD
 [v0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [v0.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.2.0
@@ -90,3 +102,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.5.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.5.1
 [v0.5.2]: https://github.com/oorabona/release-it-preset/releases/tag/v0.5.2
 [0.5.2]: https://github.com/oorabona/release-it-preset/releases/tag/v0.5.2
+[v0.6.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.6.0
+[0.6.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.6.0

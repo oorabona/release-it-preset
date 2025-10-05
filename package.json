@@ -1,6 +1,6 @@
 {
   "name": "@oorabona/release-it-preset",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Shared release-it configuration and scripts for the organisation",
   "type": "module",
   "keywords": [
@@ -55,7 +55,7 @@
     "release:manual-changelog": "node ./bin/cli.js manual-changelog",
     "release:hotfix": "node ./bin/cli.js hotfix",
     "release:republish": "node ./bin/cli.js republish",
-  "release:retry-preflight": "node ./bin/cli.js retry-publish-preflight",
+    "release:retry-preflight": "node ./bin/cli.js retry-publish-preflight",
     "release:retry-publish": "node ./bin/cli.js retry-publish",
     "release:update": "node ./bin/cli.js update",
     "release:validate": "node ./bin/cli.js validate",
