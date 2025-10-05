@@ -59,7 +59,7 @@ jobs:
           path: dist
 
       - name: Update GitHub release and publish to npm
-        run: pnpm exec release-it-preset retry-publish --ci
+        run: pnpm release-it-preset retry-publish --ci
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_PUBLISH: 'true'

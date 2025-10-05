@@ -154,7 +154,7 @@ jobs:
           path: dist
 
       - name: Republish with release-it-preset
-        run: pnpm exec release-it-preset republish --ci
+        run: pnpm release-it-preset republish --ci
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_PUBLISH: 'true'

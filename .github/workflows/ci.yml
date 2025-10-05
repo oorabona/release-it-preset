@@ -101,11 +101,11 @@ jobs:
           path: dist
 
       - name: Test CLI help
-        run: pnpm exec release-it-preset --help
+        run: pnpm release-it-preset --help
 
       - name: Test CLI unknown command
         run: |
-          if pnpm exec release-it-preset unknown-command 2>&1 | grep -q "Unknown command"; then
+          if pnpm release-it-preset unknown-command 2>&1 | grep -q "Unknown command"; then
             echo "✅ CLI properly rejects unknown commands"
           else
             echo "❌ CLI should reject unknown commands"
@@ -113,7 +113,7 @@ jobs:
           fi
 
       - name: Test check command
-        run: pnpm exec release-it-preset check
+        run: pnpm release-it-preset check
 
       - name: Test init and validate commands in temp project
         run: |
@@ -188,22 +188,22 @@ jobs:
           path: dist
 
       - name: Run release-it-preset check
-        run: pnpm exec release-it-preset check
+        run: pnpm release-it-preset check
 
       # We populate the changelog before validation to ensure [Unreleased] section is not empty
       # which would cause validate to fail
       - name: Populate changelog
-        run: pnpm exec release-it-preset update
+        run: pnpm release-it-preset update
 
       # But since changelog population creates a modification, the working directory
       # is no longer clean, so we need to validate with --allow-dirty
       # Alternatively, we could commit the changelog update, but that would create noise
       # in the commit history for every release
       - name: Validate release readiness
-        run: pnpm exec release-it-preset validate --allow-dirty
+        run: pnpm release-it-preset validate --allow-dirty
 
       - name: Run release and publish
-        run: pnpm exec release-it-preset default --ci --increment ${{ inputs.increment }}
+        run: pnpm release-it-preset default --ci --increment ${{ inputs.increment }}
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
