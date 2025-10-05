@@ -45,7 +45,7 @@ jobs:
             if (releaseValidation === 'true') {
               summary += '✅ **Release validation**: Passed\n';
             } else {
-              summary += '⚠️  **Release validation**: `pnpm exec release-it-preset validate --allow-dirty` reported issues (non-blocking)\n';
+              summary += '⚠️  **Release validation**: `pnpm release-it-preset validate --allow-dirty` reported issues (non-blocking)\n';
             }
 
             if (changelogStatus === 'updated') {
