@@ -16,6 +16,11 @@ Shared [release-it](https://github.com/release-it/release-it) configuration and 
 - [Quick Start](#quick-start)
 - [Available Configurations](#available-configurations)
 - [CLI Usage](#cli-usage)
+  - [Zero-Config Mode (Auto-Detection)](#zero-config-mode-auto-detection)
+  - [Preset Selection Mode](#preset-selection-mode)
+  - [Passthrough Mode (Custom Config Override)](#passthrough-mode-custom-config-override)
+  - [Monorepo Support](#monorepo-support)
+  - [Utility Commands](#utility-commands)
 - [Scripts](#scripts)
 - [Environment Variables](#environment-variables)
 - [Configuration Override](#configuration-override)
@@ -37,6 +42,9 @@ Shared [release-it](https://github.com/release-it/release-it) configuration and 
 - 🔄 Republish and retry mechanisms for failed releases
 - ⚡ Hotfix release support
 - 🎯 Environment variable configuration
+- 🔍 **NEW v0.9.0:** Zero-config auto-detection mode
+- 🏢 **NEW v0.9.0:** Monorepo support with parent directory config references
+- ⚙️ **NEW v0.9.0:** Passthrough mode for custom config files
 
 ## Installation
 
@@ -331,9 +339,42 @@ Features:
 
 ## CLI Usage
 
-The package provides a `release-it-preset` CLI with two types of commands:
+The package provides a `release-it-preset` CLI with four operating modes:
 
-### Release Commands
+1. **Zero-Config Mode** (auto-detection) - No arguments needed
+2. **Preset Selection Mode** - Specify which preset to use
+3. **Passthrough Mode** - Direct config file override
+4. **Utility Mode** - Helper commands
+
+### Zero-Config Mode (Auto-Detection)
+
+**NEW in v0.9.0** - The CLI can automatically detect which preset to use from your `.release-it.json`:
+
+```bash
+# Just run release-it-preset with no arguments
+pnpm release-it-preset
+
+# 🔍 Auto-detected preset: default
+# ✅ Config validated: preset "default"
+# 📝 Using: /path/to/.release-it.json
+```
+
+**How it works:**
+1. CLI reads your `.release-it.json`
+2. Extracts the preset name from the `extends` field
+3. Runs that preset automatically
+
+**Requirements:**
+- `.release-it.json` must exist
+- Must have `extends` field like `"@oorabona/release-it-preset/config/default"`
+
+**Benefits:**
+- ✅ Shortest command possible
+- ✅ Config file is source of truth
+- ✅ No need to remember preset names
+- ✅ Follows industry standards (ESLint, TypeScript, Prettier)
+
+### Preset Selection Mode
 
 Run release-it with specific configurations:
 
@@ -349,6 +390,92 @@ pnpm release-it-preset manual-changelog
 ```
 
 All additional arguments are passed through to release-it.
+
+### Passthrough Mode (Custom Config Override)
+
+**NEW in v0.9.0** - Use a custom config file and bypass preset validation:
+
+```bash
+# Use custom config file
+pnpm release-it-preset --config .release-it-manual.json
+
+# 🔀 Passthrough mode: using config .release-it-manual.json
+#    Bypassing preset validation - direct release-it invocation
+```
+
+**Use cases:**
+- **Switching presets occasionally** - Have multiple config files for different scenarios
+- **Monorepo workflows** - Reference shared configs from parent directories
+- **Advanced customization** - Full control over release-it configuration
+
+**Example workflow:**
+
+```json
+// .release-it.json (default - 95% of time)
+{
+  "extends": "@oorabona/release-it-preset/config/default",
+  "git": { "requireBranch": "develop" }
+}
+
+// .release-it-manual.json (rare - 5% of time)
+{
+  "extends": "@oorabona/release-it-preset/config/manual-changelog",
+  "git": { "requireBranch": "develop" }
+}
+```
+
+```bash
+# Normal release
+pnpm release-it-preset                              # Auto-detects default
+
+# Manual changelog release (rare)
+pnpm release-it-preset --config .release-it-manual.json
+```
+
+**Benefits:**
+- ✅ No need to edit `.release-it.json` to switch presets
+- ✅ Config files are explicit and version-controlled
+- ✅ Works with monorepo parent directory references
+
+### Monorepo Support
+
+**NEW in v0.9.0** - Parent directory config references are now supported:
+
+```bash
+# Monorepo structure
+/my-monorepo/
+├── .release-it-base.json        # Shared configuration
+├── packages/
+│   ├── core/
+│   │   └── .release-it.json     # extends: ../../.release-it-base.json
+│   └── utils/
+│       └── .release-it.json     # extends: ../../.release-it-base.json
+```
+
+```json
+// packages/core/.release-it.json
+{
+  "extends": [
+    "../../.release-it-base.json",                    // ✅ Parent reference allowed!
+    "@oorabona/release-it-preset/config/default"
+  ]
+}
+```
+
+**Security validation:**
+- ✅ Parent directory references (`../`) supported (up to 5 levels)
+- ✅ Config file extension whitelist (`.json`, `.js`, `.cjs`, `.mjs`, `.yaml`, `.yml`, `.toml`)
+- ✅ File existence validation
+- ❌ Absolute paths blocked (use relative paths)
+- ❌ Excessive traversal blocked (max `../../../../../../`)
+
+**Why this is safe:**
+- Config files are trusted code (developer controls the repository)
+- Industry standard pattern (TypeScript, ESLint, Prettier all allow `../`)
+- Multiple validation layers prevent abuse
+- No privilege escalation in CLI tool context
+
+See [examples/monorepo-workflow.md](examples/monorepo-workflow.md) for complete monorepo guide.
 
 ### Utility Commands
 
