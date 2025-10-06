@@ -119,36 +119,44 @@ function handleReleaseCommand(configName, args) {
 
       const expectedExtends = `@oorabona/release-it-preset/config/${configName}`;
 
-      if (userConfig.extends) {
-        // If extends exists, it MUST match the CLI preset
-        const extendsMatch = userConfig.extends.match(/@oorabona\/release-it-preset\/config\/(\w+)/);
-        const extendsPreset = extendsMatch?.[1];
-
-        if (extendsPreset && extendsPreset !== configName) {
-          console.error(`\n❌ Configuration mismatch error!`);
-          console.error(`   CLI preset:               ${configName}`);
-          console.error(`   .release-it.json extends: ${extendsPreset}`);
-          console.error(``);
-          console.error(`Either:`);
-          console.error(`  1. Remove the "extends" field from .release-it.json (recommended)`);
-          console.error(`     → Your overrides will merge with the CLI preset automatically`);
-          console.error(``);
-          console.error(`  2. Run: release-it-preset ${extendsPreset}`);
-          console.error(`     → Use the preset specified in your config file`);
-          console.error(``);
-          console.error(`  3. Update .release-it.json extends to: "${expectedExtends}"`);
-          console.error(`     → Match your config file to the CLI command\n`);
-          process.exit(1);
-        }
-
-        console.log(`✅ Config file extends matches CLI preset: ${configName}`);
-        console.log(`📝 Using: ${userConfigPath}\n`);
-      } else {
-        // No extends = natural merge (Mode 3 - Hybrid)
-        console.log(`📝 Merging CLI preset "${configName}" with user config overrides`);
-        console.log(`   Config file: ${userConfigPath}`);
-        console.log(`   User overrides will take precedence\n`);
+      if (!userConfig.extends) {
+        // ERROR: extends is required for config merging
+        console.error(`\n❌ Configuration error!`);
+        console.error(`   .release-it.json is missing the required "extends" field.`);
+        console.error(``);
+        console.error(`Without "extends", your config won't merge with the preset.`);
+        console.error(`This means you'll get release-it defaults instead of preset defaults.`);
+        console.error(``);
+        console.error(`Fix by adding this to .release-it.json:`);
+        console.error(`  {`);
+        console.error(`    "extends": "${expectedExtends}",`);
+        console.error(`    ...your overrides`);
+        console.error(`  }`);
+        console.error(``);
+        console.error(`Or remove .release-it.json to use the preset directly.\n`);
+        process.exit(1);
       }
+
+      // Validate extends matches CLI preset
+      const extendsMatch = userConfig.extends.match(/@oorabona\/release-it-preset\/config\/(\w+)/);
+      const extendsPreset = extendsMatch?.[1];
+
+      if (extendsPreset && extendsPreset !== configName) {
+        console.error(`\n❌ Configuration mismatch error!`);
+        console.error(`   CLI preset:               ${configName}`);
+        console.error(`   .release-it.json extends: ${extendsPreset}`);
+        console.error(``);
+        console.error(`Either:`);
+        console.error(`  1. Run: release-it-preset ${extendsPreset}`);
+        console.error(`     → Use the preset specified in your config file`);
+        console.error(``);
+        console.error(`  2. Update .release-it.json extends to: "${expectedExtends}"`);
+        console.error(`     → Match your config file to the CLI command\n`);
+        process.exit(1);
+      }
+
+      console.log(`✅ Config validated: preset "${configName}"`);
+      console.log(`📝 Using: ${userConfigPath}\n`);
     } catch (error) {
       if (error instanceof SyntaxError) {
         console.error(`❌ Failed to parse .release-it.json: ${error.message}`);
@@ -158,12 +166,12 @@ function handleReleaseCommand(configName, args) {
       process.exit(1);
     }
 
-    // Let release-it handle the merge naturally
+    // Let release-it discover .release-it.json and merge via extends
     fullArgs = [...args];
   } else {
     // No user config - use preset directly
     console.log(`📝 Using preset config directly: ${configPath}`);
-    console.log(`   Tip: Create .release-it.json (without "extends") to add overrides\n`);
+    console.log(`   Tip: Create .release-it.json with "extends" to customize\n`);
     fullArgs = ['--config', configPath, ...args];
   }
 
