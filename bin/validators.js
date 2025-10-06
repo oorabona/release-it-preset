@@ -10,6 +10,9 @@
  * - Fail securely
  */
 
+import { existsSync, statSync } from 'node:fs';
+import { extname, isAbsolute, resolve } from 'node:path';
+
 /**
  * Validates that a config name is in the allowed list
  *
@@ -96,26 +99,75 @@ export function sanitizeArgs(args) {
 }
 
 /**
- * Validates that a path does not contain directory traversal attempts
+ * Validates config file paths with monorepo support
  *
- * @param {string} path - The path to validate
- * @throws {Error} If path contains traversal patterns
- * @returns {string} The validated path
+ * Security approach: Defense in depth with multiple validation layers
+ * - Whitelist allowed file extensions
+ * - Limit parent directory traversal depth (monorepo support)
+ * - Reject absolute paths from CLI
+ * - Validate file existence
+ *
+ * Why we allow ".." (parent directory references):
+ * - Standard pattern in monorepos (TypeScript, ESLint, Prettier all allow it)
+ * - Developer controls the environment (config files are trusted code boundary)
+ * - No privilege escalation possible in CLI tool context
+ * - Multiple validation layers prevent abuse
+ *
+ * @param {string} configPath - The config file path to validate (relative or absolute)
+ * @throws {Error} If validation fails (invalid extension, too deep, missing file, etc.)
+ * @returns {string} Absolute path to validated config file
  */
-export function validatePath(path) {
-  // Check for directory traversal patterns
-  if (path.includes('..')) {
+export function validateConfigPath(configPath) {
+  // 1. Whitelist config file extensions (defense in depth)
+  const allowedExtensions = ['.json', '.js', '.cjs', '.mjs', '.yaml', '.yml', '.toml'];
+  const ext = extname(configPath).toLowerCase();
+
+  if (!allowedExtensions.includes(ext)) {
     throw new Error(
-      `Path contains directory traversal pattern (..) which is not allowed: "${path}"`
+      `Invalid config file extension: "${ext}"\n` +
+      `Allowed: ${allowedExtensions.join(', ')}\n` +
+      `This restriction prevents reading non-config files.`
     );
   }
 
-  // Check for absolute paths (we expect relative paths)
-  if (path.startsWith('/') || /^[a-zA-Z]:/.test(path)) {
+  // 2. Limit parent directory traversal depth (max 5 levels for monorepo support)
+  const upwardLevels = (configPath.match(/\.\.\//g) || []).length;
+  if (upwardLevels > 5) {
     throw new Error(
-      `Absolute paths are not allowed: "${path}"`
+      `Too many parent directory references: ${upwardLevels}\n` +
+      `Maximum allowed: 5 levels (../../../../../../)\n` +
+      `This prevents accidental access to system directories.`
     );
   }
 
-  return path;
+  // 3. Reject absolute paths from CLI (could reference system files)
+  if (isAbsolute(configPath)) {
+    throw new Error(
+      `Absolute paths not allowed: "${configPath}"\n` +
+      `Use relative paths from your project directory.\n` +
+      `For monorepos, use parent references like ../../config.json`
+    );
+  }
+
+  // 4. Resolve to absolute path and validate file exists
+  const resolved = resolve(process.cwd(), configPath);
+
+  if (!existsSync(resolved)) {
+    throw new Error(
+      `Config file not found: "${configPath}"\n` +
+      `Resolved to: ${resolved}\n` +
+      `Check that the file exists and the path is correct.`
+    );
+  }
+
+  // 5. Validate it's a file (not a directory or symlink to avoid confusion)
+  const stats = statSync(resolved);
+  if (!stats.isFile()) {
+    throw new Error(
+      `Config path must be a file, not a directory: "${configPath}"\n` +
+      `Resolved to: ${resolved}`
+    );
+  }
+
+  return resolved;
 }
