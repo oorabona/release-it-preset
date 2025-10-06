@@ -564,16 +564,16 @@ pnpm release
 
 ## Configuration Modes
 
-The preset supports three configuration modes to suit different workflows:
+The preset supports two configuration modes:
 
-### Mode 1: CLI Only (No Config File)
+### Mode 1: Direct Preset Usage (No Config File)
 
-**When to use:** Simple projects with minimal customization needs
+**When to use:** Simple projects, trust preset defaults, or customize only via environment variables
 
 Don't create `.release-it.json`. Just run the CLI:
 
 ```bash
-pnpm release-it-preset hotfix
+pnpm release-it-preset default
 ```
 
 All configuration comes from the preset and environment variables.
@@ -582,23 +582,22 @@ All configuration comes from the preset and environment variables.
 - ✅ Zero config files
 - ✅ Consistent behavior across projects
 - ✅ Easy to understand
+- ✅ Perfect for getting started
 
 ---
 
-### Mode 2: CLI + User Overrides (Recommended)
+### Mode 2: Preset + User Overrides (Recommended)
 
-**When to use:** Customize specific options while using CLI presets
+**When to use:** Customize specific options while keeping preset defaults
 
-Create `.release-it.json` **WITHOUT the `extends` field**:
+Create `.release-it.json` **WITH the `extends` field**:
 
 ```json
 {
+  "extends": "@oorabona/release-it-preset/config/default",
   "git": {
     "requireBranch": "master",
     "commitMessage": "chore: release v${version}"
-  },
-  "npm": {
-    "publish": true
   }
 }
 ```
@@ -606,24 +605,26 @@ Create `.release-it.json` **WITHOUT the `extends` field**:
 Run with CLI preset:
 
 ```bash
-pnpm release-it-preset hotfix
+pnpm release-it-preset default
 ```
 
 **How it works:**
-- CLI selects the preset (`hotfix` in this example)
-- release-it merges your overrides on top of the preset
+- The `extends` field loads the preset
+- release-it merges your overrides on top via c12
 - **Your values take precedence** over preset defaults
+- CLI validates that `extends` matches the command
 
 **Pros:**
-- ✅ **Recommended approach** for most use cases
-- ✅ CLI controls preset selection
-- ✅ Declarative overrides in config file
-- ✅ No `extends` maintenance needed
+- ✅ **Recommended for customization**
+- ✅ Declarative config with explicit preset
+- ✅ Industry standard pattern (like ESLint, TypeScript)
+- ✅ Guaranteed config merging via release-it's c12
 
-**Example use case:** You want to use the `hotfix` preset but require releases from `master` instead of `main`:
+**Example:** Using `hotfix` preset but release from `master` instead of `main`:
 
 ```json
 {
+  "extends": "@oorabona/release-it-preset/config/hotfix",
   "git": {
     "requireBranch": "master"
   }
@@ -631,71 +632,60 @@ pnpm release-it-preset hotfix
 ```
 
 ```bash
-pnpm release-it-preset hotfix  # Uses hotfix preset + your branch override
+pnpm release-it-preset hotfix
 ```
 
 ---
 
-### Mode 3: File with Extends (Advanced)
+### Configuration Validation
 
-**When to use:** Lock a specific preset regardless of CLI command
+The CLI validates your `.release-it.json` to prevent misconfigurations:
 
-Create `.release-it.json` **WITH the `extends` field**:
+#### Error 1: Missing `extends` field
 
-```json
+```bash
+# .release-it.json without extends:
 {
-  "extends": "@oorabona/release-it-preset/config/hotfix",
-  "git": {
-    "commitMessage": "custom: ${version}"
-  }
+  "git": { "requireBranch": "master" }
 }
+
+# Running:
+pnpm release-it-preset default
+
+# ❌ Configuration error!
+#    .release-it.json is missing the required "extends" field.
+#
+#    Without "extends", your config won't merge with the preset.
+#    This means you'll get release-it defaults instead of preset defaults.
+#
+#    Fix by adding this to .release-it.json:
+#      {
+#        "extends": "@oorabona/release-it-preset/config/default",
+#        ...your overrides
+#      }
 ```
 
-Run matching CLI command:
+**Why `extends` is required:** Without it, release-it only loads your config file and uses release-it's own defaults. The preset is never loaded, so you lose important defaults like `npm.publish: false`.
+
+#### Error 2: Preset mismatch
 
 ```bash
-pnpm release-it-preset hotfix  # Must match the extends!
-```
+# .release-it.json extends "default":
+{
+  "extends": "@oorabona/release-it-preset/config/default"
+}
 
-**How it works:**
-- The `extends` field locks the preset
-- CLI command **must match** the preset in `extends`
-- Mismatch triggers an error
-
-**Pros:**
-- ✅ Prevents accidental use of wrong presets
-- ✅ Explicit preset declaration in config
-
-**Cons:**
-- ⚠️ Less flexible (preset locked in file)
-- ⚠️ Requires updating `extends` to switch presets
-
----
-
-### Configuration Error Handling
-
-If your `.release-it.json` has an `extends` field that doesn't match the CLI command, you'll get a clear error:
-
-```bash
-# Your config extends "default", but you run:
+# But you run:
 pnpm release-it-preset hotfix
 
 # ❌ Configuration mismatch error!
 #    CLI preset:               hotfix
 #    .release-it.json extends: default
 #
-# Either:
-#   1. Remove the "extends" field from .release-it.json (recommended)
-#      → Your overrides will merge with the CLI preset automatically
-#
-#   2. Run: release-it-preset default
-#      → Use the preset specified in your config file
-#
-#   3. Update .release-it.json extends to: "@oorabona/release-it-preset/config/hotfix"
-#      → Match your config file to the CLI command
+#    Either:
+#      1. Run: release-it-preset default
+#      2. Update .release-it.json extends to: "@oorabona/release-it-preset/config/hotfix"
 ```
-
-This prevents silent misconfigurations where the wrong preset runs unexpectedly.
 
 ---
 
@@ -703,12 +693,12 @@ This prevents silent misconfigurations where the wrong preset runs unexpectedly.
 
 | Scenario | Recommended Mode |
 |----------|------------------|
-| Minimal config, trust defaults | **Mode 1** (CLI only) |
-| Customize branch/commit messages | **Mode 2** (CLI + overrides) |
-| Lock preset for safety | **Mode 3** (File with extends) |
-| Monorepo with different presets per package | **Mode 2** (CLI + overrides) |
+| Quick start, minimal config | **Mode 1** (No config file) |
+| Customize branch/commit/hooks | **Mode 2** (Config with extends) |
+| Environment-only customization | **Mode 1** (Use env vars) |
+| Monorepo with per-package config | **Mode 2** (Each package has own config) |
 
-**Most users should use Mode 2** for the best balance of flexibility and clarity.
+**Use Mode 1 to get started, switch to Mode 2 when you need customization.**
 
 ## Borrowing Scripts & Workflows
 

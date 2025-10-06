@@ -4,59 +4,16 @@ This example shows how to customize the release configuration for your specific 
 
 ## Configuration Modes Overview
 
-The preset supports three configuration modes (see [README - Configuration Modes](../README.md#configuration-modes) for full details):
+The preset supports two configuration modes (see [README - Configuration Modes](../README.md#configuration-modes) for full details):
 
-1. **Mode 1: CLI Only** - No config file, pure CLI usage
-2. **Mode 2: CLI + User Overrides (Recommended)** - Config file WITHOUT `extends`
-3. **Mode 3: File with Extends (Advanced)** - Config file WITH `extends`
-
----
-
-## Mode 2: CLI + User Overrides (Recommended)
-
-**This is the recommended approach** for most use cases.
-
-Create `.release-it.json` **WITHOUT the `extends` field**:
-
-```json
-{
-  "git": {
-    "requireBranch": "develop",
-    "commitMessage": "chore(release): ${version}",
-    "requireCleanWorkingDir": true
-  },
-  "github": {
-    "releaseName": "Version ${version}",
-    "releaseNotes": "echo 'Custom release notes for ${version}'"
-  },
-  "npm": {
-    "publish": false
-  }
-}
-```
-
-Then run:
-
-```bash
-pnpm release-it-preset default
-```
-
-**How it works:**
-- CLI selects the `default` preset
-- release-it merges your overrides on top
-- Your values take precedence over preset defaults
-
-**Benefits:**
-- ✅ CLI controls which preset is used
-- ✅ Easy to switch between presets (just change the CLI command)
-- ✅ Declarative overrides in config file
-- ✅ No `extends` maintenance
+1. **Mode 1: Direct Preset** - No config file
+2. **Mode 2: Preset + Overrides** - Config file WITH `extends` (recommended for customization)
 
 ---
 
-## Mode 3: File with Extends (Advanced)
+## Mode 2: Preset + User Overrides (Recommended)
 
-**Only use this if you want to lock a specific preset** in the config file.
+**Use this when you need to customize specific options while keeping preset defaults.**
 
 Create `.release-it.json` **WITH the `extends` field**:
 
@@ -81,15 +38,51 @@ Create `.release-it.json` **WITH the `extends` field**:
 Then run:
 
 ```bash
-pnpm release-it-preset default  # Must match the extends!
+pnpm release-it-preset default
 ```
 
-⚠️ **Important:** The CLI preset **must match** the `extends` value, or you'll get an error.
+**How it works:**
+- The `extends` field loads the preset configuration
+- release-it merges your overrides on top via c12
+- **Your values take precedence** over preset defaults
+- CLI validates that `extends` matches the command
 
-**When to use this:**
-- You want to ensure a specific preset is always used
-- Prevents accidental use of wrong presets
-- Good for projects with strict release processes
+**Benefits:**
+- ✅ Explicit preset declaration
+- ✅ Guaranteed config merging
+- ✅ Industry standard pattern (like ESLint, TypeScript)
+- ✅ Clear error messages if misconfigured
+
+---
+
+## Why `extends` is Required
+
+Without `extends`, release-it only loads your `.release-it.json` and uses release-it's own defaults. The preset is never loaded!
+
+```json
+// ❌ WRONG - This won't work:
+{
+  "git": { "requireBranch": "develop" }
+}
+```
+
+```bash
+pnpm release-it-preset default
+
+# ❌ Configuration error!
+#    .release-it.json is missing the required "extends" field.
+#    Without "extends", you'll get release-it defaults instead of preset defaults.
+```
+
+**Always include `extends`** to ensure proper config merging:
+
+```json
+// ✅ CORRECT:
+{
+  "extends": "@oorabona/release-it-preset/config/default",
+  "git": { "requireBranch": "develop" }
+}
+```
 
 ## Using Environment Variables
 
