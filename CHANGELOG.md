@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2025-10-06
+
+### 🚨 CRITICAL BUG FIX
+
+**If you upgraded to v0.8.0 and removed the `extends` field from `.release-it.json`, your configuration is BROKEN.**
+
+#### What Happened
+
+v0.8.0 incorrectly documented that the `extends` field was optional ("Mode 2" without extends). In reality, without `extends`, release-it only loads your `.release-it.json` and uses **release-it's own defaults** instead of the preset's defaults. This means:
+
+- ❌ `npm.publish` defaults to `true` (should be `false` from preset)
+- ❌ `github.release` settings ignored
+- ❌ Hooks for changelog automation (`populate-unreleased-changelog`, `republish-changelog`) are **not executed**
+- ❌ You get release-it defaults instead of preset defaults
+
+**Risk:** Accidental npm publishes, missing changelog updates, incorrect release behavior.
+
+#### How to Fix
+
+**Add the `extends` field back to your `.release-it.json`:**
+
+```json
+{
+  "extends": "@oorabona/release-it-preset/config/default",
+  ...your overrides
+}
+```
+
+Or **remove `.release-it.json`** entirely to use the preset directly via CLI.
+
+#### Why This Fix
+
+Configuration merging **only works** when `extends` is explicitly specified. This is consistent with all major configuration tools:
+- ESLint requires `extends` in `.eslintrc`
+- TypeScript requires `extends` in `tsconfig.json`
+- Prettier config inheritance works the same way
+
+Without `extends`, release-it/c12 has no way to know which preset to load and merge.
+
+### Fixed
+
+- **CLI now requires `extends` field** when `.release-it.json` exists ([bin/cli.js](bin/cli.js))
+  - Clear error message guides users to add missing `extends`
+  - Prevents silent misconfigurations that cause broken releases
+  - Validates `extends` matches CLI preset name
+- **Documentation updated** to reflect correct usage ([README.md](README.md), [examples/](examples/))
+  - Removed incorrect "Mode 2 without extends" documentation
+  - Clarified that `extends` is required for config merging
+  - Added explanation of why `extends` is necessary
+
+### Removed
+
+- ❌ "Mode 2" (CLI preset + user config without extends) - **this never worked correctly**
+- The preset now supports 2 modes instead of 3:
+  - Mode 1: No config file (direct preset usage)
+  - Mode 2: Config file with `extends` (preset + user overrides)
+
+### Migration Guide
+
+**If you're on v0.8.0 and followed the docs to remove `extends`:**
+
+1. Add `extends` back to `.release-it.json`:
+   ```json
+   {
+     "extends": "@oorabona/release-it-preset/config/default",
+     "git": {
+       "requireBranch": "master"  // your overrides
+     }
+   }
+   ```
+
+2. Or remove `.release-it.json` if you don't need overrides
+
+**If you kept `extends` in v0.8.0:**
+- ✅ No changes needed - your config already works correctly
+
 ## [0.8.0] - 2025-10-06
 
 ### Changed
@@ -147,7 +223,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.8.1...HEAD
+[v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
+[0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
 [v0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [v0.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.2.0
