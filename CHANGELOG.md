@@ -7,6 +7,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2025-10-06
+
+### Added
+
+- **Zero-Config Mode**: Run `release-it-preset` without arguments to auto-detect preset from `.release-it.json` ([bin/cli.js](bin/cli.js))
+  - Reads `.release-it.json` and extracts preset name from `extends` field
+  - Follows industry standards (ESLint, TypeScript, Prettier)
+  - Clear error messages when config is missing or misconfigured
+  - Example: `pnpm release-it-preset` → auto-detects and runs configured preset
+
+- **Passthrough Mode**: Use custom config files via `--config` flag ([bin/cli.js](bin/cli.js))
+  - Bypass preset validation for advanced workflows
+  - Support switching between multiple config files
+  - Example: `pnpm release-it-preset --config .release-it-manual.json`
+  - Enables easier preset switching without editing files
+
+- **Monorepo Support**: Parent directory config references now allowed ([bin/validators.js](bin/validators.js))
+  - Support `../../.release-it-base.json` style references (up to 5 levels)
+  - Config file extension whitelist for security
+  - Industry standard pattern (TypeScript, ESLint, Prettier all support this)
+  - Defense-in-depth validation (extension check, depth limit, existence check)
+
+- **CLI Mode Detection**: Automatic conflict detection between preset command and `--config` flag ([bin/cli.js](bin/cli.js))
+  - Clear error when both preset and `--config` are specified
+  - Guides user to choose correct approach
+
+- **Documentation**: Comprehensive monorepo workflow guide ([examples/monorepo-workflow.md](examples/monorepo-workflow.md))
+  - Step-by-step setup instructions
+  - GitHub Actions integration examples
+  - Security considerations
+  - Troubleshooting guide
+
+### Changed
+
+- **CLI Help**: Updated to document 4 operating modes (zero-config, preset selection, passthrough, utility)
+- **README.md**: New sections for Zero-Config Mode, Passthrough Mode, and Monorepo Support
+
+### Removed
+
+- **validatePath()**: Removed deprecated path validation function ([bin/validators.js](bin/validators.js))
+  - Replaced by `validateConfigPath()` which provides monorepo support
+  - No public API impact (function was never documented or exported publicly)
+  - Use `validateConfigPath()` for all config file path validation
+
+### Fixed
+
+- **Monorepo Workflows**: Path traversal validation no longer blocks legitimate parent directory references
+  - Previous versions blocked ALL `..` patterns (too strict)
+  - Now allows up to 5 levels of parent traversal with security checks
+  - Fixes compatibility with standard monorepo config patterns
+
+### Security
+
+- **Defense-in-Depth Validation**: Multiple security layers for config path validation
+  - Extension whitelist (`.json`, `.js`, `.cjs`, `.mjs`, `.yaml`, `.yml`, `.toml`)
+  - Depth limit (max 5 parent directory levels)
+  - Absolute path blocking (must use relative paths)
+  - File existence and type validation
+- **OWASP Compliance**: Follows input validation and fail-secure principles
+- **No Privilege Escalation**: Config files remain in trusted code boundary
+
+### Migration Guide
+
+**From v0.8.x to v0.9.0:**
+
+No breaking changes! All existing workflows continue to work.
+
+**New capabilities you can adopt:**
+
+1. **Simplify your workflow** with zero-config mode:
+   ```bash
+   # Before (v0.8.x)
+   pnpm release-it-preset default
+
+   # After (v0.9.0) - shorter!
+   pnpm release-it-preset
+   ```
+
+2. **Enable monorepo workflows** with parent config references:
+   ```json
+   {
+     "extends": [
+       "../../.release-it-base.json",
+       "@oorabona/release-it-preset/config/default"
+     ]
+   }
+   ```
+
+3. **Switch presets easily** without editing config:
+   ```bash
+   # Create .release-it-manual.json once
+   # Then switch with --config flag
+   pnpm release-it-preset --config .release-it-manual.json
+   ```
+
 ## [0.8.1] - 2025-10-06
 
 ### 🚨 CRITICAL BUG FIX
@@ -223,7 +318,9 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.9.0...HEAD
+[v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
+[0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
 [0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
 [v0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
