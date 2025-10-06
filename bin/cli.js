@@ -27,7 +27,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { validateConfigName, validateUtilityCommand, sanitizeArgs } from './validators.js';
+import { validateConfigName, validateUtilityCommand, sanitizeArgs, validateConfigPath } from './validators.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,7 +54,14 @@ const UTILITY_COMMANDS = {
 
 function showHelp() {
   console.log(`
-Usage: release-it-preset <command> [...args]
+Usage: release-it-preset [command] [...args]
+       release-it-preset --config <file> [...args]
+
+CLI Modes:
+  1. Auto-detection (no command)      - Reads preset from .release-it.json
+  2. Preset selection                  - Specify preset command
+  3. Passthrough (--config)            - Direct config file, bypass validation
+  4. Utility commands                  - Helper scripts
 
 Release Commands:
   default          Full release with changelog, git, GitHub, and npm
@@ -73,19 +80,28 @@ Utility Commands:
   check-pr               Evaluate PR hygiene (branch diff, changelog status, conventions)
   retry-publish-preflight  Run retry publish safety checks without executing release
 
+Passthrough Mode:
+  --config <file>  Use custom config file, bypass preset validation
+
 Examples:
+  # Zero-config (auto-detect from .release-it.json)
+  release-it-preset
+
   # Release commands
   release-it-preset default --dry-run
   release-it-preset hotfix --verbose
   release-it-preset changelog-only --ci
 
+  # Passthrough mode (custom config)
+  release-it-preset --config .release-it-manual.json
+
+  # Monorepo (parent config reference)
+  release-it-preset --config ../../.release-it-base.json
+
   # Utility commands
   release-it-preset init
   release-it-preset update
   release-it-preset validate
-  release-it-preset check
-  release-it-preset check-pr
-  release-it-preset retry-publish-preflight
 
 For release-it options, see: https://github.com/release-it/release-it
 For environment variables, see: https://github.com/oorabona/release-it-preset#environment-variables
@@ -138,7 +154,7 @@ function handleReleaseCommand(configName, args) {
       }
 
       // Validate extends matches CLI preset
-      const extendsMatch = userConfig.extends.match(/@oorabona\/release-it-preset\/config\/(\w+)/);
+      const extendsMatch = userConfig.extends.match(/@oorabona\/release-it-preset\/config\/([\w-]+)/);
       const extendsPreset = extendsMatch?.[1];
 
       if (extendsPreset && extendsPreset !== configName) {
@@ -237,10 +253,53 @@ function handleUtilityCommand(commandName, args) {
   });
 }
 
+function passthroughToReleaseIt(args) {
+  // Extract --config value
+  const configIndex = args.indexOf('--config');
+  if (configIndex === -1 || configIndex === args.length - 1) {
+    console.error('❌ --config requires a file path argument\n');
+    console.error('Usage: release-it-preset --config <file>');
+    process.exit(1);
+  }
+
+  const configPath = args[configIndex + 1];
+
+  // Security validation
+  try {
+    validateConfigPath(configPath);
+    sanitizeArgs(args);
+
+    console.log(`🔀 Passthrough mode: using config ${configPath}`);
+    console.log(`   Bypassing preset validation - direct release-it invocation\n`);
+  } catch (error) {
+    console.error(`❌ Configuration validation failed: ${error.message}`);
+    process.exit(1);
+  }
+
+  // Delegate to release-it
+  const releaseItCommand = 'release-it';
+  const child = spawn(releaseItCommand, args, {
+    stdio: 'inherit',
+    shell: false, // Security: prevent command injection
+  });
+
+  child.on('error', (error) => {
+    console.error(`❌ Failed to start release-it: ${error.message}`);
+    console.error(`\nMake sure release-it is installed:`);
+    console.error(`  pnpm add -D release-it`);
+    process.exit(1);
+  });
+
+  child.on('close', (code) => {
+    process.exit(code ?? 0);
+  });
+}
+
 function main() {
   const args = process.argv.slice(2);
 
-  if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
+  // Handle --help
+  if (args.includes('--help') || args.includes('-h')) {
     showHelp();
     process.exit(0);
   }
@@ -248,13 +307,66 @@ function main() {
   const command = args[0];
   const commandArgs = args.slice(1);
 
-  // Check if it's a release config
+  // Check for conflicting arguments (preset command + --config)
+  if (args.includes('--config') && RELEASE_CONFIGS[command]) {
+    console.error('❌ Conflicting arguments detected!\n');
+    console.error('   You specified both a preset command and --config flag.');
+    console.error('');
+    console.error('   Either:');
+    console.error(`     1. Use preset: release-it-preset ${command}`);
+    console.error(`     2. Use config: release-it-preset --config <file>`);
+    console.error('');
+    console.error('   Do not mix both approaches.');
+    process.exit(1);
+  }
+
+  // MODE 1: Passthrough - Direct release-it with custom config
+  if (args.includes('--config')) {
+    passthroughToReleaseIt(args);
+    return;
+  }
+
+  // MODE 2: Auto-detection - No arguments, read preset from .release-it.json
+  if (args.length === 0) {
+    const userConfigPath = join(process.cwd(), '.release-it.json');
+
+    if (!existsSync(userConfigPath)) {
+      console.error('❌ No command specified and no .release-it.json found\n');
+      console.error('Either:');
+      console.error('  1. Run: release-it-preset init');
+      console.error('  2. Run: release-it-preset <command>\n');
+      showHelp();
+      process.exit(1);
+    }
+
+    try {
+      const config = JSON.parse(readFileSync(userConfigPath, 'utf8'));
+      const extendsMatch = config.extends?.match(/@oorabona\/release-it-preset\/config\/([\w-]+)/);
+
+      if (!extendsMatch) {
+        console.error('❌ .release-it.json does not extend a known preset\n');
+        console.error('Expected extends field like:');
+        console.error('  "@oorabona/release-it-preset/config/default"\n');
+        process.exit(1);
+      }
+
+      const preset = extendsMatch[1];
+      console.log(`🔍 Auto-detected preset: ${preset}`);
+      handleReleaseCommand(preset, []);
+      return;
+    } catch (error) {
+      console.error(`❌ Error reading .release-it.json: ${error.message}`);
+      process.exit(1);
+    }
+  }
+
+  // MODE 3: Preset command (existing logic)
   if (RELEASE_CONFIGS[command]) {
     handleReleaseCommand(command, commandArgs);
     return;
   }
 
-  // Check if it's a utility command
+  // MODE 4: Utility command (existing logic)
   if (UTILITY_COMMANDS[command]) {
     handleUtilityCommand(command, commandArgs);
     return;
@@ -264,6 +376,7 @@ function main() {
   console.error(`❌ Unknown command: ${command}`);
   console.error(`\nAvailable release configs: ${Object.keys(RELEASE_CONFIGS).join(', ')}`);
   console.error(`Available utility commands: ${Object.keys(UTILITY_COMMANDS).join(', ')}`);
+  console.error(`\nFor direct config file usage: release-it-preset --config <file>`);
   console.error(`\nRun 'release-it-preset --help' for more information.`);
   process.exit(1);
 }
