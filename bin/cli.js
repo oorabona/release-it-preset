@@ -24,8 +24,10 @@
  */
 
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { validateConfigName, validateUtilityCommand, sanitizeArgs } from './validators.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -91,19 +93,45 @@ For environment variables, see: https://github.com/oorabona/release-it-preset#en
 }
 
 function handleReleaseCommand(configName, args) {
-  const configPath = join(__dirname, '..', RELEASE_CONFIGS[configName]);
+  // Validate inputs
+  try {
+    validateConfigName(configName, new Set(Object.keys(RELEASE_CONFIGS)));
+    sanitizeArgs(args);
+  } catch (error) {
+    console.error(`❌ Validation error: ${error.message}`);
+    process.exit(1);
+  }
 
-  console.log(`🚀 Running release-it with config: ${configName}`);
-  console.log(`📝 Config file: ${configPath}`);
+  const configPath = join(__dirname, '..', RELEASE_CONFIGS[configName]);
+  const userConfigPath = join(process.cwd(), '.release-it.json');
+  const hasUserConfig = existsSync(userConfigPath);
+
+  console.log(`🚀 Running release-it with preset: ${configName}`);
 
   const releaseItCommand = 'release-it';
-  const fullArgs = ['--config', configPath, ...args];
+  let fullArgs;
+  let strategyMessage;
+
+  if (hasUserConfig) {
+    // User has .release-it.json - let release-it handle the merge naturally
+    // The user config should have "extends": "@oorabona/release-it-preset/config/<preset>"
+    fullArgs = [...args];
+    strategyMessage = `📝 Using user config: ${userConfigPath}\n   (should extend preset: ${configName})`;
+    console.log(strategyMessage);
+    console.log(`ℹ️  Ensure your .release-it.json contains: "extends": "@oorabona/release-it-preset/config/${configName}"`);
+  } else {
+    // No user config - use preset directly
+    fullArgs = ['--config', configPath, ...args];
+    strategyMessage = `📝 Using preset config directly: ${configPath}`;
+    console.log(strategyMessage);
+    console.log(`ℹ️  Tip: Create .release-it.json with "extends" to customize the preset`);
+  }
 
   console.log(`💡 Command: ${releaseItCommand} ${fullArgs.join(' ')}\n`);
 
   const child = spawn(releaseItCommand, fullArgs, {
     stdio: 'inherit',
-    shell: true,
+    shell: false, // Security: disable shell to prevent command injection
   });
 
   child.on('error', (error) => {
@@ -119,6 +147,15 @@ function handleReleaseCommand(configName, args) {
 }
 
 function handleUtilityCommand(commandName, args) {
+  // Validate inputs
+  try {
+    validateUtilityCommand(commandName, new Set(Object.keys(UTILITY_COMMANDS)));
+    sanitizeArgs(args);
+  } catch (error) {
+    console.error(`❌ Validation error: ${error.message}`);
+    process.exit(1);
+  }
+
   const base = UTILITY_COMMANDS[commandName];
   const compiledPath = join(__dirname, '..', 'dist', 'scripts', `${base}.js`);
   const sourcePath = join(__dirname, '..', 'scripts', `${base}.ts`);
@@ -136,7 +173,7 @@ function handleUtilityCommand(commandName, args) {
 
     const child = spawn(runner, [target, ...args], {
       stdio: 'inherit',
-      shell: true,
+      shell: false, // Security: disable shell to prevent command injection
     });
 
     child.on('error', (error) => {

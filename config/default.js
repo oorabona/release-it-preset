@@ -17,17 +17,11 @@
  * ```
  */
 
-import { createReleaseNotesGenerator, getGitChangelogCommand, runScriptCommand } from './helpers.js';
+import { runScriptCommand } from './helpers.js';
+import { createBaseGitConfig, createBaseGitHubConfig, createBaseNpmConfig } from './base-config.js';
 
 const config = {
-  git: {
-    changelog: getGitChangelogCommand(),
-    commitMessage: process.env.GIT_COMMIT_MESSAGE || 'release: bump v${version}',
-    tagName: process.env.GIT_TAG_NAME || 'v${version}',
-    requireBranch: process.env.GIT_REQUIRE_BRANCH || 'main',
-    requireUpstream: process.env.GIT_REQUIRE_UPSTREAM === 'true',
-    requireCleanWorkingDir: process.env.GIT_REQUIRE_CLEAN === 'true',
-  },
+  git: createBaseGitConfig(),
   hooks: {
     'before:bump': [
       runScriptCommand('populate-unreleased-changelog'),
@@ -36,20 +30,8 @@ const config = {
       runScriptCommand('republish-changelog'),
     ],
   },
-  github: {
-    release: process.env.GITHUB_RELEASE === 'true',
-    releaseNotes: createReleaseNotesGenerator(),
-  },
-  npm: {
-    skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
-    publish: process.env.NPM_PUBLISH === 'true',
-    versionArgs: ['--allow-same-version'],
-    publishArgs: [
-      '--provenance',
-      '--access',
-      process.env.NPM_ACCESS || 'public',
-    ],
-  },
+  github: createBaseGitHubConfig(),
+  npm: createBaseNpmConfig(),
 };
 
 export default config;

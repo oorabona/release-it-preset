@@ -1,24 +1,11 @@
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_CHANGELOG_COMMAND } from './constants.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const RUN_SCRIPT_PATH = join(__dirname, '..', 'bin', 'run-script.js');
-const DEFAULT_CHANGELOG_COMMAND = [
-  'git log',
-  '--pretty=format:"* %s (%h)"',
-  '${from}..${to}',
-  '--grep="^release"',
-  '--grep="^Release"',
-  '--grep="^release-"',
-  '--grep="^Release-"',
-  '--grep="^hotfix"',
-  '--grep="^Hotfix"',
-  '--grep="^ci"',
-  '--grep="^CI"',
-  '--invert-grep',
-].join(' ');
 
 const DOUBLE_QUOTE = /["\\]/g;
 

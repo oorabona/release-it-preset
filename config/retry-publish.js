@@ -15,26 +15,15 @@
  * ```
  */
 
-import { createReleaseNotesGenerator } from './helpers.js';
+import { createBaseGitHubConfig, createBaseNpmConfig } from './base-config.js';
 
 const config = {
   increment: false,
   git: false,
-  npm: {
-    skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
-    publish: process.env.NPM_PUBLISH === 'true',
-    versionArgs: ['--allow-same-version'],
-    publishArgs: [
-      '--provenance',
-      '--access',
-      process.env.NPM_ACCESS || 'public',
-    ],
-  },
-  github: {
-    release: process.env.GITHUB_RELEASE === 'true',
+  npm: createBaseNpmConfig(),
+  github: createBaseGitHubConfig({
     update: true,
-    releaseNotes: createReleaseNotesGenerator(),
-  },
+  }),
 };
 
 export default config;

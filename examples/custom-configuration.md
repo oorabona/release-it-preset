@@ -4,6 +4,8 @@ This example shows how to customize the release configuration for your specific 
 
 ## Extending the Default Configuration
 
+> **Note:** The CLI now intelligently detects your `.release-it.json` file. When present, it runs `release-it` without `--config`, allowing release-it to naturally merge your config with the preset. Your settings have priority!
+
 Create `.release-it.json`:
 
 ```json

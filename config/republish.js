@@ -18,19 +18,15 @@
  * ```
  */
 
-import { createReleaseNotesGenerator, getGitChangelogCommand, runScriptCommand } from './helpers.js';
+import { runScriptCommand } from './helpers.js';
+import { createBaseGitConfig, createBaseGitHubConfig, createBaseNpmConfig } from './base-config.js';
 
 const config = {
   increment: false,
-  git: {
-    changelog: getGitChangelogCommand(),
+  git: createBaseGitConfig({
     commitMessage: process.env.GIT_COMMIT_MESSAGE || 'chore: republish v${version}',
-    tagName: process.env.GIT_TAG_NAME || 'v${version}',
     tagAnnotation: 'Release ${version} (republished)',
-    requireBranch: process.env.GIT_REQUIRE_BRANCH || 'main',
-    requireUpstream: process.env.GIT_REQUIRE_UPSTREAM === 'true',
-    requireCleanWorkingDir: process.env.GIT_REQUIRE_CLEAN === 'true',
-  },
+  }),
   hooks: {
     'before:init': [
       'echo "⚠️  WARNING: You are about to MOVE an existing tag!"',
@@ -41,21 +37,10 @@ const config = {
       runScriptCommand('republish-changelog'),
     ],
   },
-  npm: {
-    skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
-      publish: process.env.NPM_PUBLISH === 'true',
-    versionArgs: ['--allow-same-version'],
-    publishArgs: [
-      '--provenance',
-      '--access',
-      process.env.NPM_ACCESS || 'public',
-    ],
-  },
-  github: {
-      release: process.env.GITHUB_RELEASE === 'true',
+  npm: createBaseNpmConfig(),
+  github: createBaseGitHubConfig({
     update: true,
-    releaseNotes: createReleaseNotesGenerator(),
-  },
+  }),
 };
 
 export default config;

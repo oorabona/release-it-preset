@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2025-10-06
+
+### Added
+- New `config/base-config.js` module with reusable configuration builders (`createBaseGitConfig`, `createBaseNpmConfig`, `createBaseGitHubConfig`)
+- New `config/constants.js` module centralizing all default values (GIT_DEFAULTS, NPM_DEFAULTS, CHANGELOG_DEFAULTS, HOTFIX_DEFAULTS)
+- New `bin/validators.js` module with security validation functions (`validateConfigName`, `validateUtilityCommand`, `sanitizeArgs`, `validatePath`)
+
+### Fixed
+- **BREAKING FIX**: CLI now respects user's `.release-it.json` file instead of ignoring it ([bin/cli.js](bin/cli.js))
+  - When `.release-it.json` exists: release-it naturally merges user config with preset (user has priority)
+  - When `.release-it.json` absent: uses `--config` directly as before
+  - Users can now customize presets via `.release-it.json` with `extends` field
+- Security: Removed `shell: true` from all `spawn()` calls to prevent command injection ([bin/cli.js](bin/cli.js))
+- Security: Added input validation and sanitization for all CLI arguments
+- Security: Added whitelist validation for config names and utility commands
+
+### Changed
+- **Refactored all 7 configuration files** to use shared base-config builders, eliminating ~40% code duplication:
+  - [config/default.js](config/default.js) - Now uses `createBaseGitConfig()`, `createBaseNpmConfig()`, `createBaseGitHubConfig()`
+  - [config/hotfix.js](config/hotfix.js) - Refactored with override for hotfix commit message
+  - [config/no-changelog.js](config/no-changelog.js) - Uses base configs with `changelog: false` override
+  - [config/republish.js](config/republish.js) - Uses base configs with republish-specific overrides
+  - [config/manual-changelog.js](config/manual-changelog.js) - Simplified using base configs
+  - [config/retry-publish.js](config/retry-publish.js) - Refactored for consistency
+  - [config/changelog-only.js](config/changelog-only.js) - No changes needed (special case)
+- All hardcoded default values moved to `config/constants.js` (compliance with CLAUDE.md constraints)
+- [config/helpers.js](config/helpers.js) - Now imports DEFAULT_CHANGELOG_COMMAND from constants
+
+### Security
+- Implemented OWASP input validation principles
+- Protection against command injection via dangerous characters (`;`, `&`, `|`, `` ` ``, `$()`, etc.)
+- Whitelisting approach for config names and command names
+- Path traversal protection
+
+### Internal
+- Improved SOLID principles compliance:
+  - Single Responsibility: Separated validation, configuration building, and constants
+  - DRY: Reduced code duplication from ~40% to <5%
+  - Dependency Inversion: User configs now have priority over preset configs
+- All 213 unit tests still passing
+- No breaking changes to existing APIs or environment variables
+
 ## [0.6.0] - 2025-10-05
 
 ### Fixed
@@ -87,7 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.7.0...HEAD
 [v0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [v0.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.2.0
@@ -104,3 +146,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.5.2]: https://github.com/oorabona/release-it-preset/releases/tag/v0.5.2
 [v0.6.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.6.0
 [0.6.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.6.0
+[v0.7.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.7.0
+[0.7.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.7.0

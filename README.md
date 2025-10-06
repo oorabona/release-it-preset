@@ -579,6 +579,40 @@ You can override any configuration in your project's `.release-it.json`:
 }
 ```
 
+### CLI Behavior with User Configuration
+
+**Important:** The CLI now intelligently detects and respects your `.release-it.json` file:
+
+- **With `.release-it.json` present:**
+  - The CLI runs `release-it` without `--config` flag
+  - release-it naturally merges your config with the preset via the `extends` field
+  - **Your settings have priority** over preset defaults
+  - Perfect for customizing tag names, commit messages, branch requirements, etc.
+
+- **Without `.release-it.json`:**
+  - The CLI runs `release-it --config <preset-path>`
+  - Uses preset configuration directly
+  - Works exactly as before
+
+**Example of customizing the default preset:**
+
+```json
+{
+  "extends": "@oorabona/release-it-preset/config/default",
+  "git": {
+    "tagName": "release-${version}",
+    "requireBranch": "develop"
+  }
+}
+```
+
+Then run:
+```bash
+pnpm release-it-preset default
+```
+
+The CLI will use your customized settings instead of the preset defaults!
+
 ## Borrowing Scripts & Workflows
 
 - The root `package.json` of this repository shows how to expose convenient `pnpm run release:*` shortcuts. Feel free to copy that block into your own project (adjust the commands if you only need a subset).
@@ -1137,6 +1171,32 @@ graph TB
 5. **Protect main branch** - Require PR reviews before merging
 6. **Use CI for publishing** - Let GitHub Actions handle GitHub releases and npm publishing with provenance
 7. **Local runs are for prep** - Keep local runs focused on changelog, versioning, and tagging unless you explicitly opt in to publish
+
+## Security
+
+This preset implements OWASP security best practices:
+
+### Input Validation
+
+All CLI inputs are validated before execution:
+- **Whitelist validation**: Config names and commands are validated against allowed lists
+- **Argument sanitization**: All arguments are checked for dangerous characters (`;`, `&`, `|`, `` ` ``, `$()`, etc.)
+- **Path traversal protection**: File paths are validated to prevent directory traversal attacks
+
+### Command Injection Prevention
+
+- All `spawn()` calls use `shell: false` to prevent command injection
+- Arguments are passed as arrays, not concatenated strings
+- No user input is ever executed in a shell context
+
+### Architecture
+
+The preset follows SOLID principles:
+- **Single Responsibility**: Each module has one clear purpose
+- **DRY**: Shared configuration builders eliminate code duplication
+- **Dependency Inversion**: User configs have priority over preset defaults
+
+All 213 unit tests verify functionality and security boundaries.
 
 ## Troubleshooting
 

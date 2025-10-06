@@ -14,38 +14,23 @@
  * ```
  */
 
-import { createReleaseNotesGenerator, getGitChangelogCommand, runScriptCommand } from './helpers.js';
+import { runScriptCommand } from './helpers.js';
+import { createBaseGitConfig, createBaseGitHubConfig, createBaseNpmConfig } from './base-config.js';
+import { GIT_DEFAULTS, HOTFIX_DEFAULTS } from './constants.js';
 
 const config = {
-  increment: process.env.HOTFIX_INCREMENT || 'patch',
-  git: {
-    changelog: getGitChangelogCommand(),
-    commitMessage: process.env.GIT_COMMIT_MESSAGE || 'hotfix: bump v${version}',
-    tagName: process.env.GIT_TAG_NAME || 'v${version}',
-    requireBranch: process.env.GIT_REQUIRE_BRANCH || 'main',
-    requireUpstream: process.env.GIT_REQUIRE_UPSTREAM === 'true',
-    requireCleanWorkingDir: process.env.GIT_REQUIRE_CLEAN === 'true',
-  },
+  increment: process.env.HOTFIX_INCREMENT || HOTFIX_DEFAULTS.INCREMENT,
+  git: createBaseGitConfig({
+    commitMessage: process.env.GIT_COMMIT_MESSAGE || GIT_DEFAULTS.HOTFIX_COMMIT_MESSAGE,
+  }),
   hooks: {
     'before:bump': [
       'echo "Creating hotfix release..."',
       runScriptCommand('populate-unreleased-changelog'),
     ],
   },
-  github: {
-    release: process.env.GITHUB_RELEASE === 'true',
-    releaseNotes: createReleaseNotesGenerator(),
-  },
-  npm: {
-    skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
-    publish: process.env.NPM_PUBLISH === 'true',
-    versionArgs: ['--allow-same-version'],
-    publishArgs: [
-      '--provenance',
-      '--access',
-      process.env.NPM_ACCESS || 'public',
-    ],
-  },
+  github: createBaseGitHubConfig(),
+  npm: createBaseNpmConfig(),
 };
 
 export default config;
