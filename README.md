@@ -562,56 +562,153 @@ GIT_REQUIRE_CLEAN="true" \
 pnpm release
 ```
 
-## Configuration Override
+## Configuration Modes
 
-You can override any configuration in your project's `.release-it.json`:
+The preset supports three configuration modes to suit different workflows:
+
+### Mode 1: CLI Only (No Config File)
+
+**When to use:** Simple projects with minimal customization needs
+
+Don't create `.release-it.json`. Just run the CLI:
+
+```bash
+pnpm release-it-preset hotfix
+```
+
+All configuration comes from the preset and environment variables.
+
+**Pros:**
+- ✅ Zero config files
+- ✅ Consistent behavior across projects
+- ✅ Easy to understand
+
+---
+
+### Mode 2: CLI + User Overrides (Recommended)
+
+**When to use:** Customize specific options while using CLI presets
+
+Create `.release-it.json` **WITHOUT the `extends` field**:
 
 ```json
 {
-  "extends": "@oorabona/release-it-preset/config/default",
   "git": {
-    "requireBranch": "develop",
+    "requireBranch": "master",
     "commitMessage": "chore: release v${version}"
   },
-  "github": {
-    "releaseName": "Release ${version}"
+  "npm": {
+    "publish": true
   }
 }
 ```
 
-### CLI Behavior with User Configuration
+Run with CLI preset:
 
-**Important:** The CLI now intelligently detects and respects your `.release-it.json` file:
+```bash
+pnpm release-it-preset hotfix
+```
 
-- **With `.release-it.json` present:**
-  - The CLI runs `release-it` without `--config` flag
-  - release-it naturally merges your config with the preset via the `extends` field
-  - **Your settings have priority** over preset defaults
-  - Perfect for customizing tag names, commit messages, branch requirements, etc.
+**How it works:**
+- CLI selects the preset (`hotfix` in this example)
+- release-it merges your overrides on top of the preset
+- **Your values take precedence** over preset defaults
 
-- **Without `.release-it.json`:**
-  - The CLI runs `release-it --config <preset-path>`
-  - Uses preset configuration directly
-  - Works exactly as before
+**Pros:**
+- ✅ **Recommended approach** for most use cases
+- ✅ CLI controls preset selection
+- ✅ Declarative overrides in config file
+- ✅ No `extends` maintenance needed
 
-**Example of customizing the default preset:**
+**Example use case:** You want to use the `hotfix` preset but require releases from `master` instead of `main`:
 
 ```json
 {
-  "extends": "@oorabona/release-it-preset/config/default",
   "git": {
-    "tagName": "release-${version}",
-    "requireBranch": "develop"
+    "requireBranch": "master"
   }
 }
 ```
 
-Then run:
 ```bash
-pnpm release-it-preset default
+pnpm release-it-preset hotfix  # Uses hotfix preset + your branch override
 ```
 
-The CLI will use your customized settings instead of the preset defaults!
+---
+
+### Mode 3: File with Extends (Advanced)
+
+**When to use:** Lock a specific preset regardless of CLI command
+
+Create `.release-it.json` **WITH the `extends` field**:
+
+```json
+{
+  "extends": "@oorabona/release-it-preset/config/hotfix",
+  "git": {
+    "commitMessage": "custom: ${version}"
+  }
+}
+```
+
+Run matching CLI command:
+
+```bash
+pnpm release-it-preset hotfix  # Must match the extends!
+```
+
+**How it works:**
+- The `extends` field locks the preset
+- CLI command **must match** the preset in `extends`
+- Mismatch triggers an error
+
+**Pros:**
+- ✅ Prevents accidental use of wrong presets
+- ✅ Explicit preset declaration in config
+
+**Cons:**
+- ⚠️ Less flexible (preset locked in file)
+- ⚠️ Requires updating `extends` to switch presets
+
+---
+
+### Configuration Error Handling
+
+If your `.release-it.json` has an `extends` field that doesn't match the CLI command, you'll get a clear error:
+
+```bash
+# Your config extends "default", but you run:
+pnpm release-it-preset hotfix
+
+# ❌ Configuration mismatch error!
+#    CLI preset:               hotfix
+#    .release-it.json extends: default
+#
+# Either:
+#   1. Remove the "extends" field from .release-it.json (recommended)
+#      → Your overrides will merge with the CLI preset automatically
+#
+#   2. Run: release-it-preset default
+#      → Use the preset specified in your config file
+#
+#   3. Update .release-it.json extends to: "@oorabona/release-it-preset/config/hotfix"
+#      → Match your config file to the CLI command
+```
+
+This prevents silent misconfigurations where the wrong preset runs unexpectedly.
+
+---
+
+### Which Mode Should I Use?
+
+| Scenario | Recommended Mode |
+|----------|------------------|
+| Minimal config, trust defaults | **Mode 1** (CLI only) |
+| Customize branch/commit messages | **Mode 2** (CLI + overrides) |
+| Lock preset for safety | **Mode 3** (File with extends) |
+| Monorepo with different presets per package | **Mode 2** (CLI + overrides) |
+
+**Most users should use Mode 2** for the best balance of flexibility and clarity.
 
 ## Borrowing Scripts & Workflows
 
