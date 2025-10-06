@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2025-10-06
+
+### Changed
+- **CLI now validates `.release-it.json` extends field** ([bin/cli.js](bin/cli.js)):
+  - If `extends` field exists, it must match the CLI preset command
+  - Mismatch triggers clear error with 3 resolution options
+  - **Recommended**: Use `.release-it.json` WITHOUT `extends` (Mode 2)
+  - CLI preset + user overrides merge naturally via release-it/c12
+- **Documentation restructured** with "Configuration Modes" section:
+  - Mode 1: CLI only (no config file)
+  - Mode 2: CLI + User Overrides (recommended) - config WITHOUT `extends`
+  - Mode 3: File with Extends (advanced) - config WITH `extends`
+  - Clear guidance on which mode to use for different scenarios
+
+### Fixed
+- Prevent silent misconfigurations where user's `.release-it.json extends` doesn't match CLI preset
+- Error messages now provide actionable resolution steps
+
 ## [0.7.0] - 2025-10-06
 
 ### Added
@@ -129,7 +147,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.8.0...HEAD
 [v0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [0.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.1.0
 [v0.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.2.0
@@ -148,3 +166,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.6.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.6.0
 [v0.7.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.7.0
 [0.7.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.7.0
+[v0.8.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.0
+[0.8.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.0
