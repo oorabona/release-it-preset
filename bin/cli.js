@@ -24,7 +24,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { validateConfigName, validateUtilityCommand, sanitizeArgs } from './validators.js';
@@ -110,24 +110,62 @@ function handleReleaseCommand(configName, args) {
 
   const releaseItCommand = 'release-it';
   let fullArgs;
-  let strategyMessage;
 
   if (hasUserConfig) {
-    // User has .release-it.json - let release-it handle the merge naturally
-    // The user config should have "extends": "@oorabona/release-it-preset/config/<preset>"
+    // Read and validate user config
+    try {
+      const userConfigContent = readFileSync(userConfigPath, 'utf8');
+      const userConfig = JSON.parse(userConfigContent);
+
+      const expectedExtends = `@oorabona/release-it-preset/config/${configName}`;
+
+      if (userConfig.extends) {
+        // If extends exists, it MUST match the CLI preset
+        const extendsMatch = userConfig.extends.match(/@oorabona\/release-it-preset\/config\/(\w+)/);
+        const extendsPreset = extendsMatch?.[1];
+
+        if (extendsPreset && extendsPreset !== configName) {
+          console.error(`\n❌ Configuration mismatch error!`);
+          console.error(`   CLI preset:               ${configName}`);
+          console.error(`   .release-it.json extends: ${extendsPreset}`);
+          console.error(``);
+          console.error(`Either:`);
+          console.error(`  1. Remove the "extends" field from .release-it.json (recommended)`);
+          console.error(`     → Your overrides will merge with the CLI preset automatically`);
+          console.error(``);
+          console.error(`  2. Run: release-it-preset ${extendsPreset}`);
+          console.error(`     → Use the preset specified in your config file`);
+          console.error(``);
+          console.error(`  3. Update .release-it.json extends to: "${expectedExtends}"`);
+          console.error(`     → Match your config file to the CLI command\n`);
+          process.exit(1);
+        }
+
+        console.log(`✅ Config file extends matches CLI preset: ${configName}`);
+        console.log(`📝 Using: ${userConfigPath}\n`);
+      } else {
+        // No extends = natural merge (Mode 3 - Hybrid)
+        console.log(`📝 Merging CLI preset "${configName}" with user config overrides`);
+        console.log(`   Config file: ${userConfigPath}`);
+        console.log(`   User overrides will take precedence\n`);
+      }
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        console.error(`❌ Failed to parse .release-it.json: ${error.message}`);
+      } else {
+        console.error(`❌ Error reading .release-it.json: ${error.message}`);
+      }
+      process.exit(1);
+    }
+
+    // Let release-it handle the merge naturally
     fullArgs = [...args];
-    strategyMessage = `📝 Using user config: ${userConfigPath}\n   (should extend preset: ${configName})`;
-    console.log(strategyMessage);
-    console.log(`ℹ️  Ensure your .release-it.json contains: "extends": "@oorabona/release-it-preset/config/${configName}"`);
   } else {
     // No user config - use preset directly
+    console.log(`📝 Using preset config directly: ${configPath}`);
+    console.log(`   Tip: Create .release-it.json (without "extends") to add overrides\n`);
     fullArgs = ['--config', configPath, ...args];
-    strategyMessage = `📝 Using preset config directly: ${configPath}`;
-    console.log(strategyMessage);
-    console.log(`ℹ️  Tip: Create .release-it.json with "extends" to customize the preset`);
   }
-
-  console.log(`💡 Command: ${releaseItCommand} ${fullArgs.join(' ')}\n`);
 
   const child = spawn(releaseItCommand, fullArgs, {
     stdio: 'inherit',
