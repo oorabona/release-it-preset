@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-04-29
+
 ### ⚠️ BREAKING CHANGES
 
 - `release-it-preset validate` now exits with code **2** (was `1`) when a precondition fails (missing `CHANGELOG.md`, empty `[Unreleased]`, wrong branch, dirty tree, missing npm auth). Other failure paths still exit `1`. Update CI scripts asserting `exitCode === 1`. ([6483e5d](https://github.com/oorabona/release-it-preset/commit/6483e5d))
@@ -341,7 +343,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.10.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -366,3 +368,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [0.7.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.7.0
 [v0.8.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.0
 [0.8.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.0
+[v0.10.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.10.0
+[0.10.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.10.0
