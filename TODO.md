@@ -6,7 +6,6 @@
 ## v1.0 Backlog
 
 ### High priority
-- [ ] 🔐 [Security] `SECURITY.md` (disclosure policy, supported versions) + automated `pnpm audit` job in CI — Priority: H
 - [ ] 🧪 [Tests] E2E with real git temp repos for ≥3 critical workflows (populate → validate → release, hotfix, retry-publish) — Priority: H
 
 ### Medium priority
@@ -21,6 +20,8 @@
 - [ ] 🚀 [Release] v1.0.0-beta.1 → rc.1 → stable cycle once backlog above is clear — Priority: M (gated)
 
 ## Recently Done
+- [x] ✅ [Security] `SECURITY.md` policy + `audit.yml` workflow (`--prod` gate + advisory full-tree) + README badge (`7c9b16f`)
+- [x] ✅ [Deps] Dev tooling bump (TS 6, vitest 4, biome 2.4) + peer release-it `^20` (`d24df9a`)
 - [x] ✅ [Scripts] Phase 3.1 — split `scripts/lib/` into focused modules (`git-utils`, `commit-parser`, `semver-utils`, `string-utils`)
 - [x] ✅ [Scripts] Phase 3.2 — Dependency Injection via `GitDeps` / `PopulateChangelogDeps` interfaces
 - [x] ✅ [Tests] CLI extends validation in `tests/integration/cli-modes.test.ts` (array + monorepo patterns)
