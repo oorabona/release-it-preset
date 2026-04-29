@@ -1,7 +1,7 @@
 # TODO — Roadmap to v1.0.0
 
 **Last updated:** 2026-04-29
-**Current version:** v0.10.0
+**Current version:** v0.10.1
 
 ## v1.0 Backlog
 
@@ -13,14 +13,13 @@
 ### Low priority
 - [ ] 📖 [Docs] `docs/adr/` — record architectural decisions (peer dep, strict `extends`, DI pattern) — Priority: L
 
-### Bugs found in v0.10.0 release dogfooding
-- [ ] 🐛 [Constants] Default `GIT_COMMIT_MESSAGE` is `release: bump v${version}` — not Conventional Commits compliant (`release` is not a recognized type). Change to `chore(release): v${version}` to play well with strict commit-msg hooks. — Priority: M
-
 ### Pre-release
 - [ ] 🚀 [Release] v1.0.0-beta.1 → rc.1 → stable cycle once backlog above is clear — Priority: M (gated)
 
 ## Recently Done
-- [x] ✅ [Release] **v0.10.0 shipped** — bundles all the items below (`c921579` tag `v0.10.0`)
+- [x] ✅ [Release] **v0.10.1 shipped** — patch fixing default release commit messages (`16467a3` tag `v0.10.1`)
+- [x] ✅ [Constants] Default release commit messages now Conventional Commits compliant (`chore(release):` / `chore(hotfix):`); changelog filters updated in tandem (`affe211`)
+- [x] ✅ [Release] **v0.10.0 shipped** — bundles the items below (`c921579` tag `v0.10.0`)
 - [x] ✅ [Scripts] Typed error hierarchy (`ScriptError`/`ValidationError`/`GitError`/`ChangelogError`) + `runScript()` wrapper, applied to all 8 main scripts. **Breaking:** `validate` now exits 2 on precondition failure (was 1) (`6483e5d`)
 - [x] ✅ [Tests] E2E suite with real git temp repos — populate / validate / retry-publish-preflight (`467cca0`)
 - [x] ✅ [Security] `SECURITY.md` policy + `audit.yml` workflow (`--prod` gate + advisory full-tree) + README badge (`7c9b16f`)
