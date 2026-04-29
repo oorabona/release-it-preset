@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.11.0] - 2026-04-30
-
 ### Added
 
 - **`GIT_CHANGELOG_PATH` env var** for monorepo per-package changelog scoping. When set to a repository-relative path (e.g. `packages/tar-xz`), `populate-unreleased-changelog` filters the underlying `git log` to commits touching that subtree, eliminating cross-package noise in monorepo workflows. Path is validated against absolute paths, `..` traversal, and shell metacharacters; invalid values throw `ValidationError`. Empty / unset preserves repository-wide behavior. ([ee81e7d](https://github.com/oorabona/release-it-preset/commit/ee81e7d))
