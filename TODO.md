@@ -1,7 +1,7 @@
 # TODO — Roadmap to v1.0.0
 
-**Last updated:** 2026-04-29
-**Current version:** v0.10.1
+**Last updated:** 2026-04-30
+**Current version:** v0.11.0
 
 ## v1.0 Backlog
 
@@ -17,6 +17,10 @@
 - [ ] 🚀 [Release] v1.0.0-beta.1 → rc.1 → stable cycle once backlog above is clear — Priority: M (gated)
 
 ## Recently Done
+- [x] ✅ [Release] **v0.11.0 shipped** — `GIT_CHANGELOG_PATH` env var + OIDC trusted publishing + smart dist-tag + MIGRATION.md + ADRs (`0b4f857` tag `v0.11.0`)
+- [x] ✅ [CI] npm OIDC trusted publishing + unified publish workflow (no more `NPM_TOKEN` secret) + smart dist-tag + idempotent publish (`560eaba`/`8324918`/`ad40152`/`10d8ce5`)
+- [x] ✅ [Docs] `docs/MIGRATION.md` (v0.x → v1.0 upgrade guide) + `docs/adr/` (4 initial ADRs) (`7841605`)
+- [x] ✅ [Tests] `bin/cli.js` instrumented in vitest coverage report (`4a13219`)
 - [x] ✅ [Release] **v0.10.1 shipped** — patch fixing default release commit messages (`16467a3` tag `v0.10.1`)
 - [x] ✅ [Constants] Default release commit messages now Conventional Commits compliant (`chore(release):` / `chore(hotfix):`); changelog filters updated in tandem (`affe211`)
 - [x] ✅ [Release] **v0.10.0 shipped** — bundles the items below (`c921579` tag `v0.10.0`)
