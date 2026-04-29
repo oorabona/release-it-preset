@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-04-30
+
+### Added
+
+- **`GIT_CHANGELOG_PATH` env var** for monorepo per-package changelog scoping. When set to a repository-relative path (e.g. `packages/tar-xz`), `populate-unreleased-changelog` filters the underlying `git log` to commits touching that subtree, eliminating cross-package noise in monorepo workflows. Path is validated against absolute paths, `..` traversal, and shell metacharacters; invalid values throw `ValidationError`. Empty / unset preserves repository-wide behavior. ([ee81e7d](https://github.com/oorabona/release-it-preset/commit/ee81e7d))
+- **`NPM_TAG` env var support** in `createBaseNpmConfig()`. When set, `--tag <value>` is appended to npm publish args. Used by the publish workflow to auto-assign version-named dist-tags when republishing older versions, so `latest` is not overwritten. ([ad40152](https://github.com/oorabona/release-it-preset/commit/ad40152))
+- **[`docs/MIGRATION.md`](docs/MIGRATION.md)** — version-by-version upgrade guide with breaking-change details and CI script update notes (covers 0.7 → 0.8, 0.9 → 0.10, 0.10 → 0.10.1, 0.10 → 0.11). ([7841605](https://github.com/oorabona/release-it-preset/commit/7841605))
+- **[`docs/adr/`](docs/adr/)** — initial Architecture Decision Records covering peer-dependency rationale, strict `extends` validation, the Dependency Injection script pattern, and the Conventional Commits default for release messages.
+- **`bin/cli.js` in vitest coverage report**. Subprocess instrumentation is not auto-attached so coverage may report 0% for now, but the file is now visible in the report rather than hidden. ([4a13219](https://github.com/oorabona/release-it-preset/commit/4a13219))
+
+### Changed
+
+- **Unified publish workflow**: `retry-publish.yml` was merged into `publish.yml`. The unified workflow accepts `push: tags`, `workflow_call`, and `workflow_dispatch` triggers, plus `tag` / `npm_only` / `github_only` / `dist_tag` inputs for partial replays. Manual replay: `gh workflow run publish.yml --ref main -f tag=vX.Y.Z`. ([8324918](https://github.com/oorabona/release-it-preset/commit/8324918))
+- **npm OIDC trusted publishing**: publish workflow no longer requires an `NPM_TOKEN` secret. The npm CLI handles authentication at publish time via the GitHub Actions id-token. Node bumped to 24 (npm ≥ 11.5.1 needed for OIDC handshake). `NPM_SKIP_CHECKS=true` bypasses release-it's `npm whoami` precheck which has no static identity to verify under OIDC. ([560eaba](https://github.com/oorabona/release-it-preset/commit/560eaba))
+- **Smart npm `dist-tag` selection**: the publish workflow now compares the version being published with the current `latest` on the registry and selects:
+  - `latest` when newer than (or equal to) the current `latest`,
+  - `v<version>` (a version-named tag) when older — so backfilling an older release does not demote `latest`.
+  Override via the `dist_tag` workflow input. ([ad40152](https://github.com/oorabona/release-it-preset/commit/ad40152))
+- **Idempotent publish**: when a version is already on the npm registry, the publish step is skipped gracefully (rather than failing with `cannot publish over existing versions`); the GitHub release update step still runs. ([10d8ce5](https://github.com/oorabona/release-it-preset/commit/10d8ce5))
+
+### Internal
+
+- README.md and CLAUDE.md environment-variable sections updated to document `GIT_CHANGELOG_PATH` and `NPM_TAG`. ([7841605](https://github.com/oorabona/release-it-preset/commit/7841605))
+
 ## [0.10.1] - 2026-04-29
 
 ### Fixed
