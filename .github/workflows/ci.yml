@@ -59,6 +59,9 @@ jobs:
       - name: Run tests with coverage
         run: pnpm test:coverage
 
+      - name: Run E2E tests
+        run: pnpm test:e2e
+
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
         if: always()

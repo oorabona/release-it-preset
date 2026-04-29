@@ -119,7 +119,62 @@ Run `pnpm test:coverage` and inspect `coverage/index.html` for current numbers.
 2. **For a new utility in `scripts/lib/`:** keep it pure (no I/O, no env reads). Test directly with example inputs.
 3. **For new CLI behavior:** add an integration test under `tests/integration/` that spawns `node bin/cli.js …` against a temp directory.
 
+## E2E (real git repos)
+
+E2E tests live in `tests/e2e/` and use a real temporary git repository with no mocks at any layer. Every test creates an isolated repo on disk, runs actual git commands, calls the compiled CLI (`node bin/cli.js`), and asserts on real file output and exit codes.
+
+### How to run
+
+```bash
+pnpm test:e2e          # Run only E2E tests (opt-in, ~30 s timeout per test)
+pnpm test              # Unit + integration (does not include E2E)
+```
+
+CI runs both:
+- `pnpm test:coverage` — unit + integration with coverage
+- `pnpm test:e2e` — E2E suite (separate step in `tests` job)
+
+### Helper API
+
+`tests/helpers/temp-repo.ts` exposes two functions:
+
+```typescript
+import { createTempGitRepo, withTempGitRepo } from '../helpers/temp-repo.js'
+
+// Manual lifecycle
+const repo = createTempGitRepo({ branch: 'main' })
+repo.commit('feat: add login', { 'src/index.ts': 'export {}' })
+repo.tag('1.0.0')
+const { stdout, stderr, exitCode } = repo.runCli(['update'])
+repo.cleanup()
+
+// Auto-cleanup via try/finally
+await withTempGitRepo(async (repo) => {
+  repo.commit('fix: edge case')
+  const result = repo.runCli(['validate'])
+  expect(result.exitCode).toBe(0)
+})
+```
+
+All temp directories are also cleaned up on process exit (orphan safety net).
+
+### Safe env defaults
+
+`runCli()` injects these defaults so tests never accidentally push or publish:
+
+| Variable | Value | Purpose |
+|---|---|---|
+| `GITHUB_RELEASE` | `false` | Disable GitHub release creation |
+| `NPM_PUBLISH` | `false` | Disable npm publish |
+| `NPM_SKIP_CHECKS` | `true` | Skip pre-publish npm safety checks |
+| `GIT_REQUIRE_UPSTREAM` | `false` | Don't require an upstream-tracking branch |
+| `GIT_REQUIRE_CLEAN` | `false` | Allow runs against repos with pending changes |
+| `CI` | `true` | Take the CI auth-token branch in `validate-release` |
+| `NPM_TOKEN` | `dummy-e2e-token` | Satisfies the CI auth-token check without contacting the registry |
+
+Pass an `env` object to `runCli()` to override any of these on a per-call basis.
+
 ## Known limitations
 
 - `bin/cli.js` is exercised end-to-end through integration tests (`tests/integration/cli*.test.ts`) but is not in the coverage `include` glob (it is plain JS, not TypeScript). Integration tests assert behavior; line coverage for the wrapper is intentionally out of scope.
-- E2E tests using a real temp git repo (no mocks at all) are not yet wired — see [`TODO.md`](../TODO.md).
+- Network-bound release steps (npm publish, GitHub release creation) remain disabled in E2E tests via the safe env defaults above. They are not fully exercised at the E2E layer — doing so would require real registry credentials and network access. The compiled script logic up to the point of network I/O is fully covered.
