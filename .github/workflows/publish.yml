@@ -101,6 +101,24 @@ jobs:
       - name: Run pre-flight checks
         run: pnpm release-it-preset retry-publish-preflight
 
+      # npm rejects publishing the same version twice. Detect early so the
+      # workflow can skip cleanly instead of failing — useful for idempotent
+      # replays (e.g. when the GitHub release step needs a retry but npm
+      # already shipped). The GitHub release update step still runs.
+      - name: Check if version already on registry
+        id: registry_state
+        run: |
+          PKG="$(node -p 'require("./package.json").name')"
+          VER="$(node -p 'require("./package.json").version')"
+          if npm view "${PKG}@${VER}" version >/dev/null 2>&1; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "ℹ️  ${PKG}@${VER} already published — npm publish step will be skipped."
+            echo "   To adjust the npm dist-tag, run: npm dist-tag add ${PKG}@${VER} <tag>"
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            echo "✅ ${PKG}@${VER} not yet on npm — will publish."
+          fi
+
       # Decide which npm dist-tag to set. When republishing an older version
       # we must NOT overwrite `latest`; we use a version-named dist-tag instead
       # (e.g. `v0.10.0`). Caller can force a specific tag via the workflow input.
@@ -138,9 +156,11 @@ jobs:
         # OIDC trusted publishing: the npm CLI handles auth at publish time via
         # the id-token. NPM_SKIP_CHECKS bypasses release-it's pre-publish
         # `npm whoami`, which has no static identity to verify under OIDC.
+        # NPM_PUBLISH falls back to `false` when the version is already on
+        # the registry, leaving room for the GitHub release step to still run.
         run: pnpm release-it-preset retry-publish --ci
         env:
-          NPM_PUBLISH: ${{ inputs.github_only && 'false' || 'true' }}
+          NPM_PUBLISH: ${{ (inputs.github_only || steps.registry_state.outputs.already_published == 'true') && 'false' || 'true' }}
           GITHUB_RELEASE: ${{ inputs.npm_only && 'false' || 'true' }}
           NPM_SKIP_CHECKS: 'true'
           NPM_TAG: ${{ steps.dist_tag.outputs.tag }}
