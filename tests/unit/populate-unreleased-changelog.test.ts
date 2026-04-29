@@ -7,6 +7,7 @@ import {
   parseCommitsWithMultiplePrefixes,
   populateChangelog,
 } from '../../scripts/populate-unreleased-changelog'
+import { ValidationError } from '../../scripts/lib/errors'
 
 describe('populate-unreleased-changelog (with DI)', () => {
   let deps: PopulateChangelogDeps
@@ -400,6 +401,71 @@ describe('populate-unreleased-changelog (with DI)', () => {
       const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
       expect(writtenContent).toBe('## [Unreleased]\n\nNo changes yet.\n\n')
       expect(deps.log).toHaveBeenCalledWith('✅ Updated [Unreleased] section with 0 commit(s)')
+    })
+
+    describe('GIT_CHANGELOG_PATH path scoping', () => {
+      beforeEach(() => {
+        vi.mocked(deps.readFileSync).mockReturnValue(
+          '# Changelog\n\n## [Unreleased]\n\nNo changes yet.\n\n',
+        )
+      })
+
+      it('should append -- <path> to git log when GIT_CHANGELOG_PATH is set', () => {
+        vi.mocked(deps.getEnv).mockImplementation(key =>
+          key === 'GIT_CHANGELOG_PATH' ? 'packages/tar-xz' : undefined,
+        )
+        vi.mocked(deps.execSync)
+          .mockReturnValueOnce('v1.0.0') // git describe
+          .mockReturnValueOnce('') // git log
+
+        populateChangelog(deps)
+
+        const execCalls = vi.mocked(deps.execSync).mock.calls
+        const gitLogCall = execCalls.find(([cmd]) =>
+          typeof cmd === 'string' && cmd.startsWith('git log'),
+        )
+        expect(gitLogCall).toBeDefined()
+        expect(gitLogCall![0]).toContain(' -- packages/tar-xz')
+      })
+
+      it('should throw ValidationError when GIT_CHANGELOG_PATH starts with ..', () => {
+        vi.mocked(deps.getEnv).mockImplementation(key =>
+          key === 'GIT_CHANGELOG_PATH' ? '../escape' : undefined,
+        )
+        vi.mocked(deps.execSync).mockReturnValue('v1.0.0')
+
+        expect(() => populateChangelog(deps)).toThrow(ValidationError)
+        expect(() => populateChangelog(deps)).toThrow(
+          /GIT_CHANGELOG_PATH must be a relative path under the repository/,
+        )
+      })
+
+      it('should throw ValidationError when GIT_CHANGELOG_PATH starts with /', () => {
+        vi.mocked(deps.getEnv).mockImplementation(key =>
+          key === 'GIT_CHANGELOG_PATH' ? '/absolute/path' : undefined,
+        )
+        vi.mocked(deps.execSync).mockReturnValue('v1.0.0')
+
+        expect(() => populateChangelog(deps)).toThrow(ValidationError)
+      })
+
+      it('should not append path filter when GIT_CHANGELOG_PATH is empty', () => {
+        vi.mocked(deps.getEnv).mockImplementation(key =>
+          key === 'GIT_CHANGELOG_PATH' ? '' : undefined,
+        )
+        vi.mocked(deps.execSync)
+          .mockReturnValueOnce('v1.0.0')
+          .mockReturnValueOnce('')
+
+        populateChangelog(deps)
+
+        const execCalls = vi.mocked(deps.execSync).mock.calls
+        const gitLogCall = execCalls.find(([cmd]) =>
+          typeof cmd === 'string' && cmd.startsWith('git log'),
+        )
+        expect(gitLogCall).toBeDefined()
+        expect(gitLogCall![0]).not.toContain(' -- ')
+      })
     })
   })
 })

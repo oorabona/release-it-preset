@@ -24,6 +24,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { getGitHubRepoUrl } from './lib/git-utils.js';
 import { CONVENTIONAL_COMMIT_REGEX } from './lib/commit-parser.js';
 import { runScript } from './lib/run-script.js';
+import { ValidationError } from './lib/errors.js';
 
 /**
  * Dependencies interface for dependency injection
@@ -229,9 +230,25 @@ export function populateChangelog(deps: PopulateChangelogDeps): void {
     latestTag = '';
   }
 
+  const gitChangelogPath = deps.getEnv('GIT_CHANGELOG_PATH');
+  let pathFilter = '';
+  if (gitChangelogPath !== undefined && gitChangelogPath !== '') {
+    // Validate: must be a relative path — no leading slash, no ".." segments, no shell metacharacters
+    if (
+      gitChangelogPath.startsWith('/') ||
+      /(^|[/\\])\.\.([/\\]|$)/.test(gitChangelogPath) ||
+      /[`$;&|<>{}()\\*?!#"']/.test(gitChangelogPath)
+    ) {
+      throw new ValidationError(
+        `GIT_CHANGELOG_PATH must be a relative path under the repository (got: ${gitChangelogPath})`
+      );
+    }
+    pathFilter = ` -- ${gitChangelogPath}`;
+  }
+
   const gitLogCommand = latestTag
-    ? `git log --pretty=format:"%H|%B|||END|||" ${latestTag}..HEAD`
-    : `git log --pretty=format:"%H|%B|||END|||"`;
+    ? `git log --pretty=format:"%H|%B|||END|||" ${latestTag}..HEAD${pathFilter}`
+    : `git log --pretty=format:"%H|%B|||END|||"${pathFilter}`;
 
   let gitOutput: string;
   try {
