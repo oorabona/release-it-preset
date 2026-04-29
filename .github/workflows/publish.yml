@@ -23,6 +23,11 @@ on:
         description: 'Create GitHub Release only (skip npm publish)'
         type: boolean
         default: false
+      dist_tag:
+        description: 'npm dist-tag override (default: auto — `latest` only when version is newest)'
+        type: string
+        required: false
+        default: ''
   workflow_dispatch:
     inputs:
       tag:
@@ -37,6 +42,11 @@ on:
         description: 'Create GitHub Release only (skip npm publish)'
         type: boolean
         default: false
+      dist_tag:
+        description: 'npm dist-tag override (default: auto — `latest` only when version is newest)'
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -91,6 +101,39 @@ jobs:
       - name: Run pre-flight checks
         run: pnpm release-it-preset retry-publish-preflight
 
+      # Decide which npm dist-tag to set. When republishing an older version
+      # we must NOT overwrite `latest`; we use a version-named dist-tag instead
+      # (e.g. `v0.10.0`). Caller can force a specific tag via the workflow input.
+      - name: Determine npm dist-tag
+        id: dist_tag
+        run: |
+          PUBLISHING="$(node -p 'require("./package.json").version')"
+          PKG="$(node -p 'require("./package.json").name')"
+
+          if [ -n "${{ inputs.dist_tag }}" ]; then
+            TAG="${{ inputs.dist_tag }}"
+            REASON="explicit input"
+          else
+            CURRENT_LATEST="$(npm view "${PKG}" version 2>/dev/null || true)"
+            if [ -z "$CURRENT_LATEST" ]; then
+              TAG="latest"
+              REASON="first publish"
+            elif [ "$(printf '%s\n%s\n' "$PUBLISHING" "$CURRENT_LATEST" | sort -V | tail -1)" = "$PUBLISHING" ] \
+                 && [ "$PUBLISHING" != "$CURRENT_LATEST" ]; then
+              TAG="latest"
+              REASON="newer than current latest ($CURRENT_LATEST)"
+            elif [ "$PUBLISHING" = "$CURRENT_LATEST" ]; then
+              TAG="latest"
+              REASON="same as current latest (idempotent)"
+            else
+              TAG="v$PUBLISHING"
+              REASON="older than current latest ($CURRENT_LATEST) — using version-named tag"
+            fi
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "📌 Publishing ${PKG}@${PUBLISHING} with --tag ${TAG} (${REASON})"
+
       - name: Publish (npm + GitHub release per inputs)
         # OIDC trusted publishing: the npm CLI handles auth at publish time via
         # the id-token. NPM_SKIP_CHECKS bypasses release-it's pre-publish
@@ -100,6 +143,7 @@ jobs:
           NPM_PUBLISH: ${{ inputs.github_only && 'false' || 'true' }}
           GITHUB_RELEASE: ${{ inputs.npm_only && 'false' || 'true' }}
           NPM_SKIP_CHECKS: 'true'
+          NPM_TAG: ${{ steps.dist_tag.outputs.tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Summarize

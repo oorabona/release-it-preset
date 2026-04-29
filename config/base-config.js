@@ -41,15 +41,24 @@ export function createBaseGitConfig(overrides = {}) {
  * @returns {Object} Npm configuration object
  */
 export function createBaseNpmConfig(overrides = {}) {
+  const publishArgs = [
+    ...NPM_DEFAULTS.PUBLISH_ARGS_BASE,
+    '--access',
+    process.env.NPM_ACCESS || NPM_DEFAULTS.ACCESS,
+  ];
+
+  // Optional --tag <name> for npm dist-tag control (e.g. republishing an older
+  // version without overwriting `latest`). When unset, npm uses `latest`.
+  const npmTag = process.env.NPM_TAG;
+  if (npmTag) {
+    publishArgs.push('--tag', npmTag);
+  }
+
   const defaults = {
     skipChecks: process.env.NPM_SKIP_CHECKS === 'true',
     publish: process.env.NPM_PUBLISH === 'true',
     versionArgs: NPM_DEFAULTS.VERSION_ARGS,
-    publishArgs: [
-      ...NPM_DEFAULTS.PUBLISH_ARGS_BASE,
-      '--access',
-      process.env.NPM_ACCESS || NPM_DEFAULTS.ACCESS,
-    ],
+    publishArgs,
   };
 
   return {
