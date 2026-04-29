@@ -5,9 +5,6 @@
 
 ## v1.0 Backlog
 
-### High priority
-- [ ] 🧪 [Tests] E2E with real git temp repos for ≥3 critical workflows (populate → validate → release, hotfix, retry-publish) — Priority: H
-
 ### Medium priority
 - [ ] 🔧 [Scripts] Phase 3.3 — `BaseScript` class + typed errors (`ValidationError`, `GitError`, `ChangelogError`) — Priority: M
 - [ ] 🧪 [Tests] Add `bin/cli.js` to coverage instrumentation (`vitest.config.ts` include) — Priority: M
@@ -20,6 +17,7 @@
 - [ ] 🚀 [Release] v1.0.0-beta.1 → rc.1 → stable cycle once backlog above is clear — Priority: M (gated)
 
 ## Recently Done
+- [x] ✅ [Tests] E2E suite with real git temp repos — populate / validate / retry-publish-preflight (`467cca0`)
 - [x] ✅ [Security] `SECURITY.md` policy + `audit.yml` workflow (`--prod` gate + advisory full-tree) + README badge (`7c9b16f`)
 - [x] ✅ [Deps] Dev tooling bump (TS 6, vitest 4, biome 2.4) + peer release-it `^20` (`d24df9a`)
 - [x] ✅ [Scripts] Phase 3.1 — split `scripts/lib/` into focused modules (`git-utils`, `commit-parser`, `semver-utils`, `string-utils`)
