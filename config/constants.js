@@ -13,8 +13,8 @@
  * Git configuration defaults
  */
 export const GIT_DEFAULTS = {
-  COMMIT_MESSAGE: 'release: bump v${version}',
-  HOTFIX_COMMIT_MESSAGE: 'hotfix: bump v${version}',
+  COMMIT_MESSAGE: 'chore(release): v${version}',
+  HOTFIX_COMMIT_MESSAGE: 'chore(hotfix): v${version}',
   TAG_NAME: 'v${version}',
   REQUIRE_BRANCH: 'main',
   REMOTE: 'origin',
@@ -22,7 +22,9 @@ export const GIT_DEFAULTS = {
 
 /**
  * Default git changelog command
- * Filters out commits matching release/hotfix/ci patterns
+ * Filters out commits matching release/hotfix/ci patterns, in both
+ * legacy form (`release: bump ...`) and Conventional Commits form
+ * (`chore(release): ...`, `chore(hotfix): ...`).
  */
 export const DEFAULT_CHANGELOG_COMMAND = [
   'git log',
@@ -36,6 +38,9 @@ export const DEFAULT_CHANGELOG_COMMAND = [
   '--grep="^Hotfix"',
   '--grep="^ci"',
   '--grep="^CI"',
+  '--grep="^chore(release)"',
+  '--grep="^chore(hotfix)"',
+  '--grep="^chore(ci)"',
   '--invert-grep',
 ].join(' ');
 

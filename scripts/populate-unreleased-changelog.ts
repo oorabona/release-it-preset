@@ -133,7 +133,14 @@ export function parseCommitsWithMultiplePrefixes(gitOutput: string, repoUrl: str
         const firstLine = body.split('\n')[0].trim();
         if (firstLine) {
           const lowerFirstLine = firstLine.toLowerCase();
-          const ignoredPatterns = [/^release\b/, /^hotfix\b/, /^ci\b/];
+          const ignoredPatterns = [
+        /^release\b/,
+        /^hotfix\b/,
+        /^ci\b/,
+        /^chore\(release\)/i,
+        /^chore\(hotfix\)/i,
+        /^chore\(ci\)/i,
+      ];
           const shouldSkip = ignoredPatterns.some((pattern) => pattern.test(lowerFirstLine));
 
           if (shouldSkip) {

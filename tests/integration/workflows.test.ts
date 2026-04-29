@@ -140,7 +140,7 @@ describe('Workflows integration', () => {
       process.env.GIT_COMMIT_MESSAGE = 'chore: release ${version}'
 
       // biome-ignore lint/suspicious/noTemplateCurlyInString: This is a literal string for release-it template, not a TS template string
-      const message = process.env.GIT_COMMIT_MESSAGE || 'release: bump v${version}'
+      const message = process.env.GIT_COMMIT_MESSAGE || 'chore(release): v${version}'
 
       // biome-ignore lint/suspicious/noTemplateCurlyInString: This is a literal string for release-it template, not a TS template string
       expect(message).toBe('chore: release ${version}')

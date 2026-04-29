@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Default release commit messages are now Conventional Commits compliant.** `GIT_DEFAULTS.COMMIT_MESSAGE` changed from `release: bump v${version}` to `chore(release): v${version}`, and `HOTFIX_COMMIT_MESSAGE` from `hotfix: bump v${version}` to `chore(hotfix): v${version}`. The previous defaults were rejected by strict commit-msg hooks since `release` and `hotfix` are not recognized Conventional Commits types. Discovered while dogfooding v0.10.0. Users who explicitly set `GIT_COMMIT_MESSAGE` are unaffected.
+- **Changelog filters updated** to recognize the new release commit format. `populate-unreleased-changelog` now skips commits matching `^chore(release)`, `^chore(hotfix)`, and `^chore(ci)` in addition to the legacy `^release`, `^hotfix`, `^ci` prefixes. `DEFAULT_CHANGELOG_COMMAND` (used by release-it preview) gets the matching grep flags. Without this, the v0.10.0 release commit would have polluted v0.11.0's `[Unreleased]` section.
+
 ## [0.10.0] - 2026-04-29
 
 ### ⚠️ BREAKING CHANGES
