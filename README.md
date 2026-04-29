@@ -4,6 +4,7 @@ Shared [release-it](https://github.com/release-it/release-it) configuration and 
 
 [![codecov](https://codecov.io/github/oorabona/release-it-preset/graph/badge.svg?token=6RMN34Z7TX)](https://codecov.io/github/oorabona/release-it-preset)
 [![CI](https://github.com/oorabona/release-it-preset/actions/workflows/ci.yml/badge.svg)](https://github.com/oorabona/release-it-preset/actions/workflows/ci.yml)
+[![Audit](https://github.com/oorabona/release-it-preset/actions/workflows/audit.yml/badge.svg)](https://github.com/oorabona/release-it-preset/actions/workflows/audit.yml)
 [![NPM Version](https://img.shields.io/npm/v/release-it-preset.svg)](https://npmjs.org/package/@oorabona/release-it-preset)
 [![NPM Downloads](https://img.shields.io/npm/dm/release-it-preset.svg)](https://npmjs.org/package/@oorabona/release-it-preset)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)

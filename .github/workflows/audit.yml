@@ -1,0 +1,44 @@
+name: Dependency Audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: "0 9 * * 1"  # Monday 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: pnpm audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Production deps only — this preset has no runtime dependencies of its own,
+      # so this gate stays clean unless we introduce one with known issues.
+      - name: Audit production deps (high+)
+        run: pnpm audit --prod --audit-level=high
+
+      # Full tree (including dev + peer transitives) — advisory only.
+      # Surfaces upstream issues in release-it / vitest / etc. without blocking PRs.
+      - name: Audit full tree (moderate+, advisory)
+        if: always()
+        continue-on-error: true
+        run: pnpm audit --audit-level=moderate || echo "::warning::Moderate or higher vulnerabilities present in dev/peer transitives — review at next opportunity."
