@@ -5,16 +5,13 @@
 
 ## v1.0 Backlog
 
-### Medium priority
-- [ ] 🧪 [Tests] Add `bin/cli.js` to coverage instrumentation (`vitest.config.ts` include) — Priority: M
-- [ ] 📖 [Docs] `docs/MIGRATION.md` — v0.x → v1.0 breaking changes guide (start with `validate` exit-code change from `6483e5d`) — Priority: M
-- [ ] 🌳 [Scripts] **Monorepo per-package CHANGELOG path scoping** — add opt-in `GIT_CHANGELOG_PATH` env var support to `scripts/populate-unreleased-changelog.ts`. When set, append ` -- ${path}` to the `git log` command (currently lines 224-226 in v0.9.0/v0.10.0 — verify line numbers on HEAD) so monorepo consumers can scope per-package CHANGELOG to commits touching their subdir. Read via existing `deps.getEnv()` DI pattern (mirrors `CHANGELOG_FILE`/`GITHUB_REPOSITORY`/`GIT_REMOTE` injection). Add unit test in `tests/unit/populate-unreleased-changelog.test.ts` mocking `getEnv('GIT_CHANGELOG_PATH')` and asserting the path appears in the `execSync` git log invocation. **Origin:** discovered via `node-liblzma#25` dogfooding — `packages/tar-xz/CHANGELOG.md` v6.1.0 captured node-liblzma C++/wasm commits (#111 wasm, #112 native), ~30 Dependabot lockfile refreshes, and repo-wide CI tweaks because `git log` runs without path filter regardless of consumer cwd. Path filter eliminates ~80% of cross-package pollution. Body-fragment parser issue (separate gap : multi-line commit bodies leak as `### Changed` entries) is out of scope — track separately if user requests. — Priority: M
-
-### Low priority
-- [ ] 📖 [Docs] `docs/adr/` — record architectural decisions (peer dep, strict `extends`, DI pattern) — Priority: L
+_All medium and low priority items shipped in v0.11.0. Only the stability cycle remains._
 
 ### Pre-release
-- [ ] 🚀 [Release] v1.0.0-beta.1 → rc.1 → stable cycle once backlog above is clear — Priority: M (gated)
+- [ ] 🚀 [Release] v1.0.0-beta.1 → rc.1 → stable cycle — declare API freeze (configs, env vars, CLI flags, exit codes); no new features expected, just commitment to semver — Priority: M (gated)
+
+### Out-of-scope follow-ups (track if user requests)
+- [ ] 💡 [Scripts] Multi-line commit body parser — multi-line commit bodies currently leak as `### Changed` entries instead of being treated as commit metadata. Surfaced during the `GIT_CHANGELOG_PATH` work but explicitly out of scope for v0.11.0.
 
 ## Recently Done
 - [x] ✅ [Release] **v0.11.0 shipped** — `GIT_CHANGELOG_PATH` env var + OIDC trusted publishing + smart dist-tag + MIGRATION.md + ADRs (`0b4f857` tag `v0.11.0`)
