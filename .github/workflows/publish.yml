@@ -10,13 +10,19 @@ on:
         description: 'Tag to publish (optional, defaults to latest tag from git describe)'
         type: string
         required: false
-    secrets:
-      NPM_TOKEN:
-        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v0.10.1). Defaults to the workflow ref.'
+        type: string
+        required: false
 
 permissions:
   contents: write
-  id-token: write
+  id-token: write  # Required for npm OIDC trusted publishing
+
+env:
+  NODE_VERSION: '24'  # npm >= 11.5.1 ships with Node 24, required for OIDC trusted publishing
 
 jobs:
   build-dist:
@@ -43,13 +49,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-
-      - name: Configure npm authentication
-        run: npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -61,9 +63,12 @@ jobs:
           path: dist
 
       - name: Update GitHub release and publish to npm
+        # OIDC trusted publishing: npm CLI handles auth at publish time via the
+        # id-token. NPM_SKIP_CHECKS bypasses release-it's pre-publish `npm whoami`,
+        # which has no usable identity until the publish handshake fires.
         run: pnpm release-it-preset retry-publish --ci
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_PUBLISH: 'true'
+          NPM_SKIP_CHECKS: 'true'
           GITHUB_RELEASE: 'true'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

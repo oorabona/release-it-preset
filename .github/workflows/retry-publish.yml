@@ -20,7 +20,10 @@ on:
 
 permissions:
   contents: write
-  id-token: write
+  id-token: write  # Required for npm OIDC trusted publishing
+
+env:
+  NODE_VERSION: '24'  # npm >= 11.5.1 ships with Node 24, required for OIDC trusted publishing
 
 jobs:
   determine-tag:
@@ -82,13 +85,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-
-      - name: Configure npm authentication
-        run: npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -107,6 +106,8 @@ jobs:
         run: pnpm release-it-preset retry-publish-preflight
 
       - name: Retry publish with release-it-preset
+        # OIDC trusted publishing: npm CLI handles auth at publish time via the
+        # id-token. NPM_SKIP_CHECKS bypasses release-it's pre-publish `npm whoami`.
         run: |
           if [ "${{ inputs.github_only }}" == "true" ]; then
             export NPM_PUBLISH=false
@@ -122,7 +123,7 @@ jobs:
 
           pnpm release-it-preset retry-publish --ci
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_SKIP_CHECKS: 'true'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Display result
