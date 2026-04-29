@@ -1,5 +1,10 @@
 name: Publish Package
 
+# Single workflow for both initial publish (tag push) and manual replay
+# (workflow_dispatch). Uses npm OIDC trusted publishing — no NPM_TOKEN needed.
+# Configure the OIDC trusted publisher on npmjs against this workflow path
+# (.github/workflows/publish.yml).
+
 on:
   push:
     tags:
@@ -7,15 +12,31 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: 'Tag to publish (optional, defaults to latest tag from git describe)'
+        description: 'Tag to publish (defaults to the triggering tag)'
         type: string
         required: false
+      npm_only:
+        description: 'Publish to npm only (skip GitHub Release)'
+        type: boolean
+        default: false
+      github_only:
+        description: 'Create GitHub Release only (skip npm publish)'
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to publish (e.g. v0.10.1). Defaults to the workflow ref.'
+        description: 'Tag to publish (e.g. v0.10.1). Required when triggered from a branch.'
         type: string
         required: false
+      npm_only:
+        description: 'Publish to npm only (skip GitHub Release)'
+        type: boolean
+        default: false
+      github_only:
+        description: 'Create GitHub Release only (skip npm publish)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,12 +50,12 @@ jobs:
     uses: oorabona/release-it-preset/.github/workflows/build-dist.yml@main
     with:
       artifact_name: dist-build
+      ref: ${{ inputs.tag || github.ref }}
     secrets: inherit
 
   publish:
     runs-on: ubuntu-latest
     needs: build-dist
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -62,13 +83,35 @@ jobs:
           name: ${{ needs.build-dist.outputs.artifact_name }}
           path: dist
 
-      - name: Update GitHub release and publish to npm
-        # OIDC trusted publishing: npm CLI handles auth at publish time via the
-        # id-token. NPM_SKIP_CHECKS bypasses release-it's pre-publish `npm whoami`,
-        # which has no usable identity until the publish handshake fires.
+      - name: Show current commit
+        run: |
+          echo "Current commit: $(git rev-parse HEAD)"
+          echo "Refs: $(git describe --all 2>/dev/null || true)"
+
+      - name: Run pre-flight checks
+        run: pnpm release-it-preset retry-publish-preflight
+
+      - name: Publish (npm + GitHub release per inputs)
+        # OIDC trusted publishing: the npm CLI handles auth at publish time via
+        # the id-token. NPM_SKIP_CHECKS bypasses release-it's pre-publish
+        # `npm whoami`, which has no static identity to verify under OIDC.
         run: pnpm release-it-preset retry-publish --ci
         env:
-          NPM_PUBLISH: 'true'
+          NPM_PUBLISH: ${{ inputs.github_only && 'false' || 'true' }}
+          GITHUB_RELEASE: ${{ inputs.npm_only && 'false' || 'true' }}
           NPM_SKIP_CHECKS: 'true'
-          GITHUB_RELEASE: 'true'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summarize
+        run: |
+          REF="${{ inputs.tag || github.ref_name }}"
+          echo "## Publish Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Tag**: ${REF}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ inputs.npm_only }}" = "true" ]; then
+            echo "**Scope**: npm only" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ inputs.github_only }}" = "true" ]; then
+            echo "**Scope**: GitHub release only" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "**Scope**: npm + GitHub release" >> "$GITHUB_STEP_SUMMARY"
+          fi

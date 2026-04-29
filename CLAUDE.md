@@ -335,22 +335,19 @@ Extends mode:
    - Uses `release-it-preset hotfix --ci`
    - Auto-generates changelog from commits
 
-4. **retry-publish.yml** - Retry Failed Publish
-   - Manual trigger to republish existing tag
-   - Options: npm only, GitHub only, or both
-   - Runs pre-flight checks
-
-5. **republish.yml** - Exceptional Republish (DANGEROUS)
+4. **republish.yml** - Exceptional Republish (DANGEROUS)
    - Moves existing git tag (breaks semver immutability)
    - Requires confirmation phrase: "I understand the risks"
    - 10-second safety delay
    - Creates audit trail
    - Only for critical emergencies
 
-6. **publish.yml** - Automated GitHub Release + npm Publish
-   - Triggered on tag push (v*)
-   - Runs `release-it-preset retry-publish --ci` to update the GitHub release and publish to npm with provenance
-   - Sets `GITHUB_RELEASE=true` and `NPM_PUBLISH=true` in the workflow environment
+5. **publish.yml** - Unified GitHub Release + npm Publish
+   - Triggered on tag push (`v*`), `workflow_call`, or `workflow_dispatch`
+   - Manual replay: `gh workflow run publish.yml --ref main -f tag=vX.Y.Z`
+   - Optional `npm_only` / `github_only` inputs scope a partial replay
+   - Uses npm OIDC trusted publishing — no `NPM_TOKEN` secret needed
+   - Runs `release-it-preset retry-publish-preflight` then `retry-publish --ci`
 
 **Principle: "Eat our own dog food"**
 All workflows use our own `release-it-preset` commands instead of custom code or direct release-it calls.
