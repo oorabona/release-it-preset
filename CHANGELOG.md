@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ⚠️ BREAKING CHANGES
+
+- `release-it-preset validate` now exits with code **2** (was `1`) when a precondition fails (missing `CHANGELOG.md`, empty `[Unreleased]`, wrong branch, dirty tree, missing npm auth). Other failure paths still exit `1`. Update CI scripts asserting `exitCode === 1`. ([6483e5d](https://github.com/oorabona/release-it-preset/commit/6483e5d))
+
+### Added
+
+- **Typed error hierarchy for scripts**: `ScriptError` base + `ValidationError` (exit 2), `GitError` (exit 1), `ChangelogError` (exit 1) in `scripts/lib/errors.ts`. New `runScript()` wrapper in `scripts/lib/run-script.ts` standardizes exit-code mapping across all 8 main scripts. ([6483e5d](https://github.com/oorabona/release-it-preset/commit/6483e5d))
+- **E2E test suite** under `tests/e2e/` with a real git temp-repo helper (`tests/helpers/temp-repo.ts`). Eight tests cover populate-changelog, validate, and retry-publish-preflight against real git operations — no mocks. New `pnpm test:e2e` script. ([467cca0](https://github.com/oorabona/release-it-preset/commit/467cca0))
+- **Security policy** ([`SECURITY.md`](SECURITY.md)) with private-advisory disclosure channel, supported-version matrix, and acknowledgement / triage / disclosure SLAs. ([7c9b16f](https://github.com/oorabona/release-it-preset/commit/7c9b16f))
+- **Dependency audit workflow** (`.github/workflows/audit.yml`) running `pnpm audit --prod --audit-level=high` on every PR + weekly cron, with a full-tree advisory step for transitive issues. README badge added. ([7c9b16f](https://github.com/oorabona/release-it-preset/commit/7c9b16f))
+- **Contributor documentation**: [`CLAUDE.md`](CLAUDE.md) (architecture + CLI/config/script reference), [`docs/testing.md`](docs/testing.md) (DI pattern + E2E helper + error-handling pattern), [`BACKLOG_STUDY.md`](BACKLOG_STUDY.md) (post-v1 ideas), [`docs/archive/`](docs/archive/) (frozen roadmap snapshots with policy). ([6fde0cf](https://github.com/oorabona/release-it-preset/commit/6fde0cf))
+
+### Changed
+
+- **Dev tooling bumped to latest**: TypeScript 5.9 → 6.0, Vitest 3 → 4, `@vitest/coverage-v8` 3 → 4, `@biomejs/biome` 2.2 → 2.4, `@types/node` 22 → 25, `tsx` 4.20 → 4.21, `nano-staged` 0.8 → 1.0, `rimraf` 6.0 → 6.1. ([d24df9a](https://github.com/oorabona/release-it-preset/commit/d24df9a))
+- **Peer contract aligned**: `peerDependencies.release-it` `^19.0.0` → `^20.0.0` (matches the version the preset is now developed and tested against). ([d24df9a](https://github.com/oorabona/release-it-preset/commit/d24df9a))
+- `tsconfig.json` now sets an explicit `"rootDir": "./scripts"` (required by TypeScript 6 when `outDir` is set). ([d24df9a](https://github.com/oorabona/release-it-preset/commit/d24df9a))
+
+### Internal
+
+- TODO.md compacted from 506 lines to a < 40-line living roadmap; verbose pre-v0.9 history archived under [`docs/archive/TODO-2025-Q4.md`](docs/archive/TODO-2025-Q4.md) with a per-item resolution table.
+- `.github/copilot-instructions.md` refreshed (release-config list, DI pattern for new scripts, removed stale runtime-dep claim).
+
 ## [0.9.0] - 2025-10-06
 
 ### Added
