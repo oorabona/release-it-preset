@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-04-29
+
 ### Added
 
 - **`GIT_CHANGELOG_PATH` env var** for monorepo per-package changelog scoping. When set to a repository-relative path (e.g. `packages/tar-xz`), `populate-unreleased-changelog` filters the underlying `git log` to commits touching that subtree, eliminating cross-package noise in monorepo workflows. Path is validated against absolute paths, `..` traversal, and shell metacharacters; invalid values throw `ValidationError`. Empty / unset preserves repository-wide behavior. ([ee81e7d](https://github.com/oorabona/release-it-preset/commit/ee81e7d))
@@ -372,7 +374,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.11.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -401,3 +403,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [0.10.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.10.0
 [v0.10.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.10.1
 [0.10.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.10.1
+[v0.11.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.11.0
+[0.11.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.11.0
