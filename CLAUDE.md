@@ -207,6 +207,7 @@ The scripts use this type mapping:
 ### Environment Variables
 All configurations support these variables:
 - `CHANGELOG_FILE` - Changelog path (default: CHANGELOG.md)
+- `GIT_CHANGELOG_PATH` - Optional. Restrict changelog generation to commits touching this repository-relative path (e.g. `packages/tar-xz`). Useful for monorepo per-package CHANGELOG files. Empty / unset = repository-wide (default).
 - `GIT_COMMIT_MESSAGE` - Commit message template
 - `GIT_TAG_NAME` - Tag name template
 - `GIT_REQUIRE_BRANCH` - Required branch for releases
@@ -221,6 +222,7 @@ All configurations support these variables:
 - `NPM_PUBLISH` - Enable npm publishing (`true` to opt in, default: `false`)
 - `NPM_SKIP_CHECKS` - Skip npm checks (true/false)
 - `NPM_ACCESS` - npm access level (default: public)
+- `NPM_TAG` - Optional. When set, npm publish appends `--tag <value>` (e.g. `legacy-v0.10.0`). Prevents overwriting `latest` when republishing older versions. Empty / unset = npm uses `latest`.
 
 ## Important Constraints
 

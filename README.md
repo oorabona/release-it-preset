@@ -660,6 +660,7 @@ Customize behavior with environment variables:
 
 ### Changelog
 - `CHANGELOG_FILE` - Changelog file path (default: `CHANGELOG.md`)
+- `GIT_CHANGELOG_PATH` - Optional. When set to a repository-relative path (e.g. `packages/tar-xz`), restrict changelog generation to commits touching that path. Useful for monorepo per-package CHANGELOG files. Empty / unset = repository-wide (default).
 
 ### Git
 - `GIT_COMMIT_MESSAGE` - Commit message template (default: `release: bump v${version}`)
@@ -678,6 +679,7 @@ Customize behavior with environment variables:
 - `NPM_PUBLISH` - Enable npm publishing (default: `false`)
 - `NPM_SKIP_CHECKS` - Skip npm checks (default: `false`)
 - `NPM_ACCESS` - npm access level (default: `public`)
+- `NPM_TAG` - Optional. When set, the npm publish step appends `--tag <value>` (e.g. `legacy-v0.10.0`). Used to assign version-named dist-tags when republishing older versions so `latest` is not overwritten. Empty / unset = npm uses `latest`.
 
 > ℹ️  By default, the presets skip GitHub releases and npm publishing. Set `GITHUB_RELEASE=true` and/or `NPM_PUBLISH=true` in the environment (typically in CI) when you are ready to perform those steps.
 
