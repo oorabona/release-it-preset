@@ -23,6 +23,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { getGitHubRepoUrl } from './lib/git-utils.js';
 import { CONVENTIONAL_COMMIT_REGEX } from './lib/commit-parser.js';
+import { runScript } from './lib/run-script.js';
 
 /**
  * Dependencies interface for dependency injection
@@ -276,19 +277,18 @@ export function populateChangelog(deps: PopulateChangelogDeps): void {
  */
 /* c8 ignore start */
 if (import.meta.url === `file://${process.argv[1]}`) {
-  try {
-    populateChangelog({
-      execSync,
-      readFileSync,
-      writeFileSync,
-      getEnv: (key: string) => process.env[key],
-      log: console.log,
-      warn: console.warn,
-      error: console.error,
-    });
-  } catch (error) {
-    console.error('❌ Failed to populate [Unreleased] section:', error);
-    process.exit(1);
-  }
+  void runScript(
+    { error: console.error, exit: process.exit },
+    () =>
+      populateChangelog({
+        execSync,
+        readFileSync,
+        writeFileSync,
+        getEnv: (key: string) => process.env[key],
+        log: console.log,
+        warn: console.warn,
+        error: console.error,
+      }),
+  );
 }
 /* c8 ignore end */

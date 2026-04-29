@@ -16,6 +16,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
+import { runScript } from './lib/run-script.js';
 
 const CHANGELOG_TEMPLATE = `# Changelog
 
@@ -205,32 +206,31 @@ export async function initProject(options: Options, deps: InitProjectDeps): Prom
  */
 /* c8 ignore start */
 if (import.meta.url === `file://${process.argv[1]}`) {
-  async function realPrompt(question: string): Promise<boolean> {
-    const rl = createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    return new Promise((resolve) => {
-      rl.question(`${question} (y/N): `, (answer) => {
-        rl.close();
-        resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
+  void runScript({ error: console.error, exit: process.exit }, async () => {
+    async function realPrompt(question: string): Promise<boolean> {
+      const rl = createInterface({
+        input: process.stdin,
+        output: process.stdout,
       });
+
+      return new Promise((resolve) => {
+        rl.question(`${question} (y/N): `, (answer) => {
+          rl.close();
+          resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
+        });
+      });
+    }
+
+    const options = parseArgs();
+
+    await initProject(options, {
+      existsSync,
+      readFileSync,
+      writeFileSync,
+      prompt: realPrompt,
+      log: console.log,
+      warn: console.warn,
     });
-  }
-
-  const options = parseArgs();
-
-  initProject(options, {
-    existsSync,
-    readFileSync,
-    writeFileSync,
-    prompt: realPrompt,
-    log: console.log,
-    warn: console.warn,
-  }).catch((error) => {
-    console.error('❌ Initialization failed:', error);
-    process.exit(1);
   });
 }
 /* c8 ignore end */

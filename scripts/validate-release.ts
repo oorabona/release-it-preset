@@ -20,6 +20,8 @@
 import type { ExecSyncOptions } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { ValidationError } from './lib/errors.js';
+import { runScript } from './lib/run-script.js';
 
 export interface ValidationResult {
   name: string;
@@ -301,7 +303,7 @@ export function validateRelease(deps: ValidateReleaseDeps, options: ValidateOpti
  */
 /* c8 ignore start */
 if (import.meta.url === `file://${process.argv[1]}`) {
-  async function main() {
+  void runScript({ error: console.error, exit: process.exit }, async () => {
     const options = parseArgs(process.argv.slice(2));
 
     console.log('🔍 Validating release readiness...\n');
@@ -333,16 +335,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
     if (allPassed) {
       console.log('✨ All validations passed! Ready to release.');
-      process.exit(0);
     } else {
-      console.log('❌ Some validations failed. Please fix the issues above before releasing.');
-      process.exit(1);
+      throw new ValidationError('Some validations failed. Please fix the issues above before releasing.');
     }
-  }
-
-  main().catch((error) => {
-    console.error('❌ Validation failed:', error);
-    process.exit(1);
   });
 }
 /* c8 ignore end */

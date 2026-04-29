@@ -98,6 +98,17 @@ describe('populate-unreleased-changelog', () => {
 })
 ```
 
+### Error handling
+
+Scripts use a small typed-error hierarchy and a shared `runScript()` wrapper for consistent CLI exit codes:
+
+- `ValidationError` — precondition failure (missing CHANGELOG, wrong branch). Exit 2.
+- `GitError` — git command failure. Exit 1.
+- `ChangelogError` — parse/write failure. Exit 1.
+- Any other thrown `Error` — generic. Exit 1.
+
+The CLI guard at the bottom of each script wraps the body in `runScript()`, which logs an icon-prefixed message and calls `process.exit` with the appropriate code. Tests can drive `runScript` directly with a fake `{ error, exit }` to assert exit codes without spawning a process.
+
 ### Why DI rather than `vi.mock()`
 
 ESM module mocking via `vi.mock()` replaces the module — the real code never executes, which leaves statement coverage at the floor. With DI:

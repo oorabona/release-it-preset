@@ -17,6 +17,7 @@ import type { ExecSyncOptions } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { getGitHubRepoUrl } from './lib/git-utils.js';
+import { runScript } from './lib/run-script.js';
 
 export interface CheckConfigDeps {
   execSync: (command: string, options?: ExecSyncOptions) => Buffer | string;
@@ -306,7 +307,7 @@ export function displayNpmStatus(deps: CheckConfigDeps, npmUsername: string | nu
  */
 /* c8 ignore start */
 if (import.meta.url === `file://${process.argv[1]}`) {
-  async function main() {
+  void runScript({ error: console.error, exit: process.exit }, async () => {
     console.log('🔍 Checking release configuration and project status...');
 
     const deps: CheckConfigDeps = {
@@ -330,11 +331,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log('\n✨ Check complete!');
     console.log('\nTo validate release readiness, run:');
     console.log('  pnpm release-it-preset validate\n');
-  }
-
-  main().catch((error) => {
-    console.error('❌ Check failed:', error);
-    process.exit(1);
   });
 }
 /* c8 ignore end */

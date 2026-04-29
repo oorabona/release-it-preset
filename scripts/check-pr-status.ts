@@ -15,6 +15,7 @@ import type { ExecSyncOptions } from 'node:child_process'
 import { execSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
 import { STRICT_CONVENTIONAL_COMMIT_REGEX } from './lib/commit-parser.js'
+import { runScript } from './lib/run-script.js'
 
 export type ChangelogStatus = 'updated' | 'skipped' | 'missing'
 
@@ -212,11 +213,13 @@ export function renderSummary(result: PrCheckResult, deps: PrCheckDeps) {
 
 /* c8 ignore start */
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const deps = createDefaultDeps()
-  const args = parseArgs(process.argv.slice(2))
-  const result = runPrCheck(args, deps)
+  void runScript({ error: console.error, exit: process.exit }, () => {
+    const deps = createDefaultDeps()
+    const args = parseArgs(process.argv.slice(2))
+    const result = runPrCheck(args, deps)
 
-  writeOutputs(result, deps)
-  renderSummary(result, deps)
+    writeOutputs(result, deps)
+    renderSummary(result, deps)
+  })
 }
 /* c8 ignore end */

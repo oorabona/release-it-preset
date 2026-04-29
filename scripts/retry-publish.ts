@@ -19,6 +19,7 @@
 import type { ExecSyncOptions } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { runScript } from './lib/run-script.js';
 
 export interface RetryPublishDeps {
   execSync: (command: string, options?: ExecSyncOptions) => Buffer | string;
@@ -106,16 +107,13 @@ export function retryPublish(deps: RetryPublishDeps): RetryPublishResult {
  */
 /* c8 ignore start */
 if (import.meta.url === `file://${process.argv[1]}`) {
-  try {
+  void runScript({ error: console.error, exit: process.exit }, () => {
     retryPublish({
       execSync,
       readFileSync,
       log: console.log,
       warn: console.warn,
     });
-  } catch (error) {
-    console.error(`❌ Pre-flight checks failed: ${error instanceof Error ? error.message : error}`);
-    process.exit(1);
-  }
+  });
 }
 /* c8 ignore end */

@@ -26,6 +26,7 @@ import { execSync } from 'node:child_process';
 import { getGitHubRepoUrl } from './lib/git-utils.js';
 import { escapeRegExp } from './lib/string-utils.js';
 import { validateAndNormalizeSemver } from './lib/semver-utils.js';
+import { runScript } from './lib/run-script.js';
 
 export interface RepublishChangelogDeps {
   execSync: (command: string, options?: ExecSyncOptions) => Buffer | string;
@@ -223,27 +224,20 @@ export function republishChangelog(version: string, deps: RepublishChangelogDeps
  */
 /* c8 ignore start */
 if (import.meta.url === `file://${process.argv[1]}`) {
-  async function main() {
-    try {
-      const pkg = await import(join(process.cwd(), 'package.json'), { with: { type: 'json' } });
-      const version = pkg.default.version;
+  void runScript({ error: console.error, exit: process.exit }, async () => {
+    const pkg = await import(join(process.cwd(), 'package.json'), { with: { type: 'json' } });
+    const version = pkg.default.version;
 
-      republishChangelog(version, {
-        execSync,
-        readFileSync,
-        writeFileSync,
-        getEnv: (key: string) => process.env[key],
-        getCwd: () => process.cwd(),
-        getDate: () => new Date().toISOString().split('T')[0],
-        log: console.log,
-        warn: console.warn,
-      });
-    } catch (error) {
-      console.error(`❌ ${error instanceof Error ? error.message : error}`);
-      process.exit(1);
-    }
-  }
-
-  main();
+    republishChangelog(version, {
+      execSync,
+      readFileSync,
+      writeFileSync,
+      getEnv: (key: string) => process.env[key],
+      getCwd: () => process.cwd(),
+      getDate: () => new Date().toISOString().split('T')[0],
+      log: console.log,
+      warn: console.warn,
+    });
+  });
 }
 /* c8 ignore end */

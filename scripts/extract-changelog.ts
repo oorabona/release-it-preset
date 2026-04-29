@@ -18,6 +18,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateAndNormalizeSemver } from './lib/semver-utils.js';
 import { escapeRegExp } from './lib/string-utils.js';
+import { runScript } from './lib/run-script.js';
 
 export interface ExtractChangelogDeps {
   readFileSync: typeof readFileSync;
@@ -63,22 +64,20 @@ export function extractChangelog(version: string, deps: ExtractChangelogDeps): s
  */
 /* c8 ignore start */
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const version = process.argv[2];
-  if (!version) {
-    console.error('Usage: tsx scripts/extract-changelog.ts <version>');
-    process.exit(1);
-  }
+  void runScript({ error: console.error, exit: process.exit }, () => {
+    const version = process.argv[2];
+    if (!version) {
+      console.error('Usage: tsx scripts/extract-changelog.ts <version>');
+      process.exit(1);
+      return;
+    }
 
-  try {
     const result = extractChangelog(version, {
       readFileSync,
       getEnv: (key: string) => process.env[key],
       getCwd: () => process.cwd(),
     });
     console.log(result);
-  } catch (error) {
-    console.error(`❌ ${error instanceof Error ? error.message : error}`);
-    process.exit(1);
-  }
+  });
 }
 /* c8 ignore end */
