@@ -13,6 +13,7 @@
     "types": ["node"],
     "declaration": true,
     "declarationDir": "dist/types",
+    "rootDir": "./scripts",
     "outDir": "dist/scripts",
     "sourceMap": false
   },

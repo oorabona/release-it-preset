@@ -32,7 +32,7 @@ These instructions orient AI coding agents contributing to `@oorabona/release-it
 - Keep CLI help text synchronized with actual command lists.
 
 ## Implementation Constraints
-- No additional runtime deps (only `@release-it/keep-a-changelog`). Avoid adding parsing libs—regex + Node APIs only.
+- No runtime dependencies. Avoid adding parsing libs—regex + Node APIs only. `release-it` is a peer dependency (consumers install it).
 - Maintain Node >= 18 compatibility; avoid experimental APIs.
 - Do not introduce circular imports; configs stay flat.
 - Preserve export map structure in `package.json` when adding files (add new explicit export if exposing new config).
