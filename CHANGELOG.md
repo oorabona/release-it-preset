@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-04-29
+
 ### Fixed
 
 - **Default release commit messages are now Conventional Commits compliant.** `GIT_DEFAULTS.COMMIT_MESSAGE` changed from `release: bump v${version}` to `chore(release): v${version}`, and `HOTFIX_COMMIT_MESSAGE` from `hotfix: bump v${version}` to `chore(hotfix): v${version}`. The previous defaults were rejected by strict commit-msg hooks since `release` and `hotfix` are not recognized Conventional Commits types. Discovered while dogfooding v0.10.0. Users who explicitly set `GIT_COMMIT_MESSAGE` are unaffected.
@@ -348,7 +350,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.10.1...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -375,3 +377,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [0.8.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.0
 [v0.10.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.10.0
 [0.10.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.10.0
+[v0.10.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.10.1
+[0.10.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.10.1
