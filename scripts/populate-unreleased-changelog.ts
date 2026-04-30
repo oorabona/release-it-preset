@@ -214,6 +214,71 @@ export function parseCommitsWithMultiplePrefixes(gitOutput: string, repoUrl: str
 }
 
 /**
+ * Resolve the `since` baseline for changelog generation.
+ *
+ * Priority:
+ * 1. GIT_CHANGELOG_SINCE env var (any git ref — trust the user)
+ * 2. Per-package detection via `chore(<pkg>): release v` commit when GIT_CHANGELOG_PATH is set
+ * 3. Fallback: `git describe --tags --abbrev=0`
+ */
+export function resolveSinceBaseline(deps: PopulateChangelogDeps): string {
+  // 1. Explicit override wins
+  const sinceOverride = deps.getEnv('GIT_CHANGELOG_SINCE');
+  if (sinceOverride && sinceOverride.trim()) {
+    deps.log(`ℹ️  Using GIT_CHANGELOG_SINCE override: ${sinceOverride.trim()}`);
+    return sinceOverride.trim();
+  }
+
+  // 2. Per-package detection: only when running scoped to a subdir
+  const path = deps.getEnv('GIT_CHANGELOG_PATH');
+  if (path && path.trim()) {
+    let pkgName = '';
+    try {
+      const pkgJsonRaw = deps.readFileSync('package.json', 'utf8') as string;
+      const pkgNameFull = (JSON.parse(pkgJsonRaw) as { name?: string }).name;
+      if (pkgNameFull) {
+        pkgName = pkgNameFull.startsWith('@')
+          ? (pkgNameFull.split('/').pop() ?? '')
+          : pkgNameFull;
+      }
+    } catch {
+      // package.json missing or unreadable — skip per-package detection
+    }
+    if (pkgName) {
+      try {
+        const sha = (
+          deps.execSync(
+            `git log --grep="^chore(${pkgName}): release v" -n 1 --pretty=format:"%H"`,
+            { encoding: 'utf8' },
+          ) as string
+        ).trim();
+        if (sha) {
+          deps.log(
+            `ℹ️  Per-package baseline (chore(${pkgName}): release …): ${sha.substring(0, 7)}`,
+          );
+          return sha;
+        }
+      } catch {
+        // fall through to tag fallback
+      }
+    }
+  }
+
+  // 3. Fallback: existing git describe behavior
+  try {
+    const tag = (
+      deps.execSync('git describe --tags --abbrev=0 2>/dev/null', { encoding: 'utf8' }) as string
+    ).trim();
+    deps.log(`ℹ️  Latest tag: ${tag}`);
+    return tag;
+  } catch {
+    deps.log('ℹ️  No tags found, using all commits');
+    return '';
+  }
+}
+
+
+/**
  * Main function to populate changelog with dependency injection
  */
 export function populateChangelog(deps: PopulateChangelogDeps): void {
@@ -221,14 +286,7 @@ export function populateChangelog(deps: PopulateChangelogDeps): void {
 
   deps.log('📝 Populating [Unreleased] section...');
 
-  let latestTag: string;
-  try {
-    latestTag = (deps.execSync('git describe --tags --abbrev=0 2>/dev/null', { encoding: 'utf8' }) as string).trim();
-    deps.log(`ℹ️  Latest tag: ${latestTag}`);
-  } catch {
-    deps.log('ℹ️  No tags found, using all commits');
-    latestTag = '';
-  }
+  const since = resolveSinceBaseline(deps);
 
   const gitChangelogPath = deps.getEnv('GIT_CHANGELOG_PATH');
   let pathFilter = '';
@@ -246,8 +304,8 @@ export function populateChangelog(deps: PopulateChangelogDeps): void {
     pathFilter = ` -- ${gitChangelogPath}`;
   }
 
-  const gitLogCommand = latestTag
-    ? `git log --pretty=format:"%H|%B|||END|||" ${latestTag}..HEAD${pathFilter}`
+  const gitLogCommand = since
+    ? `git log --pretty=format:"%H|%B|||END|||" ${since}..HEAD${pathFilter}`
     : `git log --pretty=format:"%H|%B|||END|||"${pathFilter}`;
 
   let gitOutput: string;
