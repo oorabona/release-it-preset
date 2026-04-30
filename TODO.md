@@ -3,15 +3,16 @@
 **Last updated:** 2026-04-30
 **Current version:** v0.12.0
 
-## v1.0 Backlog
+## v1.0 Backlog (tracked as GitHub issues)
 
-_All medium and low priority items shipped in v0.11.0. Only the stability cycle remains._
+All open work has been moved to GitHub issues for public visibility:
 
-### Pre-release
-- [ ] 🚀 [Release] v1.0.0-beta.1 → rc.1 → stable cycle — declare API freeze (configs, env vars, CLI flags, exit codes); no new features expected, just commitment to semver — Priority: M (gated)
+- [ ] 🐛 [#23](https://github.com/oorabona/release-it-preset/issues/23) Multi-line body parser — Priority: H (next ship as v0.13.0)
+- [ ] 🚀 [#24](https://github.com/oorabona/release-it-preset/issues/24) v1.0.0 stability cycle (tracking checklist) — Priority: M (gated, drives beta.1 → rc.1 → stable)
+- [ ] 🔧 [#25](https://github.com/oorabona/release-it-preset/issues/25) `release-it-preset doctor` command — Priority: M (v1.0.0-beta.2)
+- [ ] 🔧 [#26](https://github.com/oorabona/release-it-preset/issues/26) Configurable commit-type → section mapping — Priority: M (v1.0.0-beta.2)
 
-### Out-of-scope follow-ups (track if user requests)
-- [ ] 💡 [Scripts] Multi-line commit body parser — multi-line commit bodies currently leak as `### Changed` entries instead of being treated as commit metadata. Surfaced during the `GIT_CHANGELOG_PATH` work but explicitly out of scope for v0.11.0.
+Sequencing rationale + memory pointer: see `project_state_v1_plan.md` in the local memory directory.
 
 ## Recently Done
 - [x] ✅ [Release] **v0.12.0 shipped** — `GIT_CHANGELOG_SINCE` + per-package baseline detection + GHA majors bumps + E2E env-leak fix (`e12b3fb` tag `v0.12.0`)
