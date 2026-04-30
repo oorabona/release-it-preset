@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Multi-line commit body parser** — `populate-unreleased-changelog` now restricts conventional-commit scanning to the **header block** (lines before the first blank line), preventing paragraph-separated trailers like `Refs: #42`, `Co-authored-by:`, etc. from leaking as spurious `### Changed` entries. AC#5 multi-prefix on consecutive lines (`feat: x\nfix: y`) is preserved. Adds explicit `BREAKING CHANGE:` footer detection — promotes the first emitted part to breaking, or emits a standalone `misc` breaking entry when no leading conventional prefix is present. Closes [#23](https://github.com/oorabona/release-it-preset/issues/23). ([9ff76aa](https://github.com/oorabona/release-it-preset/commit/9ff76aa))
+- **Multi-line commit body parser** — `populate-unreleased-changelog` now restricts conventional-commit scanning to the **header block** (lines before the first blank line), preventing paragraph-separated trailers like `Refs: #42`, `Co-authored-by:`, etc. from leaking as spurious `### Changed` entries. Multi-prefix on consecutive lines (`feat: x\nfix: y`) is preserved. Adds explicit `BREAKING CHANGE:` footer detection — promotes the first emitted part to breaking, or emits a standalone `misc` breaking entry when no leading conventional prefix is present. Closes [#23](https://github.com/oorabona/release-it-preset/issues/23). ([9ff76aa](https://github.com/oorabona/release-it-preset/commit/9ff76aa))
 
 ### Changed
 

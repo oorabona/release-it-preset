@@ -115,8 +115,9 @@ export function parseCommitsWithMultiplePrefixes(
       // Compute the header block: first contiguous run of non-empty lines.
       // This prevents paragraph-separated footer tokens like "Refs: #42" or
       // "Co-authored-by: ..." from matching the conventional-commit regex
-      // via the 'gm' flag in extractConventionalCommitParts. AC#5 (consecutive
-      // multi-prefix lines) is preserved because those lines share no blank line.
+      // via the 'gm' flag in extractConventionalCommitParts. Consecutive
+      // multi-prefix lines (e.g. "feat: x\nfix: y") are preserved because
+      // they share no blank line — see #23 for the original use case.
       const headerBlock = body.split('\n').reduce(
         (acc, line) => {
           if (!acc.done) {
@@ -133,14 +134,14 @@ export function parseCommitsWithMultiplePrefixes(
 
       const parts = extractConventionalCommitParts(headerBlock, shortSha);
 
-      // F-003: Detect "BREAKING CHANGE:" trailers only in the LAST paragraph of the body,
+      // Detect "BREAKING CHANGE:" trailers only in the LAST paragraph of the body,
       // AND only when the body has more than one paragraph (i.e., there is at least one
       // blank-line separator). Per Conventional Commits 1.0.0 §6, a footer requires a
       // blank line separating it from the preceding content. A "BREAKING CHANGE:" that
       // appears on a line immediately after the subject line (no blank line) is mid-body
       // prose, NOT a footer, and must NOT promote the commit to breaking.
       //
-      // F-004: Use matchAll() so multiple BREAKING CHANGE: lines in the same last
+      // matchAll() is used so multiple BREAKING CHANGE: lines in the same last
       // paragraph each emit a separate breaking entry.
       // CRLF safety: accept both LF and CRLF line endings so commits authored on
       // Windows produce the same output (a paragraph separator can be \n\n or \r\n\r\n).
@@ -158,7 +159,7 @@ export function parseCommitsWithMultiplePrefixes(
         }
         // Each BREAKING CHANGE: footer line emits its own breaking entry with the
         // footer's description (distinct from the commit subject).
-        // F-004: Multiple footer lines → multiple entries.
+        // Multiple footer lines → multiple entries.
         for (const m of breakingFooterMatches) {
           parts.push({
             type: 'misc',
@@ -203,7 +204,7 @@ export function parseCommitsWithMultiplePrefixes(
   const breakingChanges: CommitPart[] = [];
 
   for (const part of allParts) {
-    // F-002: Breaking parts go ONLY into the BREAKING CHANGES section.
+    // Breaking parts go ONLY into the BREAKING CHANGES section.
     // They are NOT also added to their native section (e.g. ### Added), which
     // would produce duplicate entries. The breaking indicator in the native
     // section was confusing — the dedicated ### ⚠️ BREAKING CHANGES section

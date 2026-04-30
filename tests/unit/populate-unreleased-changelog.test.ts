@@ -247,8 +247,8 @@ describe('populate-unreleased-changelog (with DI)', () => {
       expect(result).not.toContain('[abc1234]')
     })
 
-    // AC#2 — multi-line body with paragraph-separated footer must NOT leak into CHANGELOG
-    it('AC#2: should not emit footer fragments (Refs:) as changelog entries', () => {
+    // multi-line body with paragraph-separated footer must NOT leak into CHANGELOG
+    it('should not emit footer fragments (Refs:) as changelog entries', () => {
       // The full body has a blank line separating the subject from the body paragraph,
       // and the "Refs:" footer trailer. Before the fix, "Refs: #42" matched the
       // conventional-commit regex and appeared as a spurious "### Changed" entry.
@@ -267,8 +267,8 @@ describe('populate-unreleased-changelog (with DI)', () => {
       expect(nonShaLines.join('\n')).not.toContain('#42')
     })
 
-    // AC#3 — BREAKING CHANGE: footer in body must promote first part to breaking
-    it('AC#3: should detect BREAKING CHANGE: footer and mark the commit as breaking', () => {
+    // BREAKING CHANGE: footer in body must promote first part to breaking
+    it('should detect BREAKING CHANGE: footer and mark the commit as breaking', () => {
       const gitOutput =
         'abc1234|feat: migrate config format\n\nUsers must update their config file.\nBREAKING CHANGE: config schema changed|||END|||'
       const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
@@ -279,8 +279,8 @@ describe('populate-unreleased-changelog (with DI)', () => {
       expect(result).not.toMatch(/^- BREAKING CHANGE/m)
     })
 
-    // AC#3 edge case — standalone BREAKING CHANGE footer with no leading conventional prefix
-    it('AC#3 edge: should emit standalone breaking entry when BREAKING CHANGE footer present but no conventional prefix', () => {
+    // edge case — standalone BREAKING CHANGE footer with no leading conventional prefix
+    it('should emit standalone breaking entry when BREAKING CHANGE footer present but no conventional prefix', () => {
       const gitOutput =
         'abc1234|Non-conventional subject line\n\nBREAKING CHANGE: removed the foo API|||END|||'
       const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
@@ -289,8 +289,8 @@ describe('populate-unreleased-changelog (with DI)', () => {
       expect(result).toContain('removed the foo API')
     })
 
-    // AC#4 — [skip-changelog] in a non-first body line must still trigger the skip
-    it('AC#4: should skip commit when [skip-changelog] appears in body paragraph (not first line)', () => {
+    // [skip-changelog] in a non-first body line must still trigger the skip
+    it('should skip commit when [skip-changelog] appears in body paragraph (not first line)', () => {
       const gitOutput =
         'abc1234|feat: internal refactor\n\nThis is an internal-only change.\n[skip-changelog]|||END|||'
       const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
@@ -298,8 +298,8 @@ describe('populate-unreleased-changelog (with DI)', () => {
       expect(result).toBe('No changes yet.')
     })
 
-    // AC#5 — consecutive multi-prefix lines (no blank line between) must produce 2 entries
-    it('AC#5: should emit two entries for consecutive conventional prefix lines with no blank line between', () => {
+    // consecutive multi-prefix lines (no blank line between) must produce 2 entries
+    it('should emit two entries for consecutive conventional prefix lines with no blank line between', () => {
       // No blank line between feat: and fix: — both are in the header block
       const gitOutput = 'abc1234|feat: add X\nfix: fix Y|||END|||'
       const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
@@ -600,7 +600,7 @@ describe('populate-unreleased-changelog (with DI)', () => {
     })
   })
 
-  describe('F-002: breaking parts dedupe (only in BREAKING CHANGES, not in native section)', () => {
+  describe('breaking parts dedupe (only in BREAKING CHANGES, not in native section)', () => {
     it('bang-style breaking commit appears ONLY in BREAKING CHANGES, not in ### Added', () => {
       const gitOutput = 'abc1234567890|feat!: migrate config format|||END|||'
       const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
@@ -625,7 +625,7 @@ describe('populate-unreleased-changelog (with DI)', () => {
     })
   })
 
-  describe('F-003: strict BREAKING CHANGE: footer (requires blank-line separation)', () => {
+  describe('strict BREAKING CHANGE: footer (requires blank-line separation)', () => {
     it('mid-body BREAKING CHANGE (no blank line) does NOT promote to breaking', () => {
       // No blank line between header and "BREAKING CHANGE:" — not a footer
       const gitOutput = 'abc1234567890|feat: x\nBREAKING CHANGE: not a footer|||END|||'
@@ -655,7 +655,7 @@ describe('populate-unreleased-changelog (with DI)', () => {
     })
   })
 
-  describe('F-004: multi-footer BREAKING CHANGE (multiple lines in last paragraph)', () => {
+  describe('multi-footer BREAKING CHANGE (multiple lines in last paragraph)', () => {
     it('two BREAKING CHANGE lines in last paragraph emit two breaking entries', () => {
       const gitOutput =
         'abc1234567890|feat: big refactor\n\nBREAKING CHANGE: API changed\nBREAKING CHANGE: config changed|||END|||'
@@ -680,8 +680,8 @@ describe('populate-unreleased-changelog (with DI)', () => {
     })
   })
 
-  describe('F-005: entry-count locks on AC#3 and AC#5', () => {
-    it('AC#3 after F-002 dedupe: BREAKING CHANGE footer entry appears exactly once', () => {
+  describe('entry-count locks (regex match counts, not just substring)', () => {
+    it('BREAKING CHANGE footer entry appears exactly once after dedupe', () => {
       const gitOutput =
         'abc1234567890|feat: migrate config format\n\nUsers must update their config file.\nBREAKING CHANGE: config schema changed|||END|||'
       const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
@@ -690,7 +690,7 @@ describe('populate-unreleased-changelog (with DI)', () => {
       expect((result.match(/migrate config format/g) ?? []).length).toBe(1)
     })
 
-    it('AC#5: two consecutive prefix lines emit exactly one entry each', () => {
+    it('two consecutive prefix lines emit exactly one entry each', () => {
       const gitOutput = 'abc1234567890|feat: add X\nfix: fix Y|||END|||'
       const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
 
@@ -699,7 +699,7 @@ describe('populate-unreleased-changelog (with DI)', () => {
     })
   })
 
-  describe('F-006: edge cases (CRLF, whitespace-only separator, mid-body BREAKING CHANGE)', () => {
+  describe('edge cases (CRLF, whitespace-only separator, mid-body BREAKING CHANGE)', () => {
     it('CRLF line endings are handled correctly', () => {
       // Windows-style \r\n — blank line is \r\n\r\n
       const gitOutput = 'abc1234567890|feat: x\r\n\r\nbody\r\nRefs: #1|||END|||'
