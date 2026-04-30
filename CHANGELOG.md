@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-04-30
+
 ### Added
 
 - **`release-it-preset doctor`** — new diagnostic CLI command that runs a structured 4-section checklist (Environment, Repository, Configuration, Readiness Summary) and reports a PASS/WARN/FAIL score. Human-readable output for interactive use; `--json` for CI integration. Exits 1 on BLOCKED, 0 on READY/WARNINGS. Closes [#25](https://github.com/oorabona/release-it-preset/issues/25). ([c1d3a3d](https://github.com/oorabona/release-it-preset/commit/c1d3a3d))
@@ -428,7 +430,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.15.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -467,3 +469,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [0.13.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.13.1
 [v0.14.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.14.0
 [0.14.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.14.0
+[v0.15.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.15.0
+[0.15.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.15.0
