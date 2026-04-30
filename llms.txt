@@ -1,0 +1,46 @@
+# @oorabona/release-it-preset
+
+> Shareable [release-it](https://github.com/release-it/release-it) preset for JavaScript packages: OIDC trusted publishing, Keep a Changelog discipline, configurable commit-type → CHANGELOG section mapping, a `doctor` CLI for pre-release diagnostic, and recovery presets (`republish`, `retry-publish`) for the scenarios other tools pretend never happen. Targets solo and small-team maintainers who want opinionated CI plumbing without the ceremony of changesets or the full-automation philosophy of semantic-release.
+
+## Documentation
+
+- [README.md](https://github.com/oorabona/release-it-preset/blob/main/README.md): overview, install patterns (npx/pnpm dlx/devDep), 7 release configurations, 7 utility CLI commands, environment variables reference, GitHub Actions workflows, ecosystem positioning vs changesets/semantic-release/release-please/plain release-it
+- [docs/PUBLIC_API.md](https://github.com/oorabona/release-it-preset/blob/main/docs/PUBLIC_API.md): explicit stable v1.0 surface (CLI commands, env vars, config exports, GHA workflow inputs, exit codes 0/1/2 + reserved 3-9) versus internal items, with versioning policy
+- [docs/MIGRATION.md](https://github.com/oorabona/release-it-preset/blob/main/docs/MIGRATION.md): version-by-version upgrade guide with breaking-change details (covers v0.7 → v1.0)
+- [CONTRIBUTING.md](https://github.com/oorabona/release-it-preset/blob/main/CONTRIBUTING.md): PR conventions (Conventional Commits required), branch prefixes, pre-PR checklist, testing conventions
+- [CODE_OF_CONDUCT.md](https://github.com/oorabona/release-it-preset/blob/main/CODE_OF_CONDUCT.md): Contributor Covenant 2.1
+- [SECURITY.md](https://github.com/oorabona/release-it-preset/blob/main/SECURITY.md): vulnerability reporting and supported versions
+- [CLAUDE.md](https://github.com/oorabona/release-it-preset/blob/main/CLAUDE.md): project conventions and architecture for AI agents
+- [AGENTS.md](https://github.com/oorabona/release-it-preset/blob/main/AGENTS.md): vendor-neutral agent context pointer
+
+## Configuration & exports
+
+- [config/default.js](https://github.com/oorabona/release-it-preset/blob/main/config/default.js): standard release flow (changelog auto-population + git + GitHub + npm)
+- [config/hotfix.js](https://github.com/oorabona/release-it-preset/blob/main/config/hotfix.js): emergency patch with auto-generated changelog
+- [config/manual-changelog.js](https://github.com/oorabona/release-it-preset/blob/main/config/manual-changelog.js): release with already-curated `[Unreleased]` content
+- [config/no-changelog.js](https://github.com/oorabona/release-it-preset/blob/main/config/no-changelog.js): release without touching CHANGELOG
+- [config/changelog-only.js](https://github.com/oorabona/release-it-preset/blob/main/config/changelog-only.js): update CHANGELOG only, no version bump
+- [config/republish.js](https://github.com/oorabona/release-it-preset/blob/main/config/republish.js): move existing tag and re-release (dangerous; "I understand the risks" workflow)
+- [config/retry-publish.js](https://github.com/oorabona/release-it-preset/blob/main/config/retry-publish.js): retry failed npm/GitHub publish without git operations
+
+## Examples
+
+- [examples/basic-usage.md](https://github.com/oorabona/release-it-preset/blob/main/examples/basic-usage.md): minimum viable adoption
+- [examples/custom-configuration.md](https://github.com/oorabona/release-it-preset/blob/main/examples/custom-configuration.md): overriding env vars and configs
+- [examples/ci-integration.md](https://github.com/oorabona/release-it-preset/blob/main/examples/ci-integration.md): GitHub Actions integration patterns
+- [examples/reusable-workflows.md](https://github.com/oorabona/release-it-preset/blob/main/examples/reusable-workflows.md): importing the package's reusable workflows in 3 lines of YAML
+- [examples/monorepo-workflow.md](https://github.com/oorabona/release-it-preset/blob/main/examples/monorepo-workflow.md): config composition guide for monorepos
+- [examples/monorepo/](https://github.com/oorabona/release-it-preset/tree/main/examples/monorepo): runnable pnpm workspace demo of `GIT_CHANGELOG_PATH` per-package CHANGELOG generation
+
+## Architecture decisions
+
+- [docs/adr/0001-peer-dependency-on-release-it.md](https://github.com/oorabona/release-it-preset/blob/main/docs/adr/0001-peer-dependency-on-release-it.md): why peer-deps for `release-it`
+- [docs/adr/0002-strict-extends-validation.md](https://github.com/oorabona/release-it-preset/blob/main/docs/adr/0002-strict-extends-validation.md): explicit `extends` enforcement in `.release-it.json`
+- [docs/adr/0003-dependency-injection-pattern.md](https://github.com/oorabona/release-it-preset/blob/main/docs/adr/0003-dependency-injection-pattern.md): DI pattern for testable scripts
+- [docs/adr/0004-conventional-commits-default.md](https://github.com/oorabona/release-it-preset/blob/main/docs/adr/0004-conventional-commits-default.md): why `chore(release): vX.Y.Z` is the default commit message
+
+## Optional
+
+- [BACKLOG_STUDY.md](https://github.com/oorabona/release-it-preset/blob/main/BACKLOG_STUDY.md): post-v1.0 ideas under consideration (plugin system, telemetry opt-in, alt formats)
+- [CHANGELOG.md](https://github.com/oorabona/release-it-preset/blob/main/CHANGELOG.md): release history (Keep a Changelog format)
+- [docs/testing.md](https://github.com/oorabona/release-it-preset/blob/main/docs/testing.md): DI test pattern for the script suite
