@@ -67,7 +67,7 @@ jobs:
           fetch-depth: ${{ inputs.fetch-depth }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Determine pnpm store path
         id: pnpm-store
