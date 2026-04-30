@@ -152,9 +152,9 @@ The full surface is documented in [`docs/PUBLIC_API.md`](./PUBLIC_API.md).
 
 The path to v1.0.0 stable runs `v0.13.0` (multi-line body parser fix) →
 `v0.14.0` (workflows OIDC parity) → `v0.15.0` (doctor + configurable
-commit-type-map) → `v1.0.0-rc.1` (freeze + OSS hygiene + announce) →
+commit-type-map) → `v1.0.0-rc.0` (freeze + OSS hygiene + announce) →
 `v1.0.0` stable. There is **no `beta` phase** — integrators concerned about
-the contract should test against `v1.0.0-rc.1`.
+the contract should test against `v1.0.0-rc.0`.
 
 Once v1.0.0 is out, standard semver discipline applies: breaking changes
 require a major version bump. The v0.x series does not provide a formal
