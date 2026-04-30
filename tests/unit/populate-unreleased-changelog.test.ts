@@ -730,6 +730,17 @@ describe('populate-unreleased-changelog (with DI)', () => {
       // The commit still appears as a regular Added entry
       expect(result).toContain('### Added')
     })
+
+    it('CRLF body with proper blank-line BREAKING CHANGE footer DOES promote', () => {
+      // Windows-authored commit: paragraph separator is \r\n\r\n, not \n\n.
+      // The splitter must accept both line endings so the footer is detected.
+      const gitOutput =
+        'abc1234567890|feat: rewrite parser\r\n\r\nBREAKING CHANGE: rule names changed|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### ⚠️ BREAKING CHANGES')
+      expect(result).toContain('rewrite parser')
+    })
   })
 
   describe('custom type map: normalizeCommitType with override', () => {

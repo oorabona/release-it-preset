@@ -33,11 +33,27 @@ describe('changelog-types', () => {
   describe('loadChangelogTypeMap', () => {
     it('returns built-in map when no file and no env var', () => {
       vi.mocked(deps.readFileSync).mockImplementation(() => {
-        throw new Error('ENOENT: file not found')
+        const err = new Error('ENOENT: no such file or directory') as NodeJS.ErrnoException
+        err.code = 'ENOENT'
+        throw err
       })
       const result = loadChangelogTypeMap(deps)
       expect(result).toEqual(BUILTIN_TYPE_MAP)
       expect(deps.warn).not.toHaveBeenCalled()
+    })
+
+    it('non-ENOENT file errors (e.g. EACCES) surface as a WARN', () => {
+      vi.mocked(deps.readFileSync).mockImplementation(() => {
+        const err = new Error('EACCES: permission denied') as NodeJS.ErrnoException
+        err.code = 'EACCES'
+        throw err
+      })
+      const result = loadChangelogTypeMap(deps)
+      // Falls back to built-in because file couldn't be read
+      expect(result).toEqual(BUILTIN_TYPE_MAP)
+      expect(deps.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Cannot read .changelog-types.json'),
+      )
     })
 
     it('file overrides built-in (custom type maps to custom section)', () => {

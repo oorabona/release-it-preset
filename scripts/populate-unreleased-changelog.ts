@@ -142,7 +142,9 @@ export function parseCommitsWithMultiplePrefixes(
       //
       // F-004: Use matchAll() so multiple BREAKING CHANGE: lines in the same last
       // paragraph each emit a separate breaking entry.
-      const paragraphs = body.split(/\n[ \t]*\n/);
+      // CRLF safety: accept both LF and CRLF line endings so commits authored on
+      // Windows produce the same output (a paragraph separator can be \n\n or \r\n\r\n).
+      const paragraphs = body.split(/\r?\n[ \t]*\r?\n/);
       const hasFooterSection = paragraphs.length > 1;
       const breakingFooterMatches = hasFooterSection
         ? [...(paragraphs[paragraphs.length - 1] ?? '').matchAll(/^BREAKING[- ]CHANGE:\s*(.+)$/gm)]

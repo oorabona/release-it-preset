@@ -232,7 +232,7 @@ function handleUtilityCommand(commandName, args) {
     const runner = useCompiled ? 'node' : 'tsx';
     const target = useCompiled ? compiledPath : sourcePath;
     if (!useCompiled) {
-      console.log('ℹ️  Compiled script not found, falling back to tsx source execution (dev mode).');
+      console.error('ℹ️  Compiled script not found, falling back to tsx source execution (dev mode).');
     }
 
     const child = spawn(runner, [target, ...args], {

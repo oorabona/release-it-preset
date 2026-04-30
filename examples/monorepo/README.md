@@ -38,15 +38,20 @@ the `devDependencies` path).
 
 ### 1. Make a baseline commit (so there's a "since" anchor)
 
+> ⚠️ **If you're exploring this example inside a clone of `release-it-preset`,
+> do NOT tag the parent repo.** Either copy this folder to a fresh location
+> first (`cp -r examples/monorepo /tmp/my-monorepo-demo && cd /tmp/my-monorepo-demo && git init && git add . && git commit -m 'init'`),
+> or set `GIT_CHANGELOG_SINCE=<sha>` instead of tagging.
+
+If you're in a fresh clone:
+
 ```bash
-git -C ../.. tag --list  # check if there's already a tag
-# If not:
-git -C ../.. tag v0.0.0-monorepo-demo
+git tag v0.0.0-monorepo-demo
 ```
 
 The preset uses `git describe --tags --abbrev=0` as the default `since`
-baseline. If your repo has no tags yet, set `GIT_CHANGELOG_SINCE` explicitly
-to a known SHA.
+baseline. If your repo has no tags yet, set `GIT_CHANGELOG_SINCE=<commit-sha>`
+to override.
 
 ### 2. Make per-package commits
 
@@ -72,9 +77,15 @@ git commit -m "feat(pkg-a): add farewell function"
 
 ### 3. Update pkg-a's CHANGELOG
 
+> ⚠️ Run `release-it-preset update` from the **monorepo root** (this folder),
+> not from inside `packages/pkg-a/`. `GIT_CHANGELOG_PATH` is a `git log -- <path>`
+> pathspec that resolves against the current working directory, and from inside
+> the package directory the path `packages/pkg-a` would not exist.
+
 ```bash
-cd packages/pkg-a
-GIT_CHANGELOG_PATH=packages/pkg-a pnpm release-it-preset update
+# From the monorepo root (examples/monorepo/):
+GIT_CHANGELOG_PATH=packages/pkg-a CHANGELOG_FILE=packages/pkg-a/CHANGELOG.md \
+  pnpm release-it-preset update
 ```
 
 Expected output:
@@ -104,8 +115,9 @@ from pkg-a's CHANGELOG — exactly the per-package isolation we wanted.
 ### 4. Update pkg-b's CHANGELOG
 
 ```bash
-cd ../pkg-b
-GIT_CHANGELOG_PATH=packages/pkg-b pnpm release-it-preset update
+# Still from the monorepo root:
+GIT_CHANGELOG_PATH=packages/pkg-b CHANGELOG_FILE=packages/pkg-b/CHANGELOG.md \
+  pnpm release-it-preset update
 ```
 
 `packages/pkg-b/CHANGELOG.md` now shows only the `fix(pkg-b)` commit:

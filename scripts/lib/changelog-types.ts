@@ -88,8 +88,14 @@ export function loadChangelogTypeMap(deps: ChangelogTypeDeps): Record<string, st
   let fileContent: string | undefined;
   try {
     fileContent = deps.readFileSync(CHANGELOG_TYPES_FILE, 'utf8') as string;
-  } catch {
-    // File does not exist — not an error, just skip
+  } catch (err) {
+    // ENOENT (file does not exist) is the expected case — silently skip.
+    // Other I/O errors (EACCES permission denied, EISDIR is a directory, etc.)
+    // are real problems and surfaced as a WARN so the user can investigate.
+    const e = err as NodeJS.ErrnoException;
+    if (e?.code !== 'ENOENT') {
+      deps.warn(`Cannot read ${CHANGELOG_TYPES_FILE}: ${e?.message ?? String(err)}. Skipping file override.`);
+    }
     fileContent = undefined;
   }
 

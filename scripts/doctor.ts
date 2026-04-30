@@ -563,7 +563,7 @@ export function formatJson(report: DoctorReport): string {
 // CLI entry (guarded)
 // ---------------------------------------------------------------------------
 
-if (process.argv[1] && (process.argv[1].endsWith('doctor.js') || process.argv[1].endsWith('doctor.ts'))) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   const isJson = process.argv.includes('--json')
 
   const deps: DoctorDeps = {
