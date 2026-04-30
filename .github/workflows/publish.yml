@@ -136,7 +136,10 @@ jobs:
             # the dist-tag so 'latest' is never demoted to a beta/rc/alpha.
             # 1.0.0-beta.1 -> beta, 2.0.0-rc.2 -> rc, 1.5.0-alpha.5 -> alpha.
             # Users opt in via 'npm install <pkg>@beta' / '@rc' / '@alpha' etc.
-            PRERELEASE_ID="${PUBLISHING#*-}"
+            # Strip semver '+build' metadata first so 1.0.0-alpha+001 -> alpha
+            # (npm dist-tag rejects names containing '+').
+            PUBLISHING_NO_BUILD="${PUBLISHING%%+*}"
+            PRERELEASE_ID="${PUBLISHING_NO_BUILD#*-}"
             PRERELEASE_ID="${PRERELEASE_ID%%.*}"
             TAG="$PRERELEASE_ID"
             REASON="pre-release ($PUBLISHING) - using $PRERELEASE_ID, latest unchanged"
