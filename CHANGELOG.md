@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **npm dist-tag selection for pre-releases** — `publish.yml` was tagging pre-release versions (`1.0.0-beta.1`, `2.0.0-rc.2`, etc.) as `latest` because `sort -V` places them after stable versions. The new branch in the smart dist-tag step extracts the prerelease identifier (`1.0.0-beta.1` → `beta`, `1.5.0-alpha.5` → `alpha`) and uses it as the npm tag, leaving `latest` on the prior stable release. Build metadata (`+build.123`) is stripped before detection so versions like `1.0.0+build-foo` (legal semver, build hyphen but no prerelease) correctly fall through to the stable path. Unblocks the v1.0.0-beta.X / rc.X cycle. ([025a5f9](https://github.com/oorabona/release-it-preset/commit/025a5f9))
+
 ## [0.13.0] - 2026-04-30
 
 ### Fixed
