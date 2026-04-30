@@ -128,9 +128,23 @@ jobs:
           PUBLISHING="$(node -p 'require("./package.json").version')"
           PKG="$(node -p 'require("./package.json").name')"
 
+          # Strip semver '+build' metadata before any prerelease detection.
+          # Without this, 1.0.0+build-foo (no prerelease, but '-' in metadata)
+          # would falsely match the prerelease branch.
+          PUBLISHING_NO_BUILD="${PUBLISHING%%+*}"
+
           if [ -n "${{ inputs.dist_tag }}" ]; then
             TAG="${{ inputs.dist_tag }}"
             REASON="explicit input"
+          elif [[ "$PUBLISHING_NO_BUILD" == *-* ]]; then
+            # Pre-release (semver '-' indicator): use the prerelease identifier as
+            # the dist-tag so 'latest' is never demoted to a beta/rc/alpha.
+            # 1.0.0-beta.1 -> beta, 2.0.0-rc.2 -> rc, 1.5.0-alpha.5 -> alpha.
+            # Users opt in via 'npm install <pkg>@beta' / '@rc' / '@alpha' etc.
+            PRERELEASE_ID="${PUBLISHING_NO_BUILD#*-}"
+            PRERELEASE_ID="${PRERELEASE_ID%%.*}"
+            TAG="$PRERELEASE_ID"
+            REASON="pre-release ($PUBLISHING) - using $PRERELEASE_ID, latest unchanged"
           else
             CURRENT_LATEST="$(npm view "${PKG}" version 2>/dev/null || true)"
             if [ -z "$CURRENT_LATEST" ]; then
