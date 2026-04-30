@@ -701,6 +701,30 @@ Customize behavior with environment variables:
 - `CHANGELOG_FILE` - Changelog file path (default: `CHANGELOG.md`)
 - `GIT_CHANGELOG_PATH` - Optional. When set to a repository-relative path (e.g. `packages/tar-xz`), restrict changelog generation to commits touching that path. Useful for monorepo per-package CHANGELOG files. Empty / unset = repository-wide (default).
 - `GIT_CHANGELOG_SINCE` - Optional. Override the `since` baseline for changelog generation (any git ref: SHA, tag, branch). When set, bypasses both the per-package release-commit detection and the `git describe --tags` fallback. Useful for monorepo workspaces with non-standard release commit patterns. Empty / unset = use auto-detection.
+- `CHANGELOG_TYPE_MAP` - Optional. JSON string mapping commit types to CHANGELOG section headings. Merged on top of `.changelog-types.json` (if present) and the built-in defaults. Use `false` as a value to suppress a type entirely. Example: `CHANGELOG_TYPE_MAP='{"ops":"### Operations","deps":"### Dependencies"}'`.
+
+### Custom type map (`.changelog-types.json`)
+
+Create a `.changelog-types.json` file in your project root to override or extend the built-in commit-type → section mapping at the project level. The file is merged on top of the built-in defaults; individual keys can be overridden without touching the rest.
+
+**Resolution order** (highest priority wins):
+1. `CHANGELOG_TYPE_MAP` env var (runtime override, e.g. in CI)
+2. `.changelog-types.json` project file
+3. Built-in defaults
+
+**Example `.changelog-types.json`:**
+```json
+{
+  "deps": "### Dependencies",
+  "ops": "### Operations",
+  "ci": false
+}
+```
+- String values must be a valid `### Section Heading`.
+- `false` suppresses the type (no CHANGELOG entry emitted).
+- Malformed JSON or invalid values → warning logged, layer ignored, lower-priority map used.
+
+**BREAKING CHANGE: footer parsing** (Conventional Commits 1.0.0 §6): `BREAKING CHANGE:` is recognised as a footer only when it appears after a blank-line separator from the preceding paragraph. Mid-body occurrences without the blank line do not promote the commit to breaking. Multiple `BREAKING CHANGE:` lines in the same footer paragraph each emit a separate entry under `### ⚠️ BREAKING CHANGES`.
 
 ### Git
 - `GIT_COMMIT_MESSAGE` - Commit message template (default: `release: bump v${version}`)
