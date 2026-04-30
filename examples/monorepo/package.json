@@ -1,0 +1,16 @@
+{
+  "name": "@example/monorepo-root",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Worked example: per-package CHANGELOG with @oorabona/release-it-preset",
+  "type": "module",
+  "scripts": {
+    "demo:update-pkg-a": "GIT_CHANGELOG_PATH=packages/pkg-a release-it-preset update",
+    "demo:update-pkg-b": "GIT_CHANGELOG_PATH=packages/pkg-b release-it-preset update"
+  },
+  "devDependencies": {
+    "@oorabona/release-it-preset": "^0.15.0",
+    "release-it": "^20.0.0"
+  },
+  "packageManager": "pnpm@10.17.1"
+}
