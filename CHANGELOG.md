@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **OSS hygiene docs** — [`CONTRIBUTING.md`](CONTRIBUTING.md) (PR conventions, gates, branch prefixes, pre-PR checklist), [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) (Contributor Covenant 2.1).
+- **[`docs/PUBLIC_API.md`](docs/PUBLIC_API.md)** — explicit stable API surface (CLI commands, env vars, config exports, GHA workflow inputs, exit codes) versus internal items, with versioning policy. Source of truth for what semver protects in v1.0+.
+- **README "Why this preset?" + "Ecosystem positioning"** sections — comparison vs changesets / semantic-release / release-please / plain release-it / `@release-it-plugins/workspaces` to help users choose the right tool for their context.
+- **README "Install patterns" + "Composing with `@release-it-plugins/workspaces`"** sections — `npx`/`pnpm dlx`/devDep examples, plus how to compose the preset with the workspaces plugin for monorepos that need bulk publish + cross-package dep sync.
+- **`doctor` workspace detection** — new `Workspace integration` check under the Configuration section. Detects `pnpm-workspace.yaml` or `package.json` workspaces field; WARN with `pnpm add -D @release-it-plugins/workspaces` recommendation when the plugin is missing, PASS otherwise. Lenient detection of malformed `workspaces` fields (string, null `packages`) — they correctly fall through to PASS.
+
+### Changed
+
+- **Peer requirement widened** to `release-it ^19.0.0 || ^20.0.0` (was `^20.0.0` only). Enables composition with `@release-it-plugins/workspaces` (whose peer maxes at v19). Tested against the full preset surface on v19.2.4 — no breaking changes observed (the v19→v20 delta is internal: undici, proxy-agent, @inquirer/prompts, Node ≥20.19.0).
+- **`engines.node` bumped to `>=20.19.0`** (was `>=18.0.0`) — matches release-it v20's minimum and aligns with the OIDC publishing path which already required Node ≥ 24 in CI.
+- **Exit code stability table** added to README and `docs/MIGRATION.md` — codes 0/1/2 are documented and frozen for v1.0+; codes 3-9 reserved for future contract additions.
+
 ## [0.15.0] - 2026-04-30
 
 ### Added
