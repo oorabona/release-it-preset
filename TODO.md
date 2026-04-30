@@ -1,7 +1,7 @@
 # TODO — Roadmap to v1.0.0
 
-**Last updated:** 2026-04-30
-**Current version:** v0.15.0
+**Last updated:** 2026-05-01
+**Current version:** v1.0.0-rc.0 (npm `rc`); v0.15.0 (npm `latest`)
 
 ## v1.0 Backlog (tracked as GitHub issues)
 
