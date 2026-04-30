@@ -408,6 +408,68 @@ describe('validateConfiguration', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Workspace integration (detectWorkspaceIntegration via validateConfiguration)
+// ---------------------------------------------------------------------------
+
+describe('Workspace integration check', () => {
+  it('PASS when no workspace files detected', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn().mockReturnValue(false),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('PASS')
+    expect(wsCheck?.value).toBe('not a monorepo')
+  })
+
+  it('WARN when pnpm-workspace.yaml present and plugin missing', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'pnpm-workspace.yaml'),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('WARN')
+    expect(wsCheck?.value).toContain('pnpm-workspace.yaml present')
+    expect(wsCheck?.detail).toContain('@release-it-plugins/workspaces')
+    expect(wsCheck?.detail).toContain('GIT_CHANGELOG_PATH')
+  })
+
+  it('WARN when package.json workspaces field present and plugin missing', () => {
+    const pkgWithWorkspaces = JSON.stringify({
+      name: 'my-monorepo',
+      version: '1.0.0',
+      workspaces: ['packages/*'],
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return pkgWithWorkspaces
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('WARN')
+    expect(wsCheck?.value).toContain('package.json workspaces field')
+    expect(wsCheck?.detail).toContain('@release-it-plugins/workspaces')
+  })
+
+  it('PASS when workspace files present and plugin is installed', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn(
+        (p: string) =>
+          p === 'pnpm-workspace.yaml' ||
+          p === 'node_modules/@release-it-plugins/workspaces/package.json',
+      ),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('PASS')
+    expect(wsCheck?.value).toBe('plugin installed')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // summarize
 // ---------------------------------------------------------------------------
 

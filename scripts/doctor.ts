@@ -288,6 +288,54 @@ export function inspectRepository(deps: DoctorDeps): RepositorySection {
 // 3. Configuration
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// Workspace integration helper (used by validateConfiguration)
+// ---------------------------------------------------------------------------
+
+function detectWorkspaceIntegration(deps: DoctorDeps): CheckResult {
+  const hasPnpmWorkspace = deps.existsSync('pnpm-workspace.yaml')
+
+  let hasWorkspacesField = false
+  if (!hasPnpmWorkspace && deps.existsSync('package.json')) {
+    try {
+      const raw = deps.readFileSync('package.json', 'utf8') as string
+      const pkg = JSON.parse(raw) as Record<string, unknown>
+      const ws = pkg.workspaces
+      hasWorkspacesField =
+        Array.isArray(ws) || (typeof ws === 'object' && ws !== null && 'packages' in ws)
+    } catch {
+      // package.json parse errors are reported by the version check — skip here
+    }
+  }
+
+  const workspaceSetup = hasPnpmWorkspace || hasWorkspacesField
+  if (!workspaceSetup) {
+    return { name: 'Workspace integration', status: 'PASS', value: 'not a monorepo' }
+  }
+
+  const pluginInstalled = deps.existsSync(
+    'node_modules/@release-it-plugins/workspaces/package.json',
+  )
+  if (pluginInstalled) {
+    return { name: 'Workspace integration', status: 'PASS', value: 'plugin installed' }
+  }
+
+  const source = hasPnpmWorkspace ? 'pnpm-workspace.yaml present' : 'package.json workspaces field'
+  return {
+    name: 'Workspace integration',
+    status: 'WARN',
+    value: `Workspace setup detected (no plugin loaded): ${source}`,
+    detail: [
+      'For multi-package publish + cross-pkg dep sync, run:',
+      '  pnpm add -D @release-it-plugins/workspaces',
+      'Then add `"plugins": {"@release-it-plugins/workspaces": true}` to .release-it.json.',
+      'Skip if you only need per-package CHANGELOG (use GIT_CHANGELOG_PATH).',
+    ].join('\n'),
+  }
+}
+
+
 export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
   const checks: CheckResult[] = []
   const changelogPath = deps.getEnv('CHANGELOG_FILE') ?? 'CHANGELOG.md'
@@ -426,6 +474,8 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
       })
     }
   }
+
+  checks.push(detectWorkspaceIntegration(deps))
 
   return { checks, status: worstStatus(checks.map((c) => c.status)) }
 }
