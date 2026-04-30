@@ -14,6 +14,7 @@ _All medium and low priority items shipped in v0.11.0. Only the stability cycle 
 - [ ] 💡 [Scripts] Multi-line commit body parser — multi-line commit bodies currently leak as `### Changed` entries instead of being treated as commit metadata. Surfaced during the `GIT_CHANGELOG_PATH` work but explicitly out of scope for v0.11.0.
 
 ## Recently Done
+- [x] ✅ [Scripts] Per-package release baseline detection in monorepos — `GIT_CHANGELOG_SINCE` env var + auto-detection of `chore(<pkg>): release v*` commits as `since` baseline (`d117cad`, closes #21)
 - [x] ✅ [Release] **v0.11.0 shipped** — `GIT_CHANGELOG_PATH` env var + OIDC trusted publishing + smart dist-tag + MIGRATION.md + ADRs (`0b4f857` tag `v0.11.0`)
 - [x] ✅ [CI] npm OIDC trusted publishing + unified publish workflow (no more `NPM_TOKEN` secret) + smart dist-tag + idempotent publish (`560eaba`/`8324918`/`ad40152`/`10d8ce5`)
 - [x] ✅ [Docs] `docs/MIGRATION.md` (v0.x → v1.0 upgrade guide) + `docs/adr/` (4 initial ADRs) (`7841605`)
