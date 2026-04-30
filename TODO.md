@@ -7,10 +7,15 @@
 
 All open work has been moved to GitHub issues for public visibility:
 
-- [x] ✅ [#23](https://github.com/oorabona/release-it-preset/issues/23) Multi-line body parser — merged `9ff76aa` (PR #27, target v0.13.0)
+- [x] ✅ [#23](https://github.com/oorabona/release-it-preset/issues/23) Multi-line body parser — shipped v0.13.0 (PR #27 / `9ff76aa`)
+- [x] ✅ Smart dist-tag pre-release — shipped v0.13.1 (PR #28 / `025a5f9`, opus AMBER + codex M findings folded)
+- [x] ✅ Workflows OIDC parity — shipped v0.14.0 (PR #29 / `2b86ae8`, ci/hotfix/republish migrated, NPM_TOKEN secret obsolete)
 - [ ] 🚀 [#24](https://github.com/oorabona/release-it-preset/issues/24) v1.0.0 stability cycle (tracking checklist) — Priority: M (gated, drives beta.1 → rc.1 → stable)
 - [ ] 🔧 [#25](https://github.com/oorabona/release-it-preset/issues/25) `release-it-preset doctor` command — Priority: M (v1.0.0-beta.2)
-- [ ] 🔧 [#26](https://github.com/oorabona/release-it-preset/issues/26) Configurable commit-type → section mapping — Priority: M (v1.0.0-beta.2)
+- [ ] 🔧 [#26](https://github.com/oorabona/release-it-preset/issues/26) Configurable commit-type → section mapping + 4 review followups (F-002..F-006) from PR #27 — Priority: M (v1.0.0-beta.2)
+- [ ] 🔧 [#30](https://github.com/oorabona/release-it-preset/issues/30) Extract smart dist-tag to composite action (DRY) — Priority: L (defer until 3rd caller)
+- [ ] 🐛 [#31](https://github.com/oorabona/release-it-preset/issues/31) ci.yml malformed shell in display step — Priority: L (cosmetic, pre-existing)
+- [ ] 🔒 Dependabot alerts on main — 1 critical / 3 high / 2 moderate — Priority: H (triage before beta.1?)
 
 Sequencing rationale + memory pointer: see `project_state_v1_plan.md` in the local memory directory.
 
