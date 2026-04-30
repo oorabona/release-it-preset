@@ -556,6 +556,45 @@ pnpm release-it-preset check
 
 Useful for debugging release issues.
 
+#### `doctor` - Release Readiness Diagnostic
+
+Runs a structured checklist across four categories and outputs a readiness score:
+
+```bash
+pnpm release-it-preset doctor
+pnpm release-it-preset doctor --json
+```
+
+**What it checks:**
+
+| Category | Checks |
+|----------|--------|
+| Environment | Known env vars, source (env / default / unset), publish-mode consistency |
+| Repository | Git repo presence, branch vs `GIT_REQUIRE_BRANCH`, latest tag, commit count, dirty WD, upstream tracking, remote URL |
+| Configuration | `CHANGELOG.md` exists + Keep a Changelog format + `[Unreleased]` content, `.release-it.json` parseable + `extends` field, `package.json` valid semver version |
+| Readiness Summary | `PASS`/`WARN`/`FAIL` counts, score `N/M checks passing`, status (`READY`/`WARNINGS`/`BLOCKED`), actionable recommendations |
+
+**Exit codes:**
+- `0` — status is `READY` or `WARNINGS`
+- `1` — status is `BLOCKED` (at least one `FAIL`)
+
+**`--json` output shape:**
+```json
+{
+  "environment": { "checks": [...], "vars": [...], "status": "PASS" },
+  "repository":  { "checks": [...], "status": "WARN" },
+  "configuration": { "checks": [...], "status": "PASS" },
+  "summary": {
+    "pass": 10, "warn": 2, "fail": 0, "total": 12,
+    "score": "10/12 checks passing",
+    "status": "WARNINGS",
+    "recommendations": ["Review 2 warning(s) before releasing"]
+  }
+}
+```
+
+Use `doctor` as a pre-release sanity check, and `check` for the full verbose configuration dump.
+
 #### `check-pr` - Pull Request Hygiene
 
 Evaluates PR readiness by analysing commits and changelog changes. Designed for CI usage but safe locally when the required environment variables are set (`PR_BASE_REF`, `PR_HEAD_REF`).
