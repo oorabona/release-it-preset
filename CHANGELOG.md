@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`GIT_CHANGELOG_SINCE` env var** — explicit `since` baseline override for changelog generation (any git ref: SHA, tag, branch). When set, bypasses both the per-package release-commit detection and the `git describe --tags` fallback. Useful for monorepo workspaces with non-standard release commit patterns. ([d117cad](https://github.com/oorabona/release-it-preset/commit/d117cad))
+- **Per-package release commit auto-detection** — when `GIT_CHANGELOG_PATH` is set, `populate-unreleased-changelog` now reads `package.json` `.name` (strips `@scope/` prefix), runs `git log --grep="^chore(<pkg>): release v" -n 1` and uses the SHA as the `since` baseline if found. Falls back to `git describe --tags` when no prior per-package release commit exists. Eliminates re-printing of commits already shipped in earlier per-package releases. Closes [#21](https://github.com/oorabona/release-it-preset/issues/21). ([d117cad](https://github.com/oorabona/release-it-preset/commit/d117cad))
+
+### Changed
+
+- **CI infrastructure modernized**: bumped `actions/checkout` 4 → 6 ([3061d00](https://github.com/oorabona/release-it-preset/commit/3061d00)), `actions/cache` 4 → 5 ([3c790c8](https://github.com/oorabona/release-it-preset/commit/3c790c8)), `pnpm/action-setup` 4 → 6 ([f551072](https://github.com/oorabona/release-it-preset/commit/f551072)). Aligns with current GitHub Actions runner expectations.
+- **Dependabot config consolidated** — weekly grouped updates for dev/prod dependencies, separate `github-actions` ecosystem tracking, Conventional Commits prefixes (`chore(deps)` / `chore(actions)`). One PR per week instead of N. ([f12c7fb](https://github.com/oorabona/release-it-preset/commit/f12c7fb))
+
+### Fixed
+
+- **E2E test helper** isolates spawned CLI from CI runner env vars — `runCli()` now forces `GITHUB_REPOSITORY=''` so `getGitHubRepoUrl()` falls back to the temp repo's configured `origin` remote rather than the CI runner's auto-set value. Fixed a flaky E2E assertion that passed locally but failed under GitHub Actions. ([85ce9a6](https://github.com/oorabona/release-it-preset/commit/85ce9a6))
+
 ## [0.11.0] - 2026-04-29
 
 ### Added
