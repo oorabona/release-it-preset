@@ -88,6 +88,19 @@ These env vars are read by configs and scripts. Setting them overrides built-in 
 | `GITHUB_RELEASE` | `false` | Set to `true` to create a GitHub Release |
 | `GITHUB_REPOSITORY` | _(unset, auto-detected from git remote)_ | `owner/repo` for commit/release links |
 
+### Hotfix
+
+| Name | Default | Notes |
+|---|---|---|
+| `HOTFIX_INCREMENT` | `patch` | Version increment for the `hotfix` config (`patch`/`minor`/`major`/`prepatch`/`preminor`/`premajor`/`prerelease`) |
+
+### `check-pr` utility
+
+| Name | Default | Notes |
+|---|---|---|
+| `PR_BASE_REF` | _(falls back to `GITHUB_BASE_REF` then `origin/main`)_ | Base ref for the PR diff (used by `release-it-preset check-pr`) |
+| `PR_HEAD_REF` | _(falls back to `GITHUB_HEAD_REF` then `HEAD`)_ | Head ref for the PR diff |
+
 ### Project file (lower priority than `CHANGELOG_TYPE_MAP` env var)
 
 | File | Notes |
@@ -154,13 +167,13 @@ Scripts use `ScriptError`/`ValidationError`/`GitError`/`ChangelogError` (typed e
 The following are **NOT** stable. Do not depend on their shape, location, or behavior across versions:
 
 - `scripts/lib/*` (helper modules: `git-utils`, `commit-parser`, `semver-utils`, `string-utils`, `changelog-types`, `errors`, `run-script`)
-- Individual `scripts/<command>.ts` exports beyond the CLI surface (e.g., importing `populateChangelog(deps)` directly from `dist/scripts/populate-unreleased-changelog.js`)
+- **Individual `scripts/<command>.ts` exports beyond the CLI surface** — `package.json` exports `./scripts/*` to expose `dist/scripts/*.js`, but consuming those modules programmatically (e.g., `import { populateChangelog } from '@oorabona/release-it-preset/scripts/populate-unreleased-changelog'`) is **exported-but-unstable**: the module-level exports may rename, change signatures, or move between minor versions. Use the CLI commands (`release-it-preset update`, etc.) for stable behavior.
 - TypeScript declaration files in `dist/types/*` — emitted for editor experience, signature shapes may evolve
 - `bin/validators.js` internals (validators are still applied to user input but their function signatures may change)
 - The DI dependency interfaces (`PopulateChangelogDeps`, `GitDeps`, `DoctorDeps`, etc.) — used internally for testing
 - The repo layout under `dist/` beyond `dist/scripts/` and `dist/types/`
 
-If you find yourself importing from `scripts/lib/*.js` or `dist/types/*` directly, you have stepped outside the stable API. Open an issue requesting the surface area you need and we can promote it to stable in a minor version.
+If you find yourself importing from `scripts/lib/*.js`, `dist/types/*`, or `@oorabona/release-it-preset/scripts/*` programmatically, you have stepped outside the stable API. Open an issue requesting the surface area you need and we can promote it to stable in a minor version.
 
 ---
 

@@ -8,7 +8,7 @@ Thanks for your interest. This project values small, focused PRs with clear test
 git clone https://github.com/oorabona/release-it-preset
 cd release-it-preset
 pnpm install
-pnpm test          # 435 tests should pass
+pnpm test          # 439+ tests should pass
 pnpm exec tsc --noEmit
 pnpm build
 ```
@@ -42,7 +42,7 @@ chore: clarify changelog comments and test labels
 Run all four locally before opening a PR:
 
 ```bash
-pnpm test                          # vitest, expect 435+ passing
+pnpm test                          # vitest, expect 439+ passing
 pnpm exec tsc --noEmit             # type check
 pnpm exec biome check --write .    # lint + format
 pnpm build                         # compile dist/scripts

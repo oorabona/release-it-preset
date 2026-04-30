@@ -100,7 +100,7 @@ pnpm add -D @oorabona/release-it-preset release-it
 
 **Global install is not recommended** — pin per-project for reproducibility. The preset is small (<20KB unpacked); CI overhead is negligible.
 
-The peer requirement is `release-it ^19.0.0 || ^20.0.0`. Both versions are tested. v20 is recommended for the OIDC trusted publishing handshake (npm ≥ 11.5.1, Node ≥ 24); v19 is supported for composing with [`@release-it-plugins/workspaces`](#composing-with-release-it-pluginsworkspaces) (its peer maxes at v19 today).
+The peer requirement is `release-it ^19.0.0 || ^20.0.0`. CI runs against the upper bound (v20.x) on every commit; v19 was smoke-tested manually before the constraint was widened. v20 is recommended for the OIDC trusted publishing handshake (npm ≥ 11.5.1, Node ≥ 24); v19 is supported for composing with [`@release-it-plugins/workspaces`](#composing-with-release-it-pluginsworkspaces) (its peer maxes at v19 today).
 
 ## Quick Start
 

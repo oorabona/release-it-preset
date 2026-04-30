@@ -303,7 +303,8 @@ function detectWorkspaceIntegration(deps: DoctorDeps): CheckResult {
       const pkg = JSON.parse(raw) as Record<string, unknown>
       const ws = pkg.workspaces
       hasWorkspacesField =
-        Array.isArray(ws) || (typeof ws === 'object' && ws !== null && 'packages' in ws)
+        Array.isArray(ws) ||
+        (typeof ws === 'object' && ws !== null && Array.isArray((ws as { packages?: unknown }).packages))
     } catch {
       // package.json parse errors are reported by the version check — skip here
     }
