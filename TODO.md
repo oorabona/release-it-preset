@@ -7,7 +7,7 @@
 
 All open work has been moved to GitHub issues for public visibility:
 
-- [ ] 🐛 [#23](https://github.com/oorabona/release-it-preset/issues/23) Multi-line body parser — Priority: H (next ship as v0.13.0)
+- [x] ✅ [#23](https://github.com/oorabona/release-it-preset/issues/23) Multi-line body parser — merged `9ff76aa` (PR #27, target v0.13.0)
 - [ ] 🚀 [#24](https://github.com/oorabona/release-it-preset/issues/24) v1.0.0 stability cycle (tracking checklist) — Priority: M (gated, drives beta.1 → rc.1 → stable)
 - [ ] 🔧 [#25](https://github.com/oorabona/release-it-preset/issues/25) `release-it-preset doctor` command — Priority: M (v1.0.0-beta.2)
 - [ ] 🔧 [#26](https://github.com/oorabona/release-it-preset/issues/26) Configurable commit-type → section mapping — Priority: M (v1.0.0-beta.2)
