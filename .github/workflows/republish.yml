@@ -164,6 +164,10 @@ jobs:
           # Strip semver '+build' metadata before any prerelease detection.
           # Without this, 1.0.0+build-foo (no prerelease, but '-' in metadata)
           # would falsely match the prerelease branch.
+          # NOTE: defense-in-depth — the pre-flight regex at line 44 currently
+          # rejects '+' entirely, so this branch is unreachable today via
+          # workflow_dispatch. Kept for byte-parity with publish.yml (where the
+          # version comes from package.json and may legitimately carry +build).
           PUBLISHING_NO_BUILD="${PUBLISHING%%+*}"
 
           if [[ "$PUBLISHING_NO_BUILD" == *-* ]]; then
@@ -200,9 +204,9 @@ jobs:
         env:
           NPM_PUBLISH: 'true'
           GITHUB_RELEASE: 'true'
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_SKIP_CHECKS: 'true'  # npm whoami has no static identity under OIDC
           NPM_TAG: ${{ steps.dist_tag.outputs.tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create audit trail
         run: |
