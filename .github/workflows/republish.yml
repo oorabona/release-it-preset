@@ -16,6 +16,9 @@ permissions:
   contents: write
   id-token: write
 
+env:
+  NODE_VERSION: '24'  # npm >= 11.5.1 ships with Node 24, required for OIDC trusted publishing
+
 concurrency:
   group: republish-${{ inputs.version }}
   cancel-in-progress: false
@@ -104,7 +107,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -131,13 +134,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-
-      - name: Configure npm authentication
-        run: npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          registry-url: 'https://registry.npmjs.org'  # Required for npm OIDC trusted publishing
 
       - name: Configure Git
         run: |
@@ -153,13 +152,57 @@ jobs:
           name: ${{ needs.build-dist.outputs.artifact_name }}
           path: dist
 
+      # Decide which npm dist-tag to set. When republishing an older version
+      # we must NOT overwrite `latest`; we use a version-named dist-tag instead
+      # (e.g. `v0.10.0`). This mirrors the same logic in publish.yml.
+      - name: Determine npm dist-tag
+        id: dist_tag
+        run: |
+          PUBLISHING="${{ inputs.version }}"
+          PKG="$(node -p 'require("./package.json").name')"
+
+          # Strip semver '+build' metadata before any prerelease detection.
+          # Without this, 1.0.0+build-foo (no prerelease, but '-' in metadata)
+          # would falsely match the prerelease branch.
+          PUBLISHING_NO_BUILD="${PUBLISHING%%+*}"
+
+          if [[ "$PUBLISHING_NO_BUILD" == *-* ]]; then
+            # Pre-release (semver '-' indicator): use the prerelease identifier as
+            # the dist-tag so 'latest' is never demoted to a beta/rc/alpha.
+            # 1.0.0-beta.1 -> beta, 2.0.0-rc.2 -> rc, 1.5.0-alpha.5 -> alpha.
+            PRERELEASE_ID="${PUBLISHING_NO_BUILD#*-}"
+            PRERELEASE_ID="${PRERELEASE_ID%%.*}"
+            TAG="$PRERELEASE_ID"
+            REASON="pre-release ($PUBLISHING) - using $PRERELEASE_ID, latest unchanged"
+          else
+            CURRENT_LATEST="$(npm view "${PKG}" version 2>/dev/null || true)"
+            if [ -z "$CURRENT_LATEST" ]; then
+              TAG="latest"
+              REASON="first publish"
+            elif [ "$(printf '%s\n%s\n' "$PUBLISHING" "$CURRENT_LATEST" | sort -V | tail -1)" = "$PUBLISHING" ] \
+                 && [ "$PUBLISHING" != "$CURRENT_LATEST" ]; then
+              TAG="latest"
+              REASON="newer than current latest ($CURRENT_LATEST)"
+            elif [ "$PUBLISHING" = "$CURRENT_LATEST" ]; then
+              TAG="latest"
+              REASON="same as current latest (idempotent)"
+            else
+              TAG="v$PUBLISHING"
+              REASON="older than current latest ($CURRENT_LATEST) — using version-named tag"
+            fi
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "📌 Republishing ${PKG}@${PUBLISHING} with --tag ${TAG} (${REASON})"
+
       - name: Republish with release-it-preset
         run: pnpm release-it-preset republish --ci
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_PUBLISH: 'true'
           GITHUB_RELEASE: 'true'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_SKIP_CHECKS: 'true'  # npm whoami has no static identity under OIDC
+          NPM_TAG: ${{ steps.dist_tag.outputs.tag }}
 
       - name: Create audit trail
         run: |
