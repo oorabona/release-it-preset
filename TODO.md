@@ -12,7 +12,7 @@ All open work has been moved to GitHub issues for public visibility:
 - [x] ✅ Workflows OIDC parity — shipped v0.14.0 (PR #29 / `2b86ae8`, ci/hotfix/republish migrated, NPM_TOKEN secret obsolete)
 - [ ] 🚀 [#24](https://github.com/oorabona/release-it-preset/issues/24) v1.0.0 stability cycle (tracking checklist) — Priority: M (gated, drives beta.1 → rc.1 → stable)
 - [x] ✅ [#25](https://github.com/oorabona/release-it-preset/issues/25) `release-it-preset doctor` command — shipped v0.15.0 (PR #33)
-- [x] ✅ [#26](https://github.com/oorabona/release-it-preset/issues/26) Configurable commit-type → section mapping + 4 review followups F-002..F-006 — shipped v0.15.0 (PR #33)
+- [x] ✅ [#26](https://github.com/oorabona/release-it-preset/issues/26) Configurable commit-type → section mapping + 4 review-loop refinements (folded into #26) — shipped v0.15.0 (PR #33)
 - [x] ✅ [#31](https://github.com/oorabona/release-it-preset/issues/31) ci.yml malformed shell display step — shipped via chore PR #32 (jq unification)
 - [x] ✅ Dependabot alerts cleared — pnpm up -L + vite ^7.3.2 pin (devDeps only, no runtime impact, PR #32)
 - [ ] 🔧 [#30](https://github.com/oorabona/release-it-preset/issues/30) Extract smart dist-tag to composite action (DRY) — Priority: L (defer until 3rd caller, post-v1.0)
