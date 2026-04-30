@@ -114,6 +114,11 @@ export function createTempGitRepo(opts: TempRepoOpts = {}): TempRepo {
   // Default safe environment for CLI invocations.
   // NPM_TOKEN=dummy bypasses `npm whoami` in validate-release (CI auth token path).
   // CI=true (not '1') matches the validate-release ciEnv check (toLowerCase() === 'true').
+  // GITHUB_REPOSITORY is forced empty so getGitHubRepoUrl() falls back to the temp
+  // repo's `origin` remote (https://github.com/example/demo-e2e.git). Without this,
+  // CI runners leak GITHUB_REPOSITORY=<owner>/<repo> into the test environment and
+  // populate-unreleased-changelog generates links pointing at the wrong project,
+  // making the commit-link assertion in hotfix.test.ts fail in CI but pass locally.
   const defaultEnv: NodeJS.ProcessEnv = {
     GITHUB_RELEASE: 'false',
     NPM_PUBLISH: 'false',
@@ -122,6 +127,7 @@ export function createTempGitRepo(opts: TempRepoOpts = {}): TempRepo {
     GIT_REQUIRE_CLEAN: 'false',
     CI: 'true',
     NPM_TOKEN: 'dummy-e2e-token',
+    GITHUB_REPOSITORY: '',
   }
 
   const repo: TempRepo = {
