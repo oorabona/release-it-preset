@@ -108,8 +108,8 @@ jobs:
       - name: Check if version already on registry
         id: registry_state
         run: |
-          PKG="$(node -p 'require("./package.json").name')"
-          VER="$(node -p 'require("./package.json").version')"
+          PKG="$(jq -r .name package.json)"
+          VER="$(jq -r .version package.json)"
           if npm view "${PKG}@${VER}" version >/dev/null 2>&1; then
             echo "already_published=true" >> "$GITHUB_OUTPUT"
             echo "ℹ️  ${PKG}@${VER} already published — npm publish step will be skipped."
@@ -125,8 +125,8 @@ jobs:
       - name: Determine npm dist-tag
         id: dist_tag
         run: |
-          PUBLISHING="$(node -p 'require("./package.json").version')"
-          PKG="$(node -p 'require("./package.json").name')"
+          PUBLISHING="$(jq -r .version package.json)"
+          PKG="$(jq -r .name package.json)"
 
           # Strip semver '+build' metadata before any prerelease detection.
           # Without this, 1.0.0+build-foo (no prerelease, but '-' in metadata)
