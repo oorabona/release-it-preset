@@ -144,15 +144,17 @@ No existing configuration is affected. Both vars require explicit opt-in.
 
 ---
 
-## Upgrade checklist for v1.0.0 (preview)
+## Upgrade checklist for v1.0.0
 
-v1.0 will freeze the public API surface: config export paths, CLI commands
-and flags, environment variable names, exit codes, and the `extends` contract.
-No additional breaking changes are planned beyond what v0.10 already shipped.
+v1.0 freezes the public API surface: config export paths, CLI commands and
+flags, environment variable names, exit codes, and the `extends` contract.
+The full surface is documented in [`docs/PUBLIC_API.md`](./PUBLIC_API.md).
 
-Before v1.0.0 stable is tagged, a `v1.0.0-beta.1` will be published.
-Integrators should test against the beta and report any contract concerns
-as issues before the stable release.
+The path to v1.0.0 stable runs `v0.13.0` (multi-line body parser fix) →
+`v0.14.0` (workflows OIDC parity) → `v0.15.0` (doctor + configurable
+commit-type-map) → `v1.0.0-rc.1` (freeze + OSS hygiene + announce) →
+`v1.0.0` stable. There is **no `beta` phase** — integrators concerned about
+the contract should test against `v1.0.0-rc.1`.
 
 Once v1.0.0 is out, standard semver discipline applies: breaking changes
 require a major version bump. The v0.x series does not provide a formal
@@ -165,7 +167,41 @@ backport policy.
       v0.10.0)
 - [ ] Verify commit-msg hooks accept `chore(release): v${version}` (default
       since v0.10.1)
-- [ ] Audit any env vars you set against the current reference in `README.md`
-      and `CLAUDE.md` — names have been stable since v0.7.0
-- [ ] Run `release-it-preset check` to confirm the preset resolves correctly
-      in your environment
+- [ ] Audit any env vars you set against [`docs/PUBLIC_API.md`](./PUBLIC_API.md)
+      — names have been stable since v0.7.0
+- [ ] Run `release-it-preset doctor` (new in v0.15.0) to confirm the preset
+      resolves correctly in your environment
+
+## v1.0 stability commitments
+
+The contract listed in [`docs/PUBLIC_API.md`](./PUBLIC_API.md) is what we
+freeze in v1.0.0. To recap:
+
+- **Stable**: 7 release configs (`default`/`hotfix`/`changelog-only`/
+  `manual-changelog`/`no-changelog`/`republish`/`retry-publish`), 7 utility
+  commands (`init`/`update`/`validate`/`check`/`doctor`/`check-pr`/
+  `retry-publish-preflight`), 18 environment variables (17 in
+  `ENV_VAR_CATALOG` + `CHANGELOG_TYPE_MAP`), 7 config exports under
+  `@oorabona/release-it-preset/config/*`, the `publish.yml` workflow input
+  contract, and the `release-it ^19 || ^20` peer dep range.
+- **Internal** (may change without notice): `scripts/lib/*`, individual
+  script exports beyond the CLI surface, `dist/types/*`, DI dependency
+  interfaces, the `bin/validators.js` internals.
+
+If a future release needs to touch any stable item, it requires a major
+version bump (`v2.0.0`).
+
+## Exit code stability
+
+CLI exit codes follow this convention from v1.0.0 onward:
+
+| Code | Meaning |
+|---|---|
+| `0` | Success (`doctor` `READY` or `WARNINGS` status; commands completed) |
+| `1` | General failure (unhandled error, validation failure, `doctor` `BLOCKED` status) |
+| `2` | Precondition failure for CI (`validate` reports CHANGELOG missing or `[Unreleased]` empty) |
+| `3..9` | **Reserved** — not currently emitted; reserved for future contract additions |
+
+Scripts use a typed error hierarchy (`ScriptError` / `ValidationError` /
+`GitError` / `ChangelogError`) under the hood; the typed errors are
+internal but the exit-code contract above is stable.

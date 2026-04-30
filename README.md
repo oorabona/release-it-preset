@@ -2,18 +2,49 @@
 
 Shared [release-it](https://github.com/release-it/release-it) configuration and scripts for automated versioning, changelog generation, and package publishing.
 
-[![codecov](https://codecov.io/github/oorabona/release-it-preset/graph/badge.svg?token=6RMN34Z7TX)](https://codecov.io/github/oorabona/release-it-preset)
+[![NPM Version](https://img.shields.io/npm/v/@oorabona/release-it-preset.svg)](https://npmjs.org/package/@oorabona/release-it-preset)
+[![NPM Downloads](https://img.shields.io/npm/dm/@oorabona/release-it-preset.svg)](https://npmjs.org/package/@oorabona/release-it-preset)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node](https://img.shields.io/node/v/@oorabona/release-it-preset.svg)](https://nodejs.org/)
+[![OIDC trusted publishing](https://img.shields.io/badge/npm-OIDC%20trusted%20publishing-green.svg)](https://docs.npmjs.com/trusted-publishers)
 [![CI](https://github.com/oorabona/release-it-preset/actions/workflows/ci.yml/badge.svg)](https://github.com/oorabona/release-it-preset/actions/workflows/ci.yml)
 [![Audit](https://github.com/oorabona/release-it-preset/actions/workflows/audit.yml/badge.svg)](https://github.com/oorabona/release-it-preset/actions/workflows/audit.yml)
-[![NPM Version](https://img.shields.io/npm/v/release-it-preset.svg)](https://npmjs.org/package/@oorabona/release-it-preset)
-[![NPM Downloads](https://img.shields.io/npm/dm/release-it-preset.svg)](https://npmjs.org/package/@oorabona/release-it-preset)
+[![codecov](https://codecov.io/github/oorabona/release-it-preset/graph/badge.svg?token=6RMN34Z7TX)](https://codecov.io/github/oorabona/release-it-preset)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## Why this preset?
+
+Most release workflows fall into one of three traps: too much manual work (plain release-it, you assemble everything), too much ceremony (changesets, great for 5+ maintainers, heavy for one), or too much automation with too little control (semantic-release, hands-off by design and format).
+
+`@oorabona/release-it-preset` occupies the productive middle ground for solo and small-team JavaScript package maintainers who want:
+
+- **Human-readable changelogs.** Keep a Changelog format (Added/Fixed/Changed/Removed/Security) generated automatically from conventional commits — no manual entry writing, no machine-format diffs.
+- **OIDC publishing without CI plumbing.** Import the reusable `publish.yml` workflow in three lines. OIDC trusted publishing with npm provenance ships on day one, no `NPM_TOKEN` secret required.
+- **Diagnostic confidence before release.** Run `release-it-preset doctor` to surface every misconfiguration — git auth, npm auth, changelog hygiene, branch requirements — before anything breaks in CI.
+- **Recovery presets for the real world.** Dedicated `republish` and `retry-publish` configs handle the scenarios other tools pretend don't happen.
+
+**Pick this preset** if you maintain one or a few npm packages, write Keep a Changelog, deploy from GitHub Actions, and want pre-built OIDC publishing without adopting changesets or semantic-release's philosophy.
+
+**Do not pick this preset** if you have a large monorepo with cross-package dependency management needs (use [changesets](https://github.com/changesets/changesets)) or if you want zero human involvement in versioning decisions (use [semantic-release](https://github.com/semantic-release/semantic-release)).
+
+## Ecosystem positioning
+
+| Tool | Strength | When to prefer it |
+|---|---|---|
+| **`@oorabona/release-it-preset`** (this) | Keep a Changelog discipline + OIDC workflows + `doctor` CLI + recovery presets | Solo / small-team JS maintainer, human-curated changelogs, GitHub Actions CI |
+| [release-it](https://github.com/release-it/release-it) (plain) | Maximum flexibility, smallest opinion footprint | You want to assemble each piece yourself |
+| [changesets](https://github.com/changesets/changesets) | PR-driven versioning, fixed/linked package versions | 5+ maintainer monorepo, every change deserves explicit intent |
+| [semantic-release](https://github.com/semantic-release/semantic-release) | Fully-automated, zero human intervention | Branch-driven release pipelines, no human review of changelogs |
+| [release-please](https://github.com/googleapis/release-please) | GitHub Release PR pattern, 20+ language strategies | Polyglot repos, GitHub-native PR-driven workflow |
+| [`@release-it-plugins/workspaces`](https://github.com/release-it-plugins/workspaces) | Multi-package iteration + cross-pkg dep sync | Monorepo with bulk publish — composes with this preset (see [Composing with `@release-it-plugins/workspaces`](#composing-with-release-it-pluginsworkspaces)) |
 
 ## Table of Contents
 
+- [Why this preset?](#why-this-preset)
+- [Ecosystem positioning](#ecosystem-positioning)
 - [Features](#features)
 - [Installation](#installation)
+  - [Install patterns](#install-patterns)
 - [Quick Start](#quick-start)
 - [Available Configurations](#available-configurations)
 - [CLI Usage](#cli-usage)
@@ -21,6 +52,7 @@ Shared [release-it](https://github.com/release-it/release-it) configuration and 
   - [Preset Selection Mode](#preset-selection-mode)
   - [Passthrough Mode (Custom Config Override)](#passthrough-mode-custom-config-override)
   - [Monorepo Support](#monorepo-support)
+  - [Composing with `@release-it-plugins/workspaces`](#composing-with-release-it-pluginsworkspaces)
   - [Utility Commands](#utility-commands)
 - [Scripts](#scripts)
 - [Environment Variables](#environment-variables)
@@ -30,8 +62,11 @@ Shared [release-it](https://github.com/release-it/release-it) configuration and 
 - [GitHub Actions Workflows](#github-actions-workflows)
   - [Reusable Workflows](#reusable-workflows)
   - [Workflow Reference](#workflow-reference)
+- [Exit codes](#exit-codes)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
+- [Public API](#public-api)
+- [Contributing](#contributing)
 
 ## Features
 
@@ -52,6 +87,20 @@ Shared [release-it](https://github.com/release-it/release-it) configuration and 
 ```bash
 pnpm add -D @oorabona/release-it-preset release-it
 ```
+
+### Install patterns
+
+| Use case | Command | Notes |
+|---|---|---|
+| **Try without installing** | `pnpm dlx @oorabona/release-it-preset doctor` | Fetch + run, no install. Use for evaluating the preset on an existing repo. |
+| **One-shot npx** | `npx -y @oorabona/release-it-preset doctor` | Same idea, npm-flavored |
+| **Adopt as devDep** (recommended) | `pnpm add -D @oorabona/release-it-preset release-it` | Pins via lockfile, idiomatic for projects |
+| **CI usage** | `pnpm install --frozen-lockfile && pnpm exec release-it-preset retry-publish --ci` | Lockfile-deterministic, no prompts |
+| **Diagnostic on any repo** | `pnpm dlx @oorabona/release-it-preset doctor` | Works against the cwd's git/package.json/CHANGELOG; great for quick health checks |
+
+**Global install is not recommended** — pin per-project for reproducibility. The preset is small (<20KB unpacked); CI overhead is negligible.
+
+The peer requirement is `release-it ^19.0.0 || ^20.0.0`. Both versions are tested. v20 is recommended for the OIDC trusted publishing handshake (npm ≥ 11.5.1, Node ≥ 24); v19 is supported for composing with [`@release-it-plugins/workspaces`](#composing-with-release-it-pluginsworkspaces) (its peer maxes at v19 today).
 
 ## Quick Start
 
@@ -476,7 +525,37 @@ pnpm release-it-preset --config .release-it-manual.json
 - Multiple validation layers prevent abuse
 - No privilege escalation in CLI tool context
 
-See [examples/monorepo-workflow.md](examples/monorepo-workflow.md) for complete monorepo guide.
+See [examples/monorepo-workflow.md](examples/monorepo-workflow.md) for complete monorepo guide and [examples/monorepo/](examples/monorepo/) for a runnable workspace demo.
+
+### Composing with `@release-it-plugins/workspaces`
+
+This preset focuses on a single package per release-it run. If your monorepo needs **bulk publish** (iterate over every workspace package + sync cross-package dependency versions), compose this preset with [`@release-it-plugins/workspaces`](https://github.com/release-it-plugins/workspaces) — the canonical release-it plugin for that workflow.
+
+```bash
+# Install both
+pnpm add -D @oorabona/release-it-preset @release-it-plugins/workspaces release-it@^19
+```
+
+```jsonc
+// .release-it.json — extends our preset AND loads the workspaces plugin
+{
+  "extends": "@oorabona/release-it-preset/config/default",
+  "plugins": {
+    "@release-it-plugins/workspaces": true
+  }
+}
+```
+
+**Peer compatibility note:** `@release-it-plugins/workspaces` v5.0.3 declares peer `release-it ^17 || ^18 || ^19`. Our preset declares peer `^19 || ^20`. The intersection is `^19`, so when composing with the workspaces plugin you must pin release-it to v19. v20 standalone (without the workspaces plugin) is fully supported and recommended for new projects.
+
+`release-it-preset doctor` does **not** check whether the workspaces plugin is loaded — it's an opt-in composition. Run it manually after install if you want to verify the plugin's own preflight checks.
+
+When this composition is right for you:
+- You release multiple packages from one repo with **synchronized versions** (all bumped together).
+- You want **cross-package dependency sync** (when `pkg-a` bumps to 2.0, `pkg-b`'s reference auto-updates).
+
+When our preset alone is enough:
+- **Independent versioning** per package (each package releases when ready). Use `GIT_CHANGELOG_PATH=packages/<pkg>` to scope the CHANGELOG. See [examples/monorepo/](examples/monorepo/) for the runnable demo.
 
 ### Utility Commands
 
@@ -1533,11 +1612,30 @@ Common issues:
 
 This can appear if you interrupt a release, tweak `CHANGELOG.md`, then retry with the same version. The preset automatically passes `--allow-same-version` to `npm version`, so simply re-run `pnpm release` (or `pnpm release-it-preset default --retry`) and select the same version—`npm` will no longer abort.
 
+## Exit codes
+
+The CLI follows this convention (stable from v1.0.0 onward):
+
+| Code | Meaning | Examples |
+|---|---|---|
+| `0` | Success | Command completed; for `doctor`, `READY` or `WARNINGS` status |
+| `1` | General failure | Unhandled error, validation failure, `doctor` `BLOCKED` status |
+| `2` | Precondition failure (CI-friendly) | `validate` reports CHANGELOG missing or `[Unreleased]` empty |
+| `3..9` | **Reserved** | Not currently emitted; reserved for future contract additions |
+
+In CI scripts, distinguish `exit 1` (try-again-friendly) from `exit 2` (precondition not met — require operator action) when chaining commands.
+
+## Public API
+
+The full **stable surface** (CLI commands, environment variables, config exports, GHA workflow inputs, exit codes) is documented in [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md). Items not listed there are internal and may change in any version.
+
 ## License
 
-MIT
+MIT — see [`LICENSE`](LICENSE).
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or pull request.
+PRs and issues welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request — it covers the Conventional Commits requirement, branch prefixes, the pre-PR checklist, and the testing conventions. By participating you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md) (Contributor Covenant 2.1).
+
+For security concerns, please email `olivier.orabona@gmail.com` directly rather than opening a public issue. See [`SECURITY.md`](SECURITY.md) for the disclosure policy.
 
