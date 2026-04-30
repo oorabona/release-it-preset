@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`release-it-preset doctor`** — new diagnostic CLI command that runs a structured 4-section checklist (Environment, Repository, Configuration, Readiness Summary) and reports a PASS/WARN/FAIL score. Human-readable output for interactive use; `--json` for CI integration. Exits 1 on BLOCKED, 0 on READY/WARNINGS. Closes [#25](https://github.com/oorabona/release-it-preset/issues/25). ([c1d3a3d](https://github.com/oorabona/release-it-preset/commit/c1d3a3d))
+- **Configurable commit-type → CHANGELOG section mapping** — override the built-in mapping via `.changelog-types.json` file (project-level) or `CHANGELOG_TYPE_MAP` env var (highest priority, JSON string). Resolution: env > file > built-in default, matching the project's existing env-var-overrides-default convention. Closes [#26](https://github.com/oorabona/release-it-preset/issues/26). ([c1d3a3d](https://github.com/oorabona/release-it-preset/commit/c1d3a3d))
+- **Worked monorepo example** — `examples/monorepo/` runnable demo of `GIT_CHANGELOG_PATH` per-package CHANGELOG generation. Two packages, walkthrough README with setup → demo commits → update command → expected output → troubleshooting. ([c1d3a3d](https://github.com/oorabona/release-it-preset/commit/c1d3a3d))
+
+### Changed
+
+- **`populate-unreleased-changelog` BREAKING CHANGE: footer parsing** is now strict per Conventional Commits 1.0.0 §6 — only matches in the LAST paragraph (after a blank-line separator). Mid-body `BREAKING CHANGE:` no longer falsely promotes a commit to breaking. CRLF line endings are accepted as paragraph separators. Multiple `BREAKING CHANGE:` footers in the last paragraph each emit a separate breaking entry. Breaking commits no longer dual-emit (they appear under `### ⚠️ BREAKING CHANGES` only, not also under their native section).
+- **dev tooling** — `pnpm up -L` to refresh devDeps to latest, vite pinned to `^7.3.2` (clears advisories), `node -p` calls in workflow YAML replaced with `jq -r` (cleaner shell). No runtime impact for npm consumers. ([ce3a731](https://github.com/oorabona/release-it-preset/commit/ce3a731))
+
 ## [0.14.0] - 2026-04-30
 
 ### Changed
