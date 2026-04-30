@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { BUILTIN_TYPE_MAP } from '../../scripts/lib/changelog-types'
 import { ValidationError } from '../../scripts/lib/errors'
 import { getGitHubRepoUrl } from '../../scripts/lib/git-utils'
 import {
@@ -489,7 +490,7 @@ describe('populate-unreleased-changelog (with DI)', () => {
           ([cmd]) => typeof cmd === 'string' && cmd.startsWith('git log'),
         )
         expect(gitLogCall).toBeDefined()
-        expect(gitLogCall![0]).toContain(' -- packages/tar-xz')
+        expect(gitLogCall?.[0]).toContain(' -- packages/tar-xz')
       })
 
       it('should throw ValidationError when GIT_CHANGELOG_PATH starts with ..', () => {
@@ -526,7 +527,7 @@ describe('populate-unreleased-changelog (with DI)', () => {
           ([cmd]) => typeof cmd === 'string' && cmd.startsWith('git log'),
         )
         expect(gitLogCall).toBeDefined()
-        expect(gitLogCall![0]).not.toContain(' -- ')
+        expect(gitLogCall?.[0]).not.toContain(' -- ')
       })
     })
   })
@@ -596,6 +597,200 @@ describe('populate-unreleased-changelog (with DI)', () => {
       vi.mocked(deps.execSync).mockReturnValue('v0.1.0\n')
       const result = resolveSinceBaseline(deps)
       expect(result).toBe('v0.1.0')
+    })
+  })
+
+  describe('F-002: breaking parts dedupe (only in BREAKING CHANGES, not in native section)', () => {
+    it('bang-style breaking commit appears ONLY in BREAKING CHANGES, not in ### Added', () => {
+      const gitOutput = 'abc1234567890|feat!: migrate config format|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### ⚠️ BREAKING CHANGES')
+      expect(result).toContain('migrate config format')
+      // exactly one occurrence in the whole output (dedupe: not also in ### Added)
+      expect((result.match(/migrate config format/g) ?? []).length).toBe(1)
+      expect(result).not.toContain('### Added')
+    })
+
+    it('BREAKING CHANGE footer entry appears ONLY in BREAKING CHANGES, not in ### Added', () => {
+      const gitOutput =
+        'abc1234567890|feat: add big thing\n\nBREAKING CHANGE: config schema changed|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### ⚠️ BREAKING CHANGES')
+      expect(result).toContain('add big thing')
+      // dedupe: appears exactly once
+      expect((result.match(/add big thing/g) ?? []).length).toBe(1)
+      expect(result).not.toContain('### Added')
+    })
+  })
+
+  describe('F-003: strict BREAKING CHANGE: footer (requires blank-line separation)', () => {
+    it('mid-body BREAKING CHANGE (no blank line) does NOT promote to breaking', () => {
+      // No blank line between header and "BREAKING CHANGE:" — not a footer
+      const gitOutput = 'abc1234567890|feat: x\nBREAKING CHANGE: not a footer|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).not.toContain('### ⚠️ BREAKING CHANGES')
+      expect(result).toContain('### Added')
+      expect(result).toContain('- x')
+    })
+
+    it('proper footer BREAKING CHANGE (blank line before) DOES promote to breaking', () => {
+      const gitOutput = 'abc1234567890|feat: x\n\nBREAKING CHANGE: real footer|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### ⚠️ BREAKING CHANGES')
+      expect(result).toContain('x')
+      // dedupe: only in breaking section
+      expect(result).not.toContain('### Added')
+    })
+
+    it('BREAKING-CHANGE (hyphen variant) in proper footer promotes to breaking', () => {
+      const gitOutput = 'abc1234567890|feat: y\n\nBREAKING-CHANGE: hyphen variant|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### ⚠️ BREAKING CHANGES')
+      expect(result).toContain('hyphen variant')
+    })
+  })
+
+  describe('F-004: multi-footer BREAKING CHANGE (multiple lines in last paragraph)', () => {
+    it('two BREAKING CHANGE lines in last paragraph emit two breaking entries', () => {
+      const gitOutput =
+        'abc1234567890|feat: big refactor\n\nBREAKING CHANGE: API changed\nBREAKING CHANGE: config changed|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### ⚠️ BREAKING CHANGES')
+      expect(result).toContain('API changed')
+      expect(result).toContain('config changed')
+      // both breaking lines present
+      expect((result.match(/API changed/g) ?? []).length).toBe(1)
+      expect((result.match(/config changed/g) ?? []).length).toBe(1)
+    })
+
+    it('standalone commit (no prefix) with two BREAKING CHANGE footers emits two entries', () => {
+      const gitOutput =
+        'abc1234567890|Non-conventional subject\n\nBREAKING CHANGE: removed foo\nBREAKING CHANGE: removed bar|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### ⚠️ BREAKING CHANGES')
+      expect(result).toContain('removed foo')
+      expect(result).toContain('removed bar')
+    })
+  })
+
+  describe('F-005: entry-count locks on AC#3 and AC#5', () => {
+    it('AC#3 after F-002 dedupe: BREAKING CHANGE footer entry appears exactly once', () => {
+      const gitOutput =
+        'abc1234567890|feat: migrate config format\n\nUsers must update their config file.\nBREAKING CHANGE: config schema changed|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      // "migrate config format" should appear exactly once (not duplicated across sections)
+      expect((result.match(/migrate config format/g) ?? []).length).toBe(1)
+    })
+
+    it('AC#5: two consecutive prefix lines emit exactly one entry each', () => {
+      const gitOutput = 'abc1234567890|feat: add X\nfix: fix Y|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect((result.match(/add X/g) ?? []).length).toBe(1)
+      expect((result.match(/fix Y/g) ?? []).length).toBe(1)
+    })
+  })
+
+  describe('F-006: edge cases (CRLF, whitespace-only separator, mid-body BREAKING CHANGE)', () => {
+    it('CRLF line endings are handled correctly', () => {
+      // Windows-style \r\n — blank line is \r\n\r\n
+      const gitOutput = 'abc1234567890|feat: x\r\n\r\nbody\r\nRefs: #1|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### Added')
+      expect(result).toContain('x')
+      // Refs: line must NOT become a changelog entry
+      expect(result).not.toMatch(/- Refs/m)
+    })
+
+    it('whitespace-only line acts as paragraph separator', () => {
+      // A line with only spaces is a blank-line separator per the spec
+      const gitOutput = 'abc1234567890|feat: x\n   \nbody text|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### Added')
+      expect(result).toContain('x')
+      // "body text" must not be a changelog entry
+      expect(result).not.toContain('body text')
+    })
+
+    it('mid-body BREAKING CHANGE without blank-line separator is not treated as footer', () => {
+      const gitOutput = 'abc1234567890|feat: x\nBREAKING CHANGE: not a footer|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).not.toContain('### ⚠️ BREAKING CHANGES')
+      // The commit still appears as a regular Added entry
+      expect(result).toContain('### Added')
+    })
+
+    it('CRLF body with proper blank-line BREAKING CHANGE footer DOES promote', () => {
+      // Windows-authored commit: paragraph separator is \r\n\r\n, not \n\n.
+      // The splitter must accept both line endings so the footer is detected.
+      const gitOutput =
+        'abc1234567890|feat: rewrite parser\r\n\r\nBREAKING CHANGE: rule names changed|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### ⚠️ BREAKING CHANGES')
+      expect(result).toContain('rewrite parser')
+    })
+  })
+
+  describe('custom type map: normalizeCommitType with override', () => {
+    it('custom typeMap routes unknown type to custom section', () => {
+      const customMap = { ...BUILTIN_TYPE_MAP, deps: '### Dependencies' }
+      expect(normalizeCommitType('deps', customMap)).toBe('### Dependencies')
+    })
+
+    it('custom typeMap false value suppresses type', () => {
+      const customMap = { ...BUILTIN_TYPE_MAP, docs: false as const }
+      expect(normalizeCommitType('docs', customMap)).toBe(false)
+    })
+
+    it('env CHANGELOG_TYPE_MAP routes deps commits to custom section via parseCommitsWithMultiplePrefixes', () => {
+      const customMap = { ...BUILTIN_TYPE_MAP, deps: '### Dependencies' }
+      const gitOutput = 'abc1234567890|deps: bump foo to 1.2.3|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(
+        gitOutput,
+        'https://github.com/owner/repo',
+        customMap,
+      )
+
+      expect(result).toContain('### Dependencies')
+      expect(result).toContain('bump foo to 1.2.3')
+      expect(result).not.toContain('### Changed')
+    })
+
+    it('populateChangelog uses CHANGELOG_TYPE_MAP env var to route custom types', () => {
+      vi.mocked(deps.readFileSync).mockImplementation(path => {
+        if (path === '.changelog-types.json') {
+          throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+        }
+        return '# Changelog\n\n## [Unreleased]\n\nNo changes yet.\n\n'
+      })
+      vi.mocked(deps.getEnv).mockImplementation(key => {
+        if (key === 'CHANGELOG_TYPE_MAP') {
+          return JSON.stringify({ ops: '### Operations' })
+        }
+        return undefined
+      })
+      vi.mocked(deps.execSync)
+        .mockReturnValueOnce('v1.0.0') // git describe
+        .mockReturnValueOnce('abc1234567890|ops: deploy infra|||END|||') // git log
+        .mockReturnValueOnce('') // git remote (getGitHubRepoUrl)
+
+      populateChangelog(deps)
+
+      const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+      expect(writtenContent).toContain('### Operations')
+      expect(writtenContent).toContain('deploy infra')
     })
   })
 })

@@ -48,6 +48,7 @@ const UTILITY_COMMANDS = {
   update: 'populate-unreleased-changelog',
   validate: 'validate-release',
   check: 'check-config',
+  doctor: 'doctor',
   'check-pr': 'check-pr-status',
   'retry-publish-preflight': 'retry-publish',
 };
@@ -77,6 +78,7 @@ Utility Commands:
   update                 Update [Unreleased] section from commits
   validate [--allow-dirty]  Validate project is ready for release
   check                  Display configuration and project status
+  doctor                 Run diagnostic checklist and show readiness score
   check-pr               Evaluate PR hygiene (branch diff, changelog status, conventions)
   retry-publish-preflight  Run retry publish safety checks without executing release
 
@@ -222,7 +224,7 @@ function handleUtilityCommand(commandName, args) {
   const compiledPath = join(__dirname, '..', 'dist', 'scripts', `${base}.js`);
   const sourcePath = join(__dirname, '..', 'scripts', `${base}.ts`);
 
-  console.log(`🔧 Running utility command: ${commandName}\n`);
+  console.error(`🔧 Running utility command: ${commandName}\n`);
 
   // Prefer compiled script; fallback to tsx source if not built yet (developer convenience)
   import('node:fs').then(fs => {
@@ -230,7 +232,7 @@ function handleUtilityCommand(commandName, args) {
     const runner = useCompiled ? 'node' : 'tsx';
     const target = useCompiled ? compiledPath : sourcePath;
     if (!useCompiled) {
-      console.log('ℹ️  Compiled script not found, falling back to tsx source execution (dev mode).');
+      console.error('ℹ️  Compiled script not found, falling back to tsx source execution (dev mode).');
     }
 
     const child = spawn(runner, [target, ...args], {

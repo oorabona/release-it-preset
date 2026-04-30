@@ -2,6 +2,8 @@
 
 This guide shows how to use `@oorabona/release-it-preset` in monorepo projects with shared configurations.
 
+> **Looking for a runnable example?** See [`examples/monorepo/`](./monorepo/) — a minimal pnpm workspace with two packages, demonstrating `GIT_CHANGELOG_PATH` per-package CHANGELOG generation end-to-end. This guide focuses on config composition and `extends` patterns; the runnable example focuses on the changelog filtering itself.
+
 ## Overview
 
 Monorepos often need to:

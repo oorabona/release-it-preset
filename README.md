@@ -556,6 +556,45 @@ pnpm release-it-preset check
 
 Useful for debugging release issues.
 
+#### `doctor` - Release Readiness Diagnostic
+
+Runs a structured checklist across four categories and outputs a readiness score:
+
+```bash
+pnpm release-it-preset doctor
+pnpm release-it-preset doctor --json
+```
+
+**What it checks:**
+
+| Category | Checks |
+|----------|--------|
+| Environment | Known env vars, source (env / default / unset), publish-mode consistency |
+| Repository | Git repo presence, branch vs `GIT_REQUIRE_BRANCH`, latest tag, commit count, dirty WD, upstream tracking, remote URL |
+| Configuration | `CHANGELOG.md` exists + Keep a Changelog format + `[Unreleased]` content, `.release-it.json` parseable + `extends` field, `package.json` valid semver version |
+| Readiness Summary | `PASS`/`WARN`/`FAIL` counts, score `N/M checks passing`, status (`READY`/`WARNINGS`/`BLOCKED`), actionable recommendations |
+
+**Exit codes:**
+- `0` — status is `READY` or `WARNINGS`
+- `1` — status is `BLOCKED` (at least one `FAIL`)
+
+**`--json` output shape:**
+```json
+{
+  "environment": { "checks": [...], "vars": [...], "status": "PASS" },
+  "repository":  { "checks": [...], "status": "WARN" },
+  "configuration": { "checks": [...], "status": "PASS" },
+  "summary": {
+    "pass": 10, "warn": 2, "fail": 0, "total": 12,
+    "score": "10/12 checks passing",
+    "status": "WARNINGS",
+    "recommendations": ["Review 2 warning(s) before releasing"]
+  }
+}
+```
+
+Use `doctor` as a pre-release sanity check, and `check` for the full verbose configuration dump.
+
 #### `check-pr` - Pull Request Hygiene
 
 Evaluates PR readiness by analysing commits and changelog changes. Designed for CI usage but safe locally when the required environment variables are set (`PR_BASE_REF`, `PR_HEAD_REF`).
@@ -662,6 +701,30 @@ Customize behavior with environment variables:
 - `CHANGELOG_FILE` - Changelog file path (default: `CHANGELOG.md`)
 - `GIT_CHANGELOG_PATH` - Optional. When set to a repository-relative path (e.g. `packages/tar-xz`), restrict changelog generation to commits touching that path. Useful for monorepo per-package CHANGELOG files. Empty / unset = repository-wide (default).
 - `GIT_CHANGELOG_SINCE` - Optional. Override the `since` baseline for changelog generation (any git ref: SHA, tag, branch). When set, bypasses both the per-package release-commit detection and the `git describe --tags` fallback. Useful for monorepo workspaces with non-standard release commit patterns. Empty / unset = use auto-detection.
+- `CHANGELOG_TYPE_MAP` - Optional. JSON string mapping commit types to CHANGELOG section headings. Merged on top of `.changelog-types.json` (if present) and the built-in defaults. Use `false` as a value to suppress a type entirely. Example: `CHANGELOG_TYPE_MAP='{"ops":"### Operations","deps":"### Dependencies"}'`.
+
+### Custom type map (`.changelog-types.json`)
+
+Create a `.changelog-types.json` file in your project root to override or extend the built-in commit-type → section mapping at the project level. The file is merged on top of the built-in defaults; individual keys can be overridden without touching the rest.
+
+**Resolution order** (highest priority wins):
+1. `CHANGELOG_TYPE_MAP` env var (runtime override, e.g. in CI)
+2. `.changelog-types.json` project file
+3. Built-in defaults
+
+**Example `.changelog-types.json`:**
+```json
+{
+  "deps": "### Dependencies",
+  "ops": "### Operations",
+  "ci": false
+}
+```
+- String values must be a valid `### Section Heading`.
+- `false` suppresses the type (no CHANGELOG entry emitted).
+- Malformed JSON or invalid values → warning logged, layer ignored, lower-priority map used.
+
+**BREAKING CHANGE: footer parsing** (Conventional Commits 1.0.0 §6): `BREAKING CHANGE:` is recognised as a footer only when it appears after a blank-line separator from the preceding paragraph. Mid-body occurrences without the blank line do not promote the commit to breaking. Multiple `BREAKING CHANGE:` lines in the same footer paragraph each emit a separate entry under `### ⚠️ BREAKING CHANGES`.
 
 ### Git
 - `GIT_COMMIT_MESSAGE` - Commit message template (default: `release: bump v${version}`)

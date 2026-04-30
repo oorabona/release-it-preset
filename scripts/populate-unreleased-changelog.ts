@@ -25,6 +25,7 @@ import { getGitHubRepoUrl } from './lib/git-utils.js';
 import { CONVENTIONAL_COMMIT_REGEX } from './lib/commit-parser.js';
 import { runScript } from './lib/run-script.js';
 import { ValidationError } from './lib/errors.js';
+import { BUILTIN_TYPE_MAP, loadChangelogTypeMap } from './lib/changelog-types.js';
 
 /**
  * Dependencies interface for dependency injection
@@ -73,37 +74,15 @@ export function extractConventionalCommitParts(commitBody: string, sha: string):
 }
 
 /**
- * Normalize commit types to standard changelog categories
+ * Normalize a commit type to a CHANGELOG section heading.
+ * Uses `typeMap` (defaults to BUILTIN_TYPE_MAP) so callers can inject
+ * a custom or project-level override without touching this function.
+ * Returns false when the type should be suppressed entirely.
  */
-export function normalizeCommitType(type: string): string | false {
-  const typeMap: Record<string, string | false> = {
-    feat: '### Added',
-    feature: '### Added',
-    add: '### Added',
-    fix: '### Fixed',
-    bugfix: '### Fixed',
-    security: '### Security',
-    perf: '### Changed',
-    refactor: '### Changed',
-    style: '### Changed',
-    docs: '### Changed',
-    test: '### Changed',
-    chore: '### Changed',
-    build: '### Changed',
-    deps: '### Changed',
-    dependency: '### Changed',
-    dependencies: '### Changed',
-    revert: '### Changed',
-    remove: '### Removed',
-    removed: '### Removed',
-    delete: '### Removed',
-    deleted: '### Removed',
-    ci: false,
-    release: false,
-    hotfix: false,
-    misc: '### Changed',
-  };
-
+export function normalizeCommitType(
+  type: string,
+  typeMap: Record<string, string | false> = BUILTIN_TYPE_MAP,
+): string | false {
   const result = typeMap[type.toLowerCase()];
   return result !== undefined ? result : '### Changed';
 }
@@ -112,7 +91,11 @@ export function normalizeCommitType(type: string): string | false {
 /**
  * Parse git log output and extract all conventional commit parts
  */
-export function parseCommitsWithMultiplePrefixes(gitOutput: string, repoUrl: string): string {
+export function parseCommitsWithMultiplePrefixes(
+  gitOutput: string,
+  repoUrl: string,
+  typeMap: Record<string, string | false> = BUILTIN_TYPE_MAP,
+): string {
   if (!gitOutput) return '';
 
   const commitEntries = gitOutput.split('|||END|||').filter((entry) => entry.trim());
@@ -150,18 +133,36 @@ export function parseCommitsWithMultiplePrefixes(gitOutput: string, repoUrl: str
 
       const parts = extractConventionalCommitParts(headerBlock, shortSha);
 
-      // Detect "BREAKING CHANGE:" trailer in the full body (not just header).
-      // This handles the footer-style breaking annotation per Conventional Commits spec.
-      const breakingFooterMatch = /^BREAKING[- ]CHANGE:\s*(.+)/m.exec(body);
-      if (breakingFooterMatch) {
+      // F-003: Detect "BREAKING CHANGE:" trailers only in the LAST paragraph of the body,
+      // AND only when the body has more than one paragraph (i.e., there is at least one
+      // blank-line separator). Per Conventional Commits 1.0.0 §6, a footer requires a
+      // blank line separating it from the preceding content. A "BREAKING CHANGE:" that
+      // appears on a line immediately after the subject line (no blank line) is mid-body
+      // prose, NOT a footer, and must NOT promote the commit to breaking.
+      //
+      // F-004: Use matchAll() so multiple BREAKING CHANGE: lines in the same last
+      // paragraph each emit a separate breaking entry.
+      // CRLF safety: accept both LF and CRLF line endings so commits authored on
+      // Windows produce the same output (a paragraph separator can be \n\n or \r\n\r\n).
+      const paragraphs = body.split(/\r?\n[ \t]*\r?\n/);
+      const hasFooterSection = paragraphs.length > 1;
+      const breakingFooterMatches = hasFooterSection
+        ? [...(paragraphs[paragraphs.length - 1] ?? '').matchAll(/^BREAKING[- ]CHANGE:\s*(.+)$/gm)]
+        : [];
+
+      if (breakingFooterMatches.length > 0) {
         if (parts.length > 0) {
-          // Promote the first emitted part to breaking.
+          // Promote the first conventional-commit part to breaking so it appears in
+          // the BREAKING CHANGES section with the commit's own description.
           parts[0] = { ...parts[0], breaking: true };
-        } else {
-          // No leading conventional prefix found; emit a standalone breaking entry.
+        }
+        // Each BREAKING CHANGE: footer line emits its own breaking entry with the
+        // footer's description (distinct from the commit subject).
+        // F-004: Multiple footer lines → multiple entries.
+        for (const m of breakingFooterMatches) {
           parts.push({
             type: 'misc',
-            description: breakingFooterMatch[1].trim(),
+            description: m[1].trim(),
             sha: shortSha,
             breaking: true,
           });
@@ -173,13 +174,13 @@ export function parseCommitsWithMultiplePrefixes(gitOutput: string, repoUrl: str
         if (firstLine) {
           const lowerFirstLine = firstLine.toLowerCase();
           const ignoredPatterns = [
-        /^release\b/,
-        /^hotfix\b/,
-        /^ci\b/,
-        /^chore\(release\)/i,
-        /^chore\(hotfix\)/i,
-        /^chore\(ci\)/i,
-      ];
+            /^release\b/,
+            /^hotfix\b/,
+            /^ci\b/,
+            /^chore\(release\)/i,
+            /^chore\(hotfix\)/i,
+            /^chore\(ci\)/i,
+          ];
           const shouldSkip = ignoredPatterns.some((pattern) => pattern.test(lowerFirstLine));
 
           if (shouldSkip) {
@@ -202,12 +203,17 @@ export function parseCommitsWithMultiplePrefixes(gitOutput: string, repoUrl: str
   const breakingChanges: CommitPart[] = [];
 
   for (const part of allParts) {
-    // Collect breaking changes separately
+    // F-002: Breaking parts go ONLY into the BREAKING CHANGES section.
+    // They are NOT also added to their native section (e.g. ### Added), which
+    // would produce duplicate entries. The breaking indicator in the native
+    // section was confusing — the dedicated ### ⚠️ BREAKING CHANGES section
+    // already provides full visibility.
     if (part.breaking) {
       breakingChanges.push(part);
+      continue;
     }
 
-    const sectionName = normalizeCommitType(part.type);
+    const sectionName = normalizeCommitType(part.type, typeMap);
     if (sectionName === false) {
       continue;
     }
@@ -217,8 +223,22 @@ export function parseCommitsWithMultiplePrefixes(gitOutput: string, repoUrl: str
     groupedParts[sectionName].push(part);
   }
 
+  // Build the final ordered section list.
+  // Custom sections (from typeMap overrides) are appended after the standard order.
   const sections: string[] = [];
-  const sectionOrder = ['### Added', '### Fixed', '### Changed', '### Removed', '### Security'];
+  const standardSectionOrder = [
+    '### Added',
+    '### Fixed',
+    '### Changed',
+    '### Removed',
+    '### Security',
+  ];
+
+  // Collect any custom section names not in the standard order
+  const customSections = Object.keys(groupedParts).filter(
+    (s) => !standardSectionOrder.includes(s),
+  );
+  const sectionOrder = [...standardSectionOrder, ...customSections];
 
   // Add BREAKING CHANGES section first if there are any
   if (breakingChanges.length > 0) {
@@ -239,9 +259,8 @@ export function parseCommitsWithMultiplePrefixes(gitOutput: string, repoUrl: str
       sections.push(
         ...groupedParts[sectionTitle].map((part) => {
           const scopePart = part.scope ? ` (${part.scope})` : '';
-          const breakingIndicator = part.breaking ? ' ⚠️ BREAKING' : '';
           const linkPart = repoUrl ? ` ([${part.sha}](${repoUrl}/commit/${part.sha}))` : ` (${part.sha})`;
-          return `- ${part.description}${scopePart}${breakingIndicator}${linkPart}`;
+          return `- ${part.description}${scopePart}${linkPart}`;
         })
       );
       sections.push('');
@@ -359,7 +378,12 @@ export function populateChangelog(deps: PopulateChangelogDeps): void {
     getEnv: deps.getEnv,
     warn: deps.warn,
   });
-  const commits = parseCommitsWithMultiplePrefixes(gitOutput, repoUrl);
+  const typeMap = loadChangelogTypeMap({
+    readFileSync: deps.readFileSync,
+    getEnv: deps.getEnv,
+    warn: deps.warn,
+  });
+  const commits = parseCommitsWithMultiplePrefixes(gitOutput, repoUrl, typeMap);
   const changelog = deps.readFileSync(changelogPath, 'utf8') as string;
   const unreleasedContent = commits && commits.trim() ? commits : 'No changes yet.';
   const unreleasedRegex = /## \[Unreleased\][\s\S]*?(?=## \[|$)/;
