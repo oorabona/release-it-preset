@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-04-30
+
 ### Changed
 
 - **Workflows OIDC parity** — `ci.yml`, `hotfix.yml`, and `republish.yml` migrated from legacy `NPM_TOKEN` (static `_authToken` config) to npm OIDC trusted publishing, matching `publish.yml`. Each gains `registry-url` on `setup-node`, `NPM_SKIP_CHECKS=true` in publish env (`npm whoami` has no static identity under OIDC), and Node.js `24` (npm ≥ 11.5.1 required for the OIDC handshake) via a top-level `NODE_VERSION` env. ([2b86ae8](https://github.com/oorabona/release-it-preset/commit/2b86ae8))
@@ -415,7 +417,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.14.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -452,3 +454,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [0.13.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.13.0
 [v0.13.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.13.1
 [0.13.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.13.1
+[v0.14.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.14.0
+[0.14.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.14.0
