@@ -25,6 +25,9 @@ permissions:
   contents: write
   id-token: write
 
+env:
+  NODE_VERSION: '24'  # npm >= 11.5.1 ships with Node 24, required for OIDC trusted publishing
+
 jobs:
   validate:
     name: Validate
@@ -42,7 +45,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -73,13 +76,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-
-      - name: Configure npm authentication
-        run: npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          registry-url: 'https://registry.npmjs.org'  # Required for npm OIDC trusted publishing
 
       - name: Configure Git
         run: |
@@ -109,10 +108,10 @@ jobs:
             node bin/cli.js hotfix --ci --increment ${{ inputs.increment }}
           fi
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_PUBLISH: 'true'      # ✅ Publish to npm with provenance
+          NPM_PUBLISH: 'true'      # ✅ Publish to npm via OIDC trusted publishing
           GITHUB_RELEASE: 'true'   # ✅ Create GitHub Release
+          NPM_SKIP_CHECKS: 'true'  # npm whoami has no static identity under OIDC
 
       - name: Display hotfix release and publish info
         if: inputs.dry_run == false
