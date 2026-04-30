@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-04-30
+
 ### Fixed
 
 - **npm dist-tag selection for pre-releases** — `publish.yml` was tagging pre-release versions (`1.0.0-beta.1`, `2.0.0-rc.2`, etc.) as `latest` because `sort -V` places them after stable versions. The new branch in the smart dist-tag step extracts the prerelease identifier (`1.0.0-beta.1` → `beta`, `1.5.0-alpha.5` → `alpha`) and uses it as the npm tag, leaving `latest` on the prior stable release. Build metadata (`+build.123`) is stripped before detection so versions like `1.0.0+build-foo` (legal semver, build hyphen but no prerelease) correctly fall through to the stable path. Unblocks the v1.0.0-beta.X / rc.X cycle. ([025a5f9](https://github.com/oorabona/release-it-preset/commit/025a5f9))
@@ -404,7 +406,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.13.1...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -439,3 +441,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [0.12.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.12.0
 [v0.13.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.13.0
 [0.13.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.13.0
+[v0.13.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.13.1
+[0.13.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.13.1
