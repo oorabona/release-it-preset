@@ -1,7 +1,7 @@
 # TODO — Roadmap to v1.0.0
 
 **Last updated:** 2026-04-30
-**Current version:** v0.11.0
+**Current version:** v0.12.0
 
 ## v1.0 Backlog
 
@@ -14,6 +14,7 @@ _All medium and low priority items shipped in v0.11.0. Only the stability cycle 
 - [ ] 💡 [Scripts] Multi-line commit body parser — multi-line commit bodies currently leak as `### Changed` entries instead of being treated as commit metadata. Surfaced during the `GIT_CHANGELOG_PATH` work but explicitly out of scope for v0.11.0.
 
 ## Recently Done
+- [x] ✅ [Release] **v0.12.0 shipped** — `GIT_CHANGELOG_SINCE` + per-package baseline detection + GHA majors bumps + E2E env-leak fix (`e12b3fb` tag `v0.12.0`)
 - [x] ✅ [Scripts] Per-package release baseline detection in monorepos — `GIT_CHANGELOG_SINCE` env var + auto-detection of `chore(<pkg>): release v*` commits as `since` baseline (`d117cad`, closes #21)
 - [x] ✅ [Release] **v0.11.0 shipped** — `GIT_CHANGELOG_PATH` env var + OIDC trusted publishing + smart dist-tag + MIGRATION.md + ADRs (`0b4f857` tag `v0.11.0`)
 - [x] ✅ [CI] npm OIDC trusted publishing + unified publish workflow (no more `NPM_TOKEN` secret) + smart dist-tag + idempotent publish (`560eaba`/`8324918`/`ad40152`/`10d8ce5`)
