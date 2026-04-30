@@ -159,7 +159,7 @@ jobs:
         id: dist_tag
         run: |
           PUBLISHING="${{ inputs.version }}"
-          PKG="$(node -p 'require("./package.json").name')"
+          PKG="$(jq -r .name package.json)"
 
           # Strip semver '+build' metadata before any prerelease detection.
           # Without this, 1.0.0+build-foo (no prerelease, but '-' in metadata)
