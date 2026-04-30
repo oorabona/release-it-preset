@@ -661,6 +661,7 @@ Customize behavior with environment variables:
 ### Changelog
 - `CHANGELOG_FILE` - Changelog file path (default: `CHANGELOG.md`)
 - `GIT_CHANGELOG_PATH` - Optional. When set to a repository-relative path (e.g. `packages/tar-xz`), restrict changelog generation to commits touching that path. Useful for monorepo per-package CHANGELOG files. Empty / unset = repository-wide (default).
+- `GIT_CHANGELOG_SINCE` - Optional. Override the `since` baseline for changelog generation (any git ref: SHA, tag, branch). When set, bypasses both the per-package release-commit detection and the `git describe --tags` fallback. Useful for monorepo workspaces with non-standard release commit patterns. Empty / unset = use auto-detection.
 
 ### Git
 - `GIT_COMMIT_MESSAGE` - Commit message template (default: `release: bump v${version}`)

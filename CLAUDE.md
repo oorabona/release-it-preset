@@ -208,6 +208,7 @@ The scripts use this type mapping:
 All configurations support these variables:
 - `CHANGELOG_FILE` - Changelog path (default: CHANGELOG.md)
 - `GIT_CHANGELOG_PATH` - Optional. Restrict changelog generation to commits touching this repository-relative path (e.g. `packages/tar-xz`). Useful for monorepo per-package CHANGELOG files. Empty / unset = repository-wide (default).
+- `GIT_CHANGELOG_SINCE` - Optional. Override the `since` baseline for changelog generation (any git ref: SHA, tag, branch). When set, bypasses both the per-package release-commit detection and the `git describe --tags` fallback. Useful for monorepo workspaces with non-standard release commit patterns. Empty / unset = use auto-detection.
 - `GIT_COMMIT_MESSAGE` - Commit message template
 - `GIT_TAG_NAME` - Tag name template
 - `GIT_REQUIRE_BRANCH` - Required branch for releases

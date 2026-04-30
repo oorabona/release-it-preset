@@ -6,6 +6,7 @@ import {
   type PopulateChangelogDeps,
   parseCommitsWithMultiplePrefixes,
   populateChangelog,
+  resolveSinceBaseline,
 } from '../../scripts/populate-unreleased-changelog'
 import { ValidationError } from '../../scripts/lib/errors'
 
@@ -466,6 +467,78 @@ describe('populate-unreleased-changelog (with DI)', () => {
         expect(gitLogCall).toBeDefined()
         expect(gitLogCall![0]).not.toContain(' -- ')
       })
+    })
+  })
+
+  describe('resolveSinceBaseline', () => {
+    beforeEach(() => {
+      deps = {
+        execSync: vi.fn(),
+        readFileSync: vi.fn(),
+        writeFileSync: vi.fn(),
+        getEnv: vi.fn(() => undefined),
+        log: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+      } as unknown as PopulateChangelogDeps
+    })
+
+    it('GIT_CHANGELOG_SINCE override wins over everything else', () => {
+      vi.mocked(deps.getEnv).mockImplementation(k =>
+        k === 'GIT_CHANGELOG_SINCE' ? 'abc123def456' : undefined,
+      )
+      const result = resolveSinceBaseline(deps)
+      expect(result).toBe('abc123def456')
+      expect(deps.execSync).not.toHaveBeenCalled()
+    })
+
+    it('per-package detection: uses last chore(<pkg>): release commit when GIT_CHANGELOG_PATH is set', () => {
+      vi.mocked(deps.getEnv).mockImplementation(k =>
+        k === 'GIT_CHANGELOG_PATH' ? 'packages/nxz' : undefined,
+      )
+      vi.mocked(deps.readFileSync).mockReturnValue(JSON.stringify({ name: '@org/nxz-cli' }))
+      vi.mocked(deps.execSync).mockReturnValue(
+        'ecff028aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n',
+      )
+      const result = resolveSinceBaseline(deps)
+      expect(result).toBe('ecff028aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+      expect(vi.mocked(deps.execSync).mock.calls[0][0]).toMatch(
+        /--grep="\^chore\(nxz-cli\): release v"/,
+      )
+    })
+
+    it('per-package detection: falls back to tag when no prior release commit found', () => {
+      vi.mocked(deps.getEnv).mockImplementation(k =>
+        k === 'GIT_CHANGELOG_PATH' ? 'packages/nxz' : undefined,
+      )
+      vi.mocked(deps.readFileSync).mockReturnValue(JSON.stringify({ name: 'nxz-cli' }))
+      vi.mocked(deps.execSync)
+        .mockReturnValueOnce('') // git log --grep returns empty
+        .mockReturnValueOnce('v1.2.3\n') // git describe returns tag
+      const result = resolveSinceBaseline(deps)
+      expect(result).toBe('v1.2.3')
+    })
+
+    it('no GIT_CHANGELOG_PATH: per-package detection NOT attempted, single-package behavior preserved', () => {
+      vi.mocked(deps.getEnv).mockReturnValue(undefined)
+      vi.mocked(deps.execSync).mockReturnValue('v1.0.0\n')
+      const result = resolveSinceBaseline(deps)
+      expect(result).toBe('v1.0.0')
+      // Only ONE execSync call (git describe), NOT two
+      expect(vi.mocked(deps.execSync)).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(deps.execSync).mock.calls[0][0]).toContain('git describe')
+    })
+
+    it('package.json missing: skip per-package detection, fall through to tag', () => {
+      vi.mocked(deps.getEnv).mockImplementation(k =>
+        k === 'GIT_CHANGELOG_PATH' ? '.' : undefined,
+      )
+      vi.mocked(deps.readFileSync).mockImplementation(() => {
+        throw new Error('ENOENT')
+      })
+      vi.mocked(deps.execSync).mockReturnValue('v0.1.0\n')
+      const result = resolveSinceBaseline(deps)
+      expect(result).toBe('v0.1.0')
     })
   })
 })
