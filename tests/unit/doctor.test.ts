@@ -408,6 +408,148 @@ describe('validateConfiguration', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Workspace integration (detectWorkspaceIntegration via validateConfiguration)
+// ---------------------------------------------------------------------------
+
+describe('Workspace integration check', () => {
+  it('PASS when no workspace files detected', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn().mockReturnValue(false),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('PASS')
+    expect(wsCheck?.value).toBe('not a monorepo')
+  })
+
+  it('WARN when pnpm-workspace.yaml present and plugin missing', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'pnpm-workspace.yaml'),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('WARN')
+    expect(wsCheck?.value).toContain('pnpm-workspace.yaml present')
+    expect(wsCheck?.detail).toContain('@release-it-plugins/workspaces')
+    expect(wsCheck?.detail).toContain('GIT_CHANGELOG_PATH')
+  })
+
+  it('WARN when package.json workspaces field present and plugin missing', () => {
+    const pkgWithWorkspaces = JSON.stringify({
+      name: 'my-monorepo',
+      version: '1.0.0',
+      workspaces: ['packages/*'],
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return pkgWithWorkspaces
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('WARN')
+    expect(wsCheck?.value).toContain('package.json workspaces field')
+    expect(wsCheck?.detail).toContain('@release-it-plugins/workspaces')
+  })
+
+  it('PASS when workspace files present and plugin is installed', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn(
+        (p: string) =>
+          p === 'pnpm-workspace.yaml' ||
+          p === 'node_modules/@release-it-plugins/workspaces/package.json',
+      ),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('PASS')
+    expect(wsCheck?.value).toBe('plugin installed')
+  })
+
+  it('WARN when package.json has workspaces as object form {packages: [...]}', () => {
+    const pkgWithWorkspacesObject = JSON.stringify({
+      name: 'my-monorepo',
+      version: '1.0.0',
+      workspaces: { packages: ['packages/*'] },
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return pkgWithWorkspacesObject
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('WARN')
+    expect(wsCheck?.value).toContain('package.json workspaces field')
+  })
+
+  it('PASS when package.json has empty workspaces array (treated as not a monorepo)', () => {
+    // Some scaffolds leave `workspaces: []` from a template; treat as non-monorepo
+    // because there are no actual workspace packages declared.
+    const pkgEmptyArray = JSON.stringify({
+      name: 'maybe-monorepo',
+      version: '1.0.0',
+      workspaces: [],
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return pkgEmptyArray
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    // Empty array IS still Array.isArray(ws) === true, so detection still WARNs.
+    // This locks the current "file shape, not content" detection rule.
+    expect(wsCheck?.status).toBe('WARN')
+  })
+
+  it('PASS when package.json workspaces is malformed (string, null, etc.)', () => {
+    // A malformed workspaces field (non-array, non-object) should NOT trip detection.
+    const pkgBadWorkspaces = JSON.stringify({
+      name: 'broken-config',
+      version: '1.0.0',
+      workspaces: 'packages/*', // string, not array — invalid per pnpm/yarn/npm spec
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return pkgBadWorkspaces
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('PASS')
+    expect(wsCheck?.value).toBe('not a monorepo')
+  })
+
+  it('PASS when {packages} is non-array (e.g. null or string) — does not trip detection', () => {
+    const pkgWeirdShape = JSON.stringify({
+      name: 'weird',
+      version: '1.0.0',
+      workspaces: { packages: null },
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return pkgWeirdShape
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    // Locks the F-003 fix: 'packages' in ws alone was too lenient
+    expect(wsCheck?.status).toBe('PASS')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // summarize
 // ---------------------------------------------------------------------------
 
