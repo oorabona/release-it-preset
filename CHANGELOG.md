@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-04-30
+
 ### Added
 
 - **`GIT_CHANGELOG_SINCE` env var** — explicit `since` baseline override for changelog generation (any git ref: SHA, tag, branch). When set, bypasses both the per-package release-commit detection and the `git describe --tags` fallback. Useful for monorepo workspaces with non-standard release commit patterns. ([d117cad](https://github.com/oorabona/release-it-preset/commit/d117cad))
@@ -388,7 +390,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.12.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -419,3 +421,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [0.10.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.10.1
 [v0.11.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.11.0
 [0.11.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.11.0
+[v0.12.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.12.0
+[0.12.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.12.0
