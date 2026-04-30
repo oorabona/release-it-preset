@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-04-30
+
 ### Fixed
 
 - **Multi-line commit body parser** — `populate-unreleased-changelog` now restricts conventional-commit scanning to the **header block** (lines before the first blank line), preventing paragraph-separated trailers like `Refs: #42`, `Co-authored-by:`, etc. from leaking as spurious `### Changed` entries. AC#5 multi-prefix on consecutive lines (`feat: x\nfix: y`) is preserved. Adds explicit `BREAKING CHANGE:` footer detection — promotes the first emitted part to breaking, or emits a standalone `misc` breaking entry when no leading conventional prefix is present. Closes [#23](https://github.com/oorabona/release-it-preset/issues/23). ([9ff76aa](https://github.com/oorabona/release-it-preset/commit/9ff76aa))
@@ -398,7 +400,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.13.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -431,3 +433,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [0.11.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.11.0
 [v0.12.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.12.0
 [0.12.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.12.0
+[v0.13.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.13.0
+[0.13.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.13.0
