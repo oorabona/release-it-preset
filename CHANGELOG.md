@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Workflows OIDC parity** — `ci.yml`, `hotfix.yml`, and `republish.yml` migrated from legacy `NPM_TOKEN` (static `_authToken` config) to npm OIDC trusted publishing, matching `publish.yml`. Each gains `registry-url` on `setup-node`, `NPM_SKIP_CHECKS=true` in publish env (`npm whoami` has no static identity under OIDC), and Node.js `24` (npm ≥ 11.5.1 required for the OIDC handshake) via a top-level `NODE_VERSION` env. ([2b86ae8](https://github.com/oorabona/release-it-preset/commit/2b86ae8))
+- **`republish.yml` smart npm dist-tag selection** — ported from `publish.yml` (incl. v0.13.1 pre-release identifier extraction + build-metadata strip). Republishing an older stable now picks `v<version>` instead of demoting registry `latest`; pre-releases pick the bare identifier (`beta`/`rc`/`alpha`/etc). ([2b86ae8](https://github.com/oorabona/release-it-preset/commit/2b86ae8))
+
+### Removed
+
+- **`NPM_TOKEN` repository secret no longer required.** All publish-capable workflows now authenticate via OIDC. The secret can be safely deleted from GitHub repository settings post-merge.
+
 ## [0.13.1] - 2026-04-30
 
 ### Fixed
