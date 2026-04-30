@@ -128,7 +128,45 @@ export function parseCommitsWithMultiplePrefixes(gitOutput: string, repoUrl: str
 
     if (sha && body) {
       const shortSha = sha.trim().substring(0, 7);
-      const parts = extractConventionalCommitParts(body, shortSha);
+
+      // Compute the header block: first contiguous run of non-empty lines.
+      // This prevents paragraph-separated footer tokens like "Refs: #42" or
+      // "Co-authored-by: ..." from matching the conventional-commit regex
+      // via the 'gm' flag in extractConventionalCommitParts. AC#5 (consecutive
+      // multi-prefix lines) is preserved because those lines share no blank line.
+      const headerBlock = body.split('\n').reduce(
+        (acc, line) => {
+          if (!acc.done) {
+            if (line.trim() === '') {
+              acc.done = true;
+            } else {
+              acc.lines.push(line);
+            }
+          }
+          return acc;
+        },
+        { lines: [] as string[], done: false },
+      ).lines.join('\n');
+
+      const parts = extractConventionalCommitParts(headerBlock, shortSha);
+
+      // Detect "BREAKING CHANGE:" trailer in the full body (not just header).
+      // This handles the footer-style breaking annotation per Conventional Commits spec.
+      const breakingFooterMatch = /^BREAKING[- ]CHANGE:\s*(.+)/m.exec(body);
+      if (breakingFooterMatch) {
+        if (parts.length > 0) {
+          // Promote the first emitted part to breaking.
+          parts[0] = { ...parts[0], breaking: true };
+        } else {
+          // No leading conventional prefix found; emit a standalone breaking entry.
+          parts.push({
+            type: 'misc',
+            description: breakingFooterMatch[1].trim(),
+            sha: shortSha,
+            breaking: true,
+          });
+        }
+      }
 
       if (parts.length === 0) {
         const firstLine = body.split('\n')[0].trim();

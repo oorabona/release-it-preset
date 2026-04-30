@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ValidationError } from '../../scripts/lib/errors'
 import { getGitHubRepoUrl } from '../../scripts/lib/git-utils'
 import {
   extractConventionalCommitParts,
@@ -8,7 +9,6 @@ import {
   populateChangelog,
   resolveSinceBaseline,
 } from '../../scripts/populate-unreleased-changelog'
-import { ValidationError } from '../../scripts/lib/errors'
 
 describe('populate-unreleased-changelog (with DI)', () => {
   let deps: PopulateChangelogDeps
@@ -245,6 +245,69 @@ describe('populate-unreleased-changelog (with DI)', () => {
       expect(result).toContain('(abc1234)')
       expect(result).not.toContain('[abc1234]')
     })
+
+    // AC#2 — multi-line body with paragraph-separated footer must NOT leak into CHANGELOG
+    it('AC#2: should not emit footer fragments (Refs:) as changelog entries', () => {
+      // The full body has a blank line separating the subject from the body paragraph,
+      // and the "Refs:" footer trailer. Before the fix, "Refs: #42" matched the
+      // conventional-commit regex and appeared as a spurious "### Changed" entry.
+      const gitOutput =
+        'abc1234|feat: add login flow\n\nImplements password + magic-link options.\nRefs: #42|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### Added')
+      expect(result).toContain('add login flow')
+      // The Refs footer must NOT be emitted as a changelog entry
+      expect(result).not.toContain('### Changed')
+      expect(result).not.toMatch(/^- Refs/m)
+      // "#42" must not appear except possibly inside the SHA commit link
+      const lines = result.split('\n')
+      const nonShaLines = lines.filter(l => !l.includes('abc1234'))
+      expect(nonShaLines.join('\n')).not.toContain('#42')
+    })
+
+    // AC#3 — BREAKING CHANGE: footer in body must promote first part to breaking
+    it('AC#3: should detect BREAKING CHANGE: footer and mark the commit as breaking', () => {
+      const gitOutput =
+        'abc1234|feat: migrate config format\n\nUsers must update their config file.\nBREAKING CHANGE: config schema changed|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### ⚠️ BREAKING CHANGES')
+      expect(result).toContain('migrate config format')
+      // The BREAKING CHANGE trailer must not be emitted as a separate changelog entry
+      expect(result).not.toMatch(/^- BREAKING CHANGE/m)
+    })
+
+    // AC#3 edge case — standalone BREAKING CHANGE footer with no leading conventional prefix
+    it('AC#3 edge: should emit standalone breaking entry when BREAKING CHANGE footer present but no conventional prefix', () => {
+      const gitOutput =
+        'abc1234|Non-conventional subject line\n\nBREAKING CHANGE: removed the foo API|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### ⚠️ BREAKING CHANGES')
+      expect(result).toContain('removed the foo API')
+    })
+
+    // AC#4 — [skip-changelog] in a non-first body line must still trigger the skip
+    it('AC#4: should skip commit when [skip-changelog] appears in body paragraph (not first line)', () => {
+      const gitOutput =
+        'abc1234|feat: internal refactor\n\nThis is an internal-only change.\n[skip-changelog]|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toBe('No changes yet.')
+    })
+
+    // AC#5 — consecutive multi-prefix lines (no blank line between) must produce 2 entries
+    it('AC#5: should emit two entries for consecutive conventional prefix lines with no blank line between', () => {
+      // No blank line between feat: and fix: — both are in the header block
+      const gitOutput = 'abc1234|feat: add X\nfix: fix Y|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### Added')
+      expect(result).toContain('add X')
+      expect(result).toContain('### Fixed')
+      expect(result).toContain('fix Y')
+    })
   })
 
   describe('getGitHubRepoUrl', () => {
@@ -422,8 +485,8 @@ describe('populate-unreleased-changelog (with DI)', () => {
         populateChangelog(deps)
 
         const execCalls = vi.mocked(deps.execSync).mock.calls
-        const gitLogCall = execCalls.find(([cmd]) =>
-          typeof cmd === 'string' && cmd.startsWith('git log'),
+        const gitLogCall = execCalls.find(
+          ([cmd]) => typeof cmd === 'string' && cmd.startsWith('git log'),
         )
         expect(gitLogCall).toBeDefined()
         expect(gitLogCall![0]).toContain(' -- packages/tar-xz')
@@ -454,15 +517,13 @@ describe('populate-unreleased-changelog (with DI)', () => {
         vi.mocked(deps.getEnv).mockImplementation(key =>
           key === 'GIT_CHANGELOG_PATH' ? '' : undefined,
         )
-        vi.mocked(deps.execSync)
-          .mockReturnValueOnce('v1.0.0')
-          .mockReturnValueOnce('')
+        vi.mocked(deps.execSync).mockReturnValueOnce('v1.0.0').mockReturnValueOnce('')
 
         populateChangelog(deps)
 
         const execCalls = vi.mocked(deps.execSync).mock.calls
-        const gitLogCall = execCalls.find(([cmd]) =>
-          typeof cmd === 'string' && cmd.startsWith('git log'),
+        const gitLogCall = execCalls.find(
+          ([cmd]) => typeof cmd === 'string' && cmd.startsWith('git log'),
         )
         expect(gitLogCall).toBeDefined()
         expect(gitLogCall![0]).not.toContain(' -- ')
@@ -497,9 +558,7 @@ describe('populate-unreleased-changelog (with DI)', () => {
         k === 'GIT_CHANGELOG_PATH' ? 'packages/nxz' : undefined,
       )
       vi.mocked(deps.readFileSync).mockReturnValue(JSON.stringify({ name: '@org/nxz-cli' }))
-      vi.mocked(deps.execSync).mockReturnValue(
-        'ecff028aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n',
-      )
+      vi.mocked(deps.execSync).mockReturnValue('ecff028aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n')
       const result = resolveSinceBaseline(deps)
       expect(result).toBe('ecff028aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
       expect(vi.mocked(deps.execSync).mock.calls[0][0]).toMatch(
@@ -530,9 +589,7 @@ describe('populate-unreleased-changelog (with DI)', () => {
     })
 
     it('package.json missing: skip per-package detection, fall through to tag', () => {
-      vi.mocked(deps.getEnv).mockImplementation(k =>
-        k === 'GIT_CHANGELOG_PATH' ? '.' : undefined,
-      )
+      vi.mocked(deps.getEnv).mockImplementation(k => (k === 'GIT_CHANGELOG_PATH' ? '.' : undefined))
       vi.mocked(deps.readFileSync).mockImplementation(() => {
         throw new Error('ENOENT')
       })
