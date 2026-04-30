@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.0] - 2026-04-30
+
 ### Added
 
 - **OSS hygiene docs** — [`CONTRIBUTING.md`](CONTRIBUTING.md) (PR conventions, gates, branch prefixes, pre-PR checklist), [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) (Contributor Covenant 2.1).
@@ -444,7 +446,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.0.0-rc.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -485,3 +487,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [0.14.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.14.0
 [v0.15.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.15.0
 [0.15.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.15.0
+[v1.0.0-rc.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.0
+[1.0.0-rc.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.0

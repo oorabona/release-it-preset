@@ -1,6 +1,6 @@
 {
   "name": "@oorabona/release-it-preset",
-  "version": "0.15.0",
+  "version": "1.0.0-rc.0",
   "description": "Shared release-it preset with OIDC trusted publishing, smart npm dist-tag selection, and monorepo per-package changelog support",
   "type": "module",
   "keywords": [
