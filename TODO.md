@@ -1,7 +1,7 @@
 # TODO — Roadmap to v1.0.0
 
 **Last updated:** 2026-04-30
-**Current version:** v0.12.0
+**Current version:** v0.15.0
 
 ## v1.0 Backlog (tracked as GitHub issues)
 
@@ -11,11 +11,12 @@ All open work has been moved to GitHub issues for public visibility:
 - [x] ✅ Smart dist-tag pre-release — shipped v0.13.1 (PR #28 / `025a5f9`, opus AMBER + codex M findings folded)
 - [x] ✅ Workflows OIDC parity — shipped v0.14.0 (PR #29 / `2b86ae8`, ci/hotfix/republish migrated, NPM_TOKEN secret obsolete)
 - [ ] 🚀 [#24](https://github.com/oorabona/release-it-preset/issues/24) v1.0.0 stability cycle (tracking checklist) — Priority: M (gated, drives beta.1 → rc.1 → stable)
-- [ ] 🔧 [#25](https://github.com/oorabona/release-it-preset/issues/25) `release-it-preset doctor` command — Priority: M (v1.0.0-beta.2)
-- [ ] 🔧 [#26](https://github.com/oorabona/release-it-preset/issues/26) Configurable commit-type → section mapping + 4 review followups (F-002..F-006) from PR #27 — Priority: M (v1.0.0-beta.2)
-- [ ] 🔧 [#30](https://github.com/oorabona/release-it-preset/issues/30) Extract smart dist-tag to composite action (DRY) — Priority: L (defer until 3rd caller)
-- [ ] 🐛 [#31](https://github.com/oorabona/release-it-preset/issues/31) ci.yml malformed shell in display step — Priority: L (cosmetic, pre-existing)
-- [ ] 🔒 Dependabot alerts on main — 1 critical / 3 high / 2 moderate — Priority: H (triage before beta.1?)
+- [x] ✅ [#25](https://github.com/oorabona/release-it-preset/issues/25) `release-it-preset doctor` command — shipped v0.15.0 (PR #33)
+- [x] ✅ [#26](https://github.com/oorabona/release-it-preset/issues/26) Configurable commit-type → section mapping + 4 review followups F-002..F-006 — shipped v0.15.0 (PR #33)
+- [x] ✅ [#31](https://github.com/oorabona/release-it-preset/issues/31) ci.yml malformed shell display step — shipped via chore PR #32 (jq unification)
+- [x] ✅ Dependabot alerts cleared — pnpm up -L + vite ^7.3.2 pin (devDeps only, no runtime impact, PR #32)
+- [ ] 🔧 [#30](https://github.com/oorabona/release-it-preset/issues/30) Extract smart dist-tag to composite action (DRY) — Priority: L (defer until 3rd caller, post-v1.0)
+- [ ] 🤔 [#34](https://github.com/oorabona/release-it-preset/issues/34) BREAKING CHANGE footer dual-emit design decision — Priority: L (option A/B/C, defer to v1.1+)
 
 Sequencing rationale + memory pointer: see `project_state_v1_plan.md` in the local memory directory.
 
