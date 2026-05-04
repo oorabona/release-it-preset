@@ -136,6 +136,12 @@ describe('populate-unreleased-changelog (with DI)', () => {
       expect(normalizeCommitType('deps')).toBe('### Changed')
       expect(normalizeCommitType('dependencies')).toBe('### Changed')
     })
+
+    it('should map deprecate/deprecated/deprecation to Deprecated section', () => {
+      expect(normalizeCommitType('deprecate')).toBe('### Deprecated')
+      expect(normalizeCommitType('deprecated')).toBe('### Deprecated')
+      expect(normalizeCommitType('deprecation')).toBe('### Deprecated')
+    })
   })
 
   describe('parseCommitsWithMultiplePrefixes', () => {
@@ -177,6 +183,52 @@ describe('populate-unreleased-changelog (with DI)', () => {
       expect(result).toContain('add C')
       expect(result).toContain('### Fixed')
       expect(result).toContain('fix B')
+    })
+
+    it('should emit ### Deprecated section for deprecate/deprecated/deprecation commits', () => {
+      const gitOutput =
+        'abc1234|deprecate(api): old endpoint sunset|||END|||def5678|deprecated: legacy auth flow|||END|||ghi9012|deprecation: v1 style config|||END|||'
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      expect(result).toContain('### Deprecated')
+      expect(result).toContain('old endpoint sunset')
+      expect(result).toContain('legacy auth flow')
+      expect(result).toContain('v1 style config')
+      expect(result).not.toContain('### Changed')
+    })
+
+    it('should order sections per Keep a Changelog 1.1.0 spec (Added, Changed, Deprecated, Removed, Fixed, Security)', () => {
+      const gitOutput = [
+        'sha1111|feat: add alpha|||END|||',
+        'sha2222|fix: fix beta|||END|||',
+        'sha3333|chore: update gamma|||END|||',
+        'sha4444|deprecate(api): sunset delta|||END|||',
+        'sha5555|remove: drop epsilon|||END|||',
+        'sha6666|security: patch zeta|||END|||',
+      ].join('')
+      const result = parseCommitsWithMultiplePrefixes(gitOutput, 'https://github.com/owner/repo')
+
+      const addedIdx = result.indexOf('### Added')
+      const changedIdx = result.indexOf('### Changed')
+      const deprecatedIdx = result.indexOf('### Deprecated')
+      const removedIdx = result.indexOf('### Removed')
+      const fixedIdx = result.indexOf('### Fixed')
+      const securityIdx = result.indexOf('### Security')
+
+      // All sections must be present
+      expect(addedIdx).toBeGreaterThan(-1)
+      expect(changedIdx).toBeGreaterThan(-1)
+      expect(deprecatedIdx).toBeGreaterThan(-1)
+      expect(removedIdx).toBeGreaterThan(-1)
+      expect(fixedIdx).toBeGreaterThan(-1)
+      expect(securityIdx).toBeGreaterThan(-1)
+
+      // Order: Added < Changed < Deprecated < Removed < Fixed < Security
+      expect(addedIdx).toBeLessThan(changedIdx)
+      expect(changedIdx).toBeLessThan(deprecatedIdx)
+      expect(deprecatedIdx).toBeLessThan(removedIdx)
+      expect(removedIdx).toBeLessThan(fixedIdx)
+      expect(fixedIdx).toBeLessThan(securityIdx)
     })
 
     it('should handle commits with scope', () => {

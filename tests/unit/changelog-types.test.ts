@@ -28,6 +28,12 @@ describe('changelog-types', () => {
       expect(BUILTIN_TYPE_MAP['release']).toBe(false)
       expect(BUILTIN_TYPE_MAP['hotfix']).toBe(false)
     })
+
+    it('should map deprecate/deprecated/deprecation to Deprecated', () => {
+      expect(BUILTIN_TYPE_MAP['deprecate']).toBe('### Deprecated')
+      expect(BUILTIN_TYPE_MAP['deprecated']).toBe('### Deprecated')
+      expect(BUILTIN_TYPE_MAP['deprecation']).toBe('### Deprecated')
+    })
   })
 
   describe('loadChangelogTypeMap', () => {

@@ -18,7 +18,7 @@ Most release workflows fall into one of three traps: too much manual work (plain
 
 `@oorabona/release-it-preset` occupies the productive middle ground for solo and small-team JavaScript package maintainers who want:
 
-- **Human-readable changelogs.** Keep a Changelog format (Added/Fixed/Changed/Removed/Security) generated automatically from conventional commits — no manual entry writing, no machine-format diffs.
+- **Human-readable changelogs.** Keep a Changelog format (Added/Changed/Deprecated/Removed/Fixed/Security) generated automatically from conventional commits — no manual entry writing, no machine-format diffs. `[YANKED]` markers in version headings are preserved transparently; apply them manually post-release per the [Keep a Changelog spec](https://keepachangelog.com/en/1.1.0/).
 - **OIDC publishing without CI plumbing.** Import the reusable `publish.yml` workflow in three lines. OIDC trusted publishing with npm provenance ships on day one, no `NPM_TOKEN` secret required.
 - **Diagnostic confidence before release.** Run `release-it-preset doctor` to surface every misconfiguration — git auth, npm auth, changelog hygiene, branch requirements — before anything breaks in CI.
 - **Recovery presets for the real world.** Dedicated `republish` and `retry-publish` configs handle the scenarios other tools pretend don't happen.
@@ -745,7 +745,10 @@ node node_modules/@oorabona/release-it-preset/dist/scripts/populate-unreleased-c
 Supported commit types:
 - `feat`, `feature`, `add` → Added
 - `fix`, `bugfix` → Fixed
+- `deprecate`, `deprecated`, `deprecation` → Deprecated
 - `perf`, `refactor`, `style`, `docs`, `test`, `chore`, `build` → Changed
+- `remove`, `removed`, `delete`, `deleted` → Removed
+- `security` → Security
 - `ci`, `release`, `hotfix` → Ignored
 
 Add `[skip-changelog]` to commit message to exclude it.
