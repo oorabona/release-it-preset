@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ⚠️ BREAKING CHANGES
+
+- **`republish` preset no longer publishes to npm.** The preset hardcodes `npm.publish = false`; setting `NPM_PUBLISH=true` is silently ignored for this preset. npm immutability (since 2016) makes republishing impossible regardless of dist-tag — the previous behavior of attempting an npm publish was dead code that always failed. The preset's scope is now explicitly: move git tag + update GitHub release. Use `npm dist-tag add` for dist-tag redirection, or the `retry-publish` preset for failed-publish retries. See [ADR 0005](docs/adr/0005-republish-scope-narrowing.md) and [MIGRATION.md](docs/MIGRATION.md#100-rc0--100-rc1--republish-preset-narrowed-scope-breaking).
+
 ## [1.0.0-rc.0] - 2026-04-30
 
 ### Added

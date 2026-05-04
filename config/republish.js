@@ -1,16 +1,24 @@
 /**
  * Republish release-it configuration
  *
- * DANGER: This configuration republishes the current version without incrementing.
- * It moves the existing git tag, which breaks semantic versioning immutability.
+ * DANGER: This configuration moves an existing git tag and updates the GitHub
+ * release. It breaks semantic versioning immutability for that tag.
  *
- * Only use this in exceptional cases when you need to:
- * - Fix a broken release
- * - Republish with corrected artifacts
+ * Scope: git tag move + GitHub release update ONLY.
+ * npm immutability (since 2016) makes republishing a version to npm impossible.
+ * This preset never attempts an npm publish regardless of NPM_PUBLISH.
+ * See ADR 0005 (docs/adr/0005-republish-scope-narrowing.md).
+ *
+ * Only use when you need to:
+ * - Move an existing git tag to a different commit
+ * - Update the corresponding GitHub release notes
+ *
+ * Alternatives for other recovery scenarios:
+ * - dist-tag changes: npm dist-tag add @pkg@version <tag>
+ * - Failed npm/GitHub publish: use the retry-publish preset
  *
  * Publishing steps remain opt-in:
  * - Set GITHUB_RELEASE=true to update the GitHub release
- * - Set NPM_PUBLISH=true to republish to npm with provenance
  *
  * Usage:
  * ```bash
@@ -37,7 +45,10 @@ const config = {
       runScriptCommand('republish-changelog'),
     ],
   },
-  npm: createBaseNpmConfig(),
+  // npm immutability (since 2016) makes republishing a version impossible.
+  // The preset's scope is narrowed to git tag move + GitHub release update.
+  // Use `npm dist-tag add` to redirect tags, or `retry-publish` for failed publishes.
+  npm: createBaseNpmConfig({ publish: false }),
   github: createBaseGitHubConfig({
     update: true,
   }),
