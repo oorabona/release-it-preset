@@ -123,6 +123,34 @@ The built-in commit-type map emits entries under these section headings (in spec
 
 Custom sections are appended after the standard order. `[YANKED]` markers in version headings are preserved transparently by the parser — no commit type generates them; apply manually per spec.
 
+#### Non-English changelogs
+
+The built-in section vocabulary is English. To generate sections in another language (per Keep a Changelog "any language" allowance), provide a complete override via `.changelog-types.json` or `CHANGELOG_TYPE_MAP`. Example for French:
+
+```json
+{
+  "feat": "### Ajouté",
+  "feature": "### Ajouté",
+  "add": "### Ajouté",
+  "fix": "### Corrigé",
+  "bugfix": "### Corrigé",
+  "deprecate": "### Déprécié",
+  "deprecated": "### Déprécié",
+  "remove": "### Retiré",
+  "removed": "### Retiré",
+  "delete": "### Retiré",
+  "security": "### Sécurité",
+  "perf": "### Modifié",
+  "refactor": "### Modifié",
+  "docs": "### Modifié",
+  "chore": "### Modifié",
+  "build": "### Modifié",
+  "deps": "### Modifié"
+}
+```
+
+Translated sections appear after the standard English order in the generated `[Unreleased]` block (since they are treated as custom sections). Existing version blocks already in your CHANGELOG.md are not rewritten — only newly-generated content uses the override.
+
 ---
 
 ## Stable config exports
