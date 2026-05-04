@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] - 2026-05-04
+
 ### Added
 
 - **Keep a Changelog `### Deprecated` section auto-generation.** Commits of type `deprecate`, `deprecated`, or `deprecation` now emit entries under a `### Deprecated` heading per [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) spec. ([ADR / migration guide](docs/MIGRATION.md#100-rc1--100-rc2--keep-a-changelog--deprecated-section--spec-compliant-ordering-additive))
@@ -460,7 +462,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.0.0-rc.1...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.0.0-rc.2...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -505,3 +507,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [1.0.0-rc.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.0
 [v1.0.0-rc.1]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.1
 [1.0.0-rc.1]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.1
+[v1.0.0-rc.2]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.2
+[1.0.0-rc.2]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.2
