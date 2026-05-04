@@ -100,14 +100,16 @@ jobs:
 
       - name: Run hotfix release and publish
         run: |
-          if [ "${{ inputs.dry_run }}" == "true" ]; then
+          if [ "$DRY_RUN" == "true" ]; then
             echo "🧪 Running in DRY RUN mode"
-            node bin/cli.js hotfix --ci --increment ${{ inputs.increment }} --dry-run
+            pnpm release-it-preset hotfix --ci --increment "$INCREMENT" --dry-run
           else
             echo "🚀 Running LIVE hotfix release and publish"
-            node bin/cli.js hotfix --ci --increment ${{ inputs.increment }}
+            pnpm release-it-preset hotfix --ci --increment "$INCREMENT"
           fi
         env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          INCREMENT: ${{ inputs.increment }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_PUBLISH: 'true'      # ✅ Publish to npm via OIDC trusted publishing
           GITHUB_RELEASE: 'true'   # ✅ Create GitHub Release
