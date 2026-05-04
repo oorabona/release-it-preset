@@ -14,6 +14,7 @@ exceptions are listed below.
 | 0.9.x → 0.10.0  | yes       | Update CI scripts that branch on `validate` exit code (`1` → `2`)       |
 | 0.10.0 → 0.10.1 | no        | Strict commit-msg hooks now accept the new default release commit format |
 | 0.10.x → 0.11.0 | no        | Two new optional env vars (`GIT_CHANGELOG_PATH`, `NPM_TAG`)              |
+| 1.0.0-rc.0 → 1.0.0-rc.1 | yes | `republish` preset no longer publishes to npm even with `NPM_PUBLISH=true`; use `npm dist-tag add` instead |
 | 0.x → 1.0       | partial   | API freeze shipped in v1.0.0-rc.0; see [Upgrade checklist for v1.0.0](#upgrade-checklist-for-v100) |
 
 ---
@@ -141,6 +142,30 @@ Two new opt-in environment variables are available:
   to unset.
 
 No existing configuration is affected. Both vars require explicit opt-in.
+
+---
+
+### 1.0.0-rc.0 → 1.0.0-rc.1 — `republish` preset narrowed scope (BREAKING)
+
+The `republish` preset hardcodes `npm.publish = false`. Setting `NPM_PUBLISH=true`
+no longer triggers an npm publish for this preset; the env var is silently ignored
+for `republish` only.
+
+**Why.** npm has been strict-immutable since 2016 (post left-pad). A version cannot
+be republished under any dist-tag once it exists on the registry. The `republish`
+preset previously promised an `NPM_PUBLISH=true` path that always failed at the npm
+step — confusing user-facing behavior. The preset's real value is git-tag movement
+and GitHub release notes update, both of which remain.
+
+**What to do:**
+- For dist-tag changes (e.g. moving `latest` to a different version):
+  `npm dist-tag add @oorabona/release-it-preset@<version> latest`
+- For retrying a publish that failed mid-flight (network, OIDC, etc.): use the
+  `retry-publish` preset
+- For moving a git tag to a different commit + updating the GitHub release:
+  continue using `republish` — just stop setting `NPM_PUBLISH=true`
+
+See [ADR 0005](adr/0005-republish-scope-narrowing.md) for full rationale.
 
 ---
 

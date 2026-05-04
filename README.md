@@ -335,11 +335,15 @@ Features:
 - ☑️ npm publishing (set `NPM_PUBLISH=true`)
 - ❌ No changelog updates
 
-### `republish` - Version Republishing
+### `republish` - Git Tag Move + GitHub Release Update
 
-⚠️ **DANGER**: Republishes existing version by moving the git tag (breaks semver immutability).
+⚠️ **DANGER**: Moves an existing git tag to HEAD and updates the GitHub release notes (breaks semver immutability for that tag).
 
-Only use when you need to fix a broken release. Publishing back to npm/GitHub still requires enabling the corresponding environment flags.
+Only use when you need to fix a broken release that requires moving the git tag. This preset **does not publish to npm** — npm immutability (since 2016) makes republishing an existing version impossible under any dist-tag. See [ADR 0005](docs/adr/0005-republish-scope-narrowing.md).
+
+Alternatives:
+- **dist-tag change** (e.g. move `latest` to a different version): `npm dist-tag add @oorabona/release-it-preset@<version> latest`
+- **Retry a failed npm/GitHub publish**: use the `retry-publish` preset instead
 
 **CLI:**
 ```bash
@@ -356,8 +360,8 @@ pnpm release-it-preset republish
 Features:
 - ⚠️ Moves existing git tag
 - ✅ Updates changelog for current version
-- ☑️ Republishes to npm (set `NPM_PUBLISH=true`)
 - ☑️ Updates GitHub release (set `GITHUB_RELEASE=true`)
+- ❌ Does not publish to npm (npm immutability — use `npm dist-tag add` or `retry-publish`)
 
 ### `retry-publish` - Retry Failed Publishing
 
@@ -1402,7 +1406,7 @@ permissions:
 - `pre-flight-checks` - Validates confirmation, version format, and tag existence
 - `build-dist` - Builds distribution using reusable workflow
 - `validate` - Validates TypeScript compilation
-- `republish` - Moves git tag and republishes
+- `republish` - Moves git tag and updates GitHub release
 
 **What it does:**
 1. **Pre-flight safety checks:**
@@ -1414,21 +1418,19 @@ permissions:
 2. Validates code compilation
 3. **Moves git tag to current commit** (⚠️ breaks immutability)
 4. Updates changelog for current version
-5. Republishes to npm with provenance
-6. Updates GitHub Release
-7. Creates audit trail document
+5. Updates GitHub Release
 
-**When to use:** ONLY for exceptional emergencies where a published version has critical security issues
+> **Note:** npm is not republished — npm immutability (since 2016) prevents republishing an existing version. To redirect a dist-tag, use `npm dist-tag add`. To retry a failed publish, use the `retry-publish` preset.
+
+**When to use:** ONLY for exceptional emergencies where a published version must be moved to a different commit (e.g. a broken tag pointing to the wrong SHA)
 
 **Permissions required:**
 ```yaml
 permissions:
   contents: write  # For git tag operations
-  id-token: write  # For npm provenance
 ```
 
 **Secrets required:**
-- `NPM_TOKEN` - npm automation token
 - `GITHUB_TOKEN` - Provided automatically
 
 **Concurrency:** Prevents parallel republish operations for same version

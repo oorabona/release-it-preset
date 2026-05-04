@@ -27,7 +27,7 @@ The `release-it-preset` binary (or `pnpm release-it-preset`) accepts these comma
 | `changelog-only` | `config/changelog-only.js` | Update CHANGELOG only; no version bump or release |
 | `manual-changelog` | `config/manual-changelog.js` | Release with already-curated `[Unreleased]` content |
 | `no-changelog` | `config/no-changelog.js` | Release without touching CHANGELOG |
-| `republish` | `config/republish.js` | Move existing tag and re-release (`I understand the risks` workflow) |
+| `republish` | `config/republish.js` | Move existing tag + update GitHub release. Does not publish to npm (immutable registry — see [ADR 0005](adr/0005-republish-scope-narrowing.md)). |
 | `retry-publish` | `config/retry-publish.js` | Retry failed npm/GitHub publish without git operations |
 
 ### Utility commands (run dedicated scripts)
@@ -76,7 +76,7 @@ These env vars are read by configs and scripts. Setting them overrides built-in 
 
 | Name | Default | Notes |
 |---|---|---|
-| `NPM_PUBLISH` | `false` | Set to `true` to enable `npm publish` (off-by-default for safety) |
+| `NPM_PUBLISH` | `false` | Set to `true` to enable `npm publish` (off-by-default for safety). **Not honored by `republish` preset** — that preset hardcodes `publish: false` (see [ADR 0005](adr/0005-republish-scope-narrowing.md)). |
 | `NPM_SKIP_CHECKS` | `false` | Skip `npm whoami` precheck (set to `true` under OIDC trusted publishing) |
 | `NPM_ACCESS` | `public` | npm `--access` value |
 | `NPM_TAG` | _(unset)_ | When set, appended as `--tag <value>` to npm publish (used by smart dist-tag selection in `publish.yml`) |
