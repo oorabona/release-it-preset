@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Documentation restructured**: `BACKLOG_STUDY.md` renamed to [`ROADMAP.md`](ROADMAP.md), promoted from "study of what to consider" to a curated post-v1.0 roadmap with explicit priorities (top-4: `doctor` extensions, industry templates, `annotate` command, SLSA/Sigstore) and explicit non-goals (plugin system, standalone binary, alt changelog formats). Telemetry and standalone perf benchmarks removed from backlog entirely.
+
+### Removed
+
+- **Public `TODO.md` removed** from the repository. Working memory now lives privately in `TODO.local.md` (gitignored). Public surface for actionable work is GitHub Issues; public surface for strategic direction is `ROADMAP.md`. No content lost — historical archive preserved at `docs/archive/TODO-2025-Q4.md`.
+
 ## [1.0.0-rc.2] - 2026-05-04
 
 ### Added
@@ -138,7 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **E2E test suite** under `tests/e2e/` with a real git temp-repo helper (`tests/helpers/temp-repo.ts`). Eight tests cover populate-changelog, validate, and retry-publish-preflight against real git operations — no mocks. New `pnpm test:e2e` script. ([467cca0](https://github.com/oorabona/release-it-preset/commit/467cca0))
 - **Security policy** ([`SECURITY.md`](SECURITY.md)) with private-advisory disclosure channel, supported-version matrix, and acknowledgement / triage / disclosure SLAs. ([7c9b16f](https://github.com/oorabona/release-it-preset/commit/7c9b16f))
 - **Dependency audit workflow** (`.github/workflows/audit.yml`) running `pnpm audit --prod --audit-level=high` on every PR + weekly cron, with a full-tree advisory step for transitive issues. README badge added. ([7c9b16f](https://github.com/oorabona/release-it-preset/commit/7c9b16f))
-- **Contributor documentation**: [`CLAUDE.md`](CLAUDE.md) (architecture + CLI/config/script reference), [`docs/testing.md`](docs/testing.md) (DI pattern + E2E helper + error-handling pattern), [`BACKLOG_STUDY.md`](BACKLOG_STUDY.md) (post-v1 ideas), [`docs/archive/`](docs/archive/) (frozen roadmap snapshots with policy). ([6fde0cf](https://github.com/oorabona/release-it-preset/commit/6fde0cf))
+- **Contributor documentation**: [`CLAUDE.md`](CLAUDE.md) (architecture + CLI/config/script reference), [`docs/testing.md`](docs/testing.md) (DI pattern + E2E helper + error-handling pattern), [`ROADMAP.md`](ROADMAP.md) (post-v1 ideas — renamed from `BACKLOG_STUDY.md` 2026-05-05), [`docs/archive/`](docs/archive/) (frozen roadmap snapshots with policy). ([6fde0cf](https://github.com/oorabona/release-it-preset/commit/6fde0cf))
 
 ### Changed
 

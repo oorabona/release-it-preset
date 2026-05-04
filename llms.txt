@@ -41,6 +41,6 @@
 
 ## Optional
 
-- [BACKLOG_STUDY.md](https://github.com/oorabona/release-it-preset/blob/main/BACKLOG_STUDY.md): post-v1.0 ideas under consideration (plugin system, telemetry opt-in, alt formats)
+- [ROADMAP.md](https://github.com/oorabona/release-it-preset/blob/main/ROADMAP.md): post-v1.0 priorities (`doctor` extensions, industry templates, breaking-change auto-detection, SLSA/Sigstore) and explicit non-goals
 - [CHANGELOG.md](https://github.com/oorabona/release-it-preset/blob/main/CHANGELOG.md): release history (Keep a Changelog format)
 - [docs/testing.md](https://github.com/oorabona/release-it-preset/blob/main/docs/testing.md): DI test pattern for the script suite

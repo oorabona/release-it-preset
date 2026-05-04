@@ -1,25 +1,25 @@
-# `docs/archive/` — Frozen snapshots
+# `docs/archive/` — Frozen snapshots (legacy)
 
-This directory holds **frozen snapshots** of working documents (typically `TODO.md`) taken when those documents are compacted.
+This directory holds **frozen snapshots** of historical working documents from the pre-v1.0 era when `TODO.md` was tracked publicly.
 
-The current, live versions always live at the repository root or under `docs/`. Anything in `docs/archive/` is **historical context only** — do not treat it as a source of truth for current project state.
+The current live working file is `TODO.local.md` (private, gitignored, per the global `*.local.md` convention). Anything in `docs/archive/` is **historical context only** — do not treat it as a source of truth for current project state.
 
-## What lives here
+## Status: closed for new entries
+
+As of 2026-05-05, this directory is **closed for new archives**. The migration of `TODO.md` → `TODO.local.md` (private working memory) means future TODO compactions stay in local memory, not in `docs/archive/`. Archiving private working memory to a public directory would leak context that was never meant to be published.
+
+The existing archived snapshots are preserved as-is for the project's historical audit trail. They captured a state of affairs that was already public at the time.
+
+## What lives here (legacy)
 
 | File pattern | Source | Trigger |
 |--------------|--------|---------|
-| `TODO-YYYY-QN.md` | `TODO.md` | When the live TODO grows past ~40 lines and gets compacted, the verbose original is archived here. |
+| `TODO-YYYY-QN.md` | (legacy, public) `TODO.md` | When the live TODO grew past ~40 lines and got compacted. |
 
-## Policy
+## Forward policy
 
-- **Naming:** `<doc-name>-YYYY-QN.md` (e.g. `TODO-2025-Q4.md`). Use the calendar quarter in which the snapshot was taken.
-- **Header:** every archive starts with a banner explaining when it was archived, why, and pointing back to the live document.
-- **Status table:** the banner should include a per-item resolution table (`Done` / `Partial` / `Deferred` / `Moved`) so the snapshot stays useful for audit.
-- **Read-only:** files here are never edited after archival. If something needs revision, edit the live document instead.
-- **Frequency:** archive on demand, not on a fixed schedule. A good trigger is "the live TODO has drifted enough that it can't be honestly maintained at < 40 lines without losing context".
+- **Public roadmap surface**: [`ROADMAP.md`](../../ROADMAP.md) at repo root — strategic framing, priorities, explicit non-goals.
+- **Public actionable surface**: GitHub Issues (`gh issue list`).
+- **Private working memory**: `TODO.local.md` (gitignored). Compactions stay private — write to the auto-memory directory if a snapshot is ever useful.
 
-## Why keep snapshots in-tree
-
-`git log --follow -p TODO.md` already preserves the history. Keeping a curated snapshot in-tree is additive: a single readable file with an explicit resolution table is faster to consult than reconstructing intent from a year of diffs. The cost is one Markdown file per major compaction — acceptable for the auditability it brings.
-
-If this directory ever grows beyond a handful of files, prune the oldest entries to GitHub Releases attachments and keep only the most recent one or two snapshots in the repo.
+If a future structural shift makes some old `TODO.local.md` content publishable, lift it into a new ADR (`docs/adr/`) or into `ROADMAP.md`, but do not re-open this archive for private content.
