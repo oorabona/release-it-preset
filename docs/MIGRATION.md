@@ -14,7 +14,7 @@ exceptions are listed below.
 | 0.9.x → 0.10.0  | yes       | Update CI scripts that branch on `validate` exit code (`1` → `2`)       |
 | 0.10.0 → 0.10.1 | no        | Strict commit-msg hooks now accept the new default release commit format |
 | 0.10.x → 0.11.0 | no        | Two new optional env vars (`GIT_CHANGELOG_PATH`, `NPM_TAG`)              |
-| 0.x → 1.0       | TBD       | API freeze; details published with v1.0.0-beta.1                        |
+| 0.x → 1.0       | partial   | API freeze shipped in v1.0.0-rc.0; see [Upgrade checklist for v1.0.0](#upgrade-checklist-for-v100) |
 
 ---
 

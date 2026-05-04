@@ -104,7 +104,7 @@ const ENV_VAR_CATALOG: Array<{ name: string; defaultValue?: string }> = [
   { name: 'CHANGELOG_FILE', defaultValue: 'CHANGELOG.md' },
   { name: 'GIT_CHANGELOG_PATH' },
   { name: 'GIT_CHANGELOG_SINCE' },
-  { name: 'GIT_COMMIT_MESSAGE', defaultValue: 'release: bump v${version}' },
+  { name: 'GIT_COMMIT_MESSAGE', defaultValue: 'chore(release): v${version}' },
   { name: 'GIT_TAG_NAME', defaultValue: 'v${version}' },
   { name: 'GIT_REQUIRE_BRANCH', defaultValue: 'main' },
   { name: 'GIT_REQUIRE_UPSTREAM', defaultValue: 'false' },

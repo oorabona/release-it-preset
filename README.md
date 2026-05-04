@@ -806,13 +806,14 @@ Create a `.changelog-types.json` file in your project root to override or extend
 **BREAKING CHANGE: footer parsing** (Conventional Commits 1.0.0 §6): `BREAKING CHANGE:` is recognised as a footer only when it appears after a blank-line separator from the preceding paragraph. Mid-body occurrences without the blank line do not promote the commit to breaking. Multiple `BREAKING CHANGE:` lines in the same footer paragraph each emit a separate entry under `### ⚠️ BREAKING CHANGES`.
 
 ### Git
-- `GIT_COMMIT_MESSAGE` - Commit message template (default: `release: bump v${version}`)
+- `GIT_COMMIT_MESSAGE` - Commit message template. Defaults vary per preset: `chore(release): v${version}` (`default`), `chore(hotfix): v${version}` (`hotfix`), `chore: republish v${version}` (`republish`). Set this env var to override across all presets.
 - `GIT_TAG_NAME` - Tag name template (default: `v${version}`)
 - `GIT_REQUIRE_BRANCH` - Required branch (default: `main`)
 - `GIT_REQUIRE_UPSTREAM` - Require upstream tracking (default: `false`)
 - `GIT_REQUIRE_CLEAN` - Require clean working directory (default: `false`)
 - `GIT_REMOTE` - Git remote name (default: `origin`)
 - `GIT_CHANGELOG_COMMAND` - Override the git log command used for previews (default filters out release/hotfix/ci commits)
+- `GIT_CHANGELOG_DESCRIBE_COMMAND` - Override the latest-tag detection command (default: `git describe --tags --abbrev=0`)
 
 ### GitHub
 - `GITHUB_RELEASE` - Enable GitHub releases (default: `false`)
@@ -1006,7 +1007,7 @@ pnpm release-it-preset hotfix
      - Bumps version, moves [Unreleased] to versioned section
     - Creates release commit + tag and pushes to origin (GitHub release happens later if `GITHUB_RELEASE=true` in CI)
 
-   **If you change your mind mid-release:** If you started with Option A but want to add manual edits when prompted `Commit (release: bump vX.Y.Z)?`, answer **No**, then press Ctrl+C to abort. Edit your `CHANGELOG.md`, then run `pnpm run release:manual-changelog` instead. Alternatively, re-run `pnpm release` and select the same version again (the preset's `--allow-same-version` makes this safe).
+   **If you change your mind mid-release:** If you started with Option A but want to add manual edits when prompted `Commit (chore(release): vX.Y.Z)?`, answer **No**, then press Ctrl+C to abort. Edit your `CHANGELOG.md`, then run `pnpm run release:manual-changelog` instead. Alternatively, re-run `pnpm release` and select the same version again (the preset's `--allow-same-version` makes this safe).
 
 4. **Note:** GitHub releases and npm publish are skipped locally by default. Enable them with environment variables or let the `publish.yml` workflow handle both steps after the tag push.
 

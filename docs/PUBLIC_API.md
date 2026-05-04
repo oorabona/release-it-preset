@@ -65,7 +65,7 @@ These env vars are read by configs and scripts. Setting them overrides built-in 
 
 | Name | Default | Notes |
 |---|---|---|
-| `GIT_COMMIT_MESSAGE` | `release: bump v${version}` | Release commit template |
+| `GIT_COMMIT_MESSAGE` | `chore(release): v${version}` | Release commit template (`hotfix` preset defaults to `chore(hotfix): v${version}`, `republish` to `chore: republish v${version}`; set this env var to override across all presets) |
 | `GIT_TAG_NAME` | `v${version}` | Tag template |
 | `GIT_REQUIRE_BRANCH` | `main` | Required branch for releases |
 | `GIT_REQUIRE_UPSTREAM` | `false` | Require upstream tracking (`true`/`false`) |

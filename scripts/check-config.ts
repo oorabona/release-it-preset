@@ -106,7 +106,7 @@ export function getNpmUsername(deps: CheckConfigDeps): string | null {
 export function getEnvironmentVariables(deps: CheckConfigDeps): Record<string, string> {
   const vars: Array<[string, string?]> = [
     ['CHANGELOG_FILE', 'CHANGELOG.md'],
-    ['GIT_COMMIT_MESSAGE', 'release: bump v${version}'],
+    ['GIT_COMMIT_MESSAGE', 'chore(release): v${version}'],
     ['GIT_TAG_NAME', 'v${version}'],
     ['GIT_REQUIRE_BRANCH', 'main'],
     ['GIT_REQUIRE_UPSTREAM', 'false'],
