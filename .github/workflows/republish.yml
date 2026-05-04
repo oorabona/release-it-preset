@@ -11,13 +11,18 @@ on:
         description: 'Type "I understand the risks" to confirm'
         required: true
         type: string
+      dry_run:
+        description: 'Dry run (no actual tag move or GitHub release update)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
-  id-token: write
+  # id-token: write intentionally omitted — no npm OIDC publish in this workflow (ADR 0005)
 
 env:
-  NODE_VERSION: '24'  # npm >= 11.5.1 ships with Node 24, required for OIDC trusted publishing
+  NODE_VERSION: '24'
 
 concurrency:
   group: republish-${{ inputs.version }}
@@ -31,38 +36,45 @@ jobs:
     steps:
       - name: Validate confirmation phrase
         run: |
-          if [ "${{ inputs.confirmation }}" != "I understand the risks" ]; then
+          if [ "$CONFIRMATION" != "I understand the risks" ]; then
             echo "❌ Invalid confirmation phrase"
             echo "Expected: 'I understand the risks'"
-            echo "Got: '${{ inputs.confirmation }}'"
+            echo "Got: '$CONFIRMATION'"
             exit 1
           fi
           echo "✅ Confirmation phrase validated"
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
 
       - name: Validate version format
         run: |
-          if ! echo "${{ inputs.version }}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'; then
-            echo "❌ Invalid version format: ${{ inputs.version }}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'; then
+            echo "❌ Invalid version format: $VERSION"
             echo "Expected format: X.Y.Z or X.Y.Z-prerelease"
             exit 1
           fi
           echo "✅ Version format is valid"
+        env:
+          VERSION: ${{ inputs.version }}
 
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ github.ref_name }}
 
       - name: Verify tag exists
         run: |
-          TAG="v${{ inputs.version }}"
-          if ! git rev-parse $TAG >/dev/null 2>&1; then
+          TAG="v$VERSION"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "❌ Tag $TAG does not exist"
             echo "Available tags:"
             git tag --sort=-v:refname | head -10
             exit 1
           fi
           echo "✅ Tag $TAG exists"
+        env:
+          VERSION: ${{ inputs.version }}
 
       - name: Display republish warning
         run: |
@@ -70,20 +82,30 @@ jobs:
           echo "⚠️  EXCEPTIONAL REPUBLISH OPERATION"
           echo "⚠️  =============================================="
           echo ""
-          echo "🔴 This will MOVE the existing git tag v${{ inputs.version }}"
+          echo "🔴 This will MOVE the existing git tag v$VERSION"
           echo "🔴 This BREAKS semantic versioning immutability"
           echo "🔴 This should ONLY be used for critical fixes"
           echo ""
           echo "What will happen:"
-          echo "  1. Move tag v${{ inputs.version }} to current commit"
+          echo "  1. Move tag v$VERSION to current commit"
           echo "  2. Update CHANGELOG.md for this version"
-          echo "  3. Republish to npm"
-          echo "  4. Update GitHub Release"
-          echo "  5. Create audit trail document"
+          echo "  3. Update GitHub Release notes"
+          echo "  4. Create audit trail document"
           echo ""
+          echo "What this will NOT do:"
+          echo "  - Republish to npm (impossible per npm immutability — see ADR 0005)"
+          echo "  - Touch the npm registry in any way"
+          echo ""
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "🧪 DRY RUN MODE — no side effects will occur"
+            echo ""
+          fi
           echo "⏰ Starting in 10 seconds..."
           sleep 10
           echo "✅ Proceeding with republish operation"
+        env:
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
 
   build-dist:
     name: Build Dist Artifact
@@ -100,6 +122,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -126,6 +150,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
@@ -136,7 +161,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'  # Required for npm OIDC trusted publishing
+          # registry-url intentionally omitted — no npm publish in this workflow (ADR 0005)
 
       - name: Configure Git
         run: |
@@ -152,95 +177,69 @@ jobs:
           name: ${{ needs.build-dist.outputs.artifact_name }}
           path: dist
 
-      # Decide which npm dist-tag to set. When republishing an older version
-      # we must NOT overwrite `latest`; we use a version-named dist-tag instead
-      # (e.g. `v0.10.0`). This mirrors the same logic in publish.yml.
-      - name: Determine npm dist-tag
-        id: dist_tag
-        run: |
-          PUBLISHING="${{ inputs.version }}"
-          PKG="$(jq -r .name package.json)"
-
-          # Strip semver '+build' metadata before any prerelease detection.
-          # Without this, 1.0.0+build-foo (no prerelease, but '-' in metadata)
-          # would falsely match the prerelease branch.
-          # NOTE: defense-in-depth — the pre-flight regex at line 44 currently
-          # rejects '+' entirely, so this branch is unreachable today via
-          # workflow_dispatch. Kept for byte-parity with publish.yml (where the
-          # version comes from package.json and may legitimately carry +build).
-          PUBLISHING_NO_BUILD="${PUBLISHING%%+*}"
-
-          if [[ "$PUBLISHING_NO_BUILD" == *-* ]]; then
-            # Pre-release (semver '-' indicator): use the prerelease identifier as
-            # the dist-tag so 'latest' is never demoted to a beta/rc/alpha.
-            # 1.0.0-beta.1 -> beta, 2.0.0-rc.2 -> rc, 1.5.0-alpha.5 -> alpha.
-            PRERELEASE_ID="${PUBLISHING_NO_BUILD#*-}"
-            PRERELEASE_ID="${PRERELEASE_ID%%.*}"
-            TAG="$PRERELEASE_ID"
-            REASON="pre-release ($PUBLISHING) - using $PRERELEASE_ID, latest unchanged"
-          else
-            CURRENT_LATEST="$(npm view "${PKG}" version 2>/dev/null || true)"
-            if [ -z "$CURRENT_LATEST" ]; then
-              TAG="latest"
-              REASON="first publish"
-            elif [ "$(printf '%s\n%s\n' "$PUBLISHING" "$CURRENT_LATEST" | sort -V | tail -1)" = "$PUBLISHING" ] \
-                 && [ "$PUBLISHING" != "$CURRENT_LATEST" ]; then
-              TAG="latest"
-              REASON="newer than current latest ($CURRENT_LATEST)"
-            elif [ "$PUBLISHING" = "$CURRENT_LATEST" ]; then
-              TAG="latest"
-              REASON="same as current latest (idempotent)"
-            else
-              TAG="v$PUBLISHING"
-              REASON="older than current latest ($CURRENT_LATEST) — using version-named tag"
-            fi
-          fi
-
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "📌 Republishing ${PKG}@${PUBLISHING} with --tag ${TAG} (${REASON})"
-
       - name: Republish with release-it-preset
-        run: pnpm release-it-preset republish --ci
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "🧪 DRY RUN — would run: pnpm release-it-preset republish --ci"
+            pnpm release-it-preset republish --ci --dry-run
+          else
+            pnpm release-it-preset republish --ci
+          fi
         env:
-          NPM_PUBLISH: 'true'
+          DRY_RUN: ${{ inputs.dry_run }}
           GITHUB_RELEASE: 'true'
-          NPM_SKIP_CHECKS: 'true'  # npm whoami has no static identity under OIDC
-          NPM_TAG: ${{ steps.dist_tag.outputs.tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # npm env vars (NPM_PUBLISH, NPM_TAG, NPM_SKIP_CHECKS) intentionally
+          # omitted: republish preset hardcodes publish:false. See ADR 0005.
 
       - name: Create audit trail
+        if: ${{ inputs.dry_run == false }}
         run: |
-          cat > REPUBLISH_AUDIT_${{ inputs.version }}.md << 'EOF'
-          # Republish Audit Trail
-
-          **Version**: ${{ inputs.version }}
-          **Date (UTC)**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-          **Triggered by**: @${{ github.actor }}
-          **Workflow run**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-          ## Reason for Republish
-          (To be documented in GitHub Release notes)
-
-          ## Verification
-          - Old tag commit: $(git rev-parse v${{ inputs.version }}^{} 2>/dev/null || echo "N/A")
-          - New tag commit: $(git rev-parse v${{ inputs.version }})
-          - npm published: ✅
-          - GitHub Release updated: ✅
-
-          ## Impact Assessment
-          Users who already installed this version may have a different version than newly installed packages.
-          EOF
+          AUDIT_FILE="REPUBLISH_AUDIT_${VERSION}.md"
+          {
+            echo "# Republish Audit Trail"
+            echo ""
+            echo "**Version**: ${VERSION}"
+            echo "**Date (UTC)**: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "**Triggered by**: @${ACTOR}"
+            echo "**Workflow run**: ${SERVER_URL}/${REPOSITORY}/actions/runs/${RUN_ID}"
+            echo ""
+            echo "## Reason for Republish"
+            echo "(To be documented in GitHub Release notes)"
+            echo ""
+            echo "## Verification"
+            echo "- Old tag commit: $(git rev-parse "v${VERSION}^{}" 2>/dev/null || echo "N/A")"
+            echo "- New tag commit: $(git rev-parse "v${VERSION}")"
+            echo "- npm: not published (republish preset narrowed since rc.1, see ADR 0005)"
+            echo "- GitHub Release updated: ✅"
+            echo ""
+            echo "## Impact Assessment"
+            echo "Users who already installed this version may have a different version than newly installed packages."
+          } > "$AUDIT_FILE"
 
           echo "✅ Audit trail created"
-          cat REPUBLISH_AUDIT_${{ inputs.version }}.md
+          cat "$AUDIT_FILE"
+        env:
+          VERSION: ${{ inputs.version }}
+          ACTOR: ${{ github.actor }}
+          SERVER_URL: ${{ github.server_url }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
 
       - name: Display result
         run: |
-          echo "✅ Republish operation completed successfully"
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "🧪 DRY RUN — Republish simulation completed (no changes made)"
+          else
+            echo "✅ Republish operation completed successfully"
+          fi
           echo ""
-          echo "Version: ${{ inputs.version }}"
-          echo "Tag: v${{ inputs.version }}"
-          echo "npm: Published with provenance"
+          echo "Version: $VERSION"
+          echo "Tag: v$VERSION"
+          echo "npm: not republished (see ADR 0005)"
           echo "GitHub Release: Updated"
           echo ""
           echo "⚠️  IMPORTANT: Document the reason for this republish in the GitHub Release notes"
+        env:
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
