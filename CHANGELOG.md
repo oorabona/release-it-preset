@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.1] - 2026-05-04
+
 ### ⚠️ BREAKING CHANGES
 
 - **`republish` preset no longer publishes to npm.** The preset hardcodes `npm.publish = false`; setting `NPM_PUBLISH=true` is silently ignored for this preset. npm immutability (since 2016) makes republishing impossible regardless of dist-tag — the previous behavior of attempting an npm publish was dead code that always failed. The preset's scope is now explicitly: move git tag + update GitHub release. Use `npm dist-tag add` for dist-tag redirection, or the `retry-publish` preset for failed-publish retries. See [ADR 0005](docs/adr/0005-republish-scope-narrowing.md) and [MIGRATION.md](docs/MIGRATION.md#100-rc0--100-rc1--republish-preset-narrowed-scope-breaking).
@@ -450,7 +452,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.0.0-rc.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.0.0-rc.1...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -493,3 +495,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [0.15.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.15.0
 [v1.0.0-rc.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.0
 [1.0.0-rc.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.0
+[v1.0.0-rc.1]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.1
+[1.0.0-rc.1]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.1

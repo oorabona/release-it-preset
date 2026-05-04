@@ -1,7 +1,8 @@
 # TODO — Roadmap to v1.0.0
 
-**Last updated:** 2026-05-01
-**Current version:** v1.0.0-rc.0 (npm `rc`); v0.15.0 (npm `latest`)
+**Last updated:** 2026-05-04
+**Current version:** v1.0.0-rc.0 (npm `rc`, soak phase); v0.15.0 (npm `latest`)
+**Earliest v1.0.0 stable cut:** 2026-05-08 (≥ 1 week soak from rc.0 ship date)
 
 ## v1.0 Backlog (tracked as GitHub issues)
 
@@ -10,7 +11,7 @@ All open work has been moved to GitHub issues for public visibility:
 - [x] ✅ [#23](https://github.com/oorabona/release-it-preset/issues/23) Multi-line body parser — shipped v0.13.0 (PR #27 / `9ff76aa`)
 - [x] ✅ Smart dist-tag pre-release — shipped v0.13.1 (PR #28 / `025a5f9`, opus AMBER + codex M findings folded)
 - [x] ✅ Workflows OIDC parity — shipped v0.14.0 (PR #29 / `2b86ae8`, ci/hotfix/republish migrated, NPM_TOKEN secret obsolete)
-- [ ] 🚀 [#24](https://github.com/oorabona/release-it-preset/issues/24) v1.0.0 stability cycle (tracking checklist) — Priority: M (gated, drives beta.1 → rc.1 → stable)
+- [ ] 🚀 [#24](https://github.com/oorabona/release-it-preset/issues/24) v1.0.0 stability cycle — Priority: M (most items shipped in rc.0; rc.1 phase compressed since rc.1 features landed in rc.0; remaining: manual e2e of hotfix + republish workflows, soak ≥1w, tag v1.0.0)
 - [x] ✅ [#25](https://github.com/oorabona/release-it-preset/issues/25) `release-it-preset doctor` command — shipped v0.15.0 (PR #33)
 - [x] ✅ [#26](https://github.com/oorabona/release-it-preset/issues/26) Configurable commit-type → section mapping + 4 review-loop refinements (folded into #26) — shipped v0.15.0 (PR #33)
 - [x] ✅ [#31](https://github.com/oorabona/release-it-preset/issues/31) ci.yml malformed shell display step — shipped via chore PR #32 (jq unification)
