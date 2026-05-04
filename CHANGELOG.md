@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Keep a Changelog `### Deprecated` section auto-generation.** Commits of type `deprecate`, `deprecated`, or `deprecation` now emit entries under a `### Deprecated` heading per [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) spec. ([ADR / migration guide](docs/MIGRATION.md#100-rc1--100-rc2--keep-a-changelog--deprecated-section--spec-compliant-ordering-additive))
+
+### Changed
+
+- **Generated `[Unreleased]` section ordering** now follows Keep a Changelog 1.1.0 canonical sequence: **Added, Changed, Deprecated, Removed, Fixed, Security**. Previously: Added, Fixed, Changed, Removed, Security. Existing versioned sections in `CHANGELOG.md` are not rewritten; only newly-generated content uses the new order.
+
 ## [1.0.0-rc.1] - 2026-05-04
 
 ### ⚠️ BREAKING CHANGES

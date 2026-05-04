@@ -107,6 +107,22 @@ These env vars are read by configs and scripts. Setting them overrides built-in 
 |---|---|
 | `.changelog-types.json` | Project-level commit-type → CHANGELOG section map override. Resolution: env var > this file > built-in defaults. |
 
+### Auto-generated CHANGELOG section vocabulary
+
+The built-in commit-type map emits entries under these section headings (in spec-canonical order per [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/)):
+
+| Section heading | Commit types (built-in) |
+|---|---|
+| `### Added` | `feat`, `feature`, `add` |
+| `### Changed` | `perf`, `refactor`, `style`, `docs`, `test`, `chore`, `build`, `deps`, `dependency`, `dependencies`, `revert`, `misc` |
+| `### Deprecated` | `deprecate`, `deprecated`, `deprecation` |
+| `### Removed` | `remove`, `removed`, `delete`, `deleted` |
+| `### Fixed` | `fix`, `bugfix` |
+| `### Security` | `security` |
+| `### ⚠️ BREAKING CHANGES` | Any commit with `!` suffix or `BREAKING CHANGE:` footer |
+
+Custom sections are appended after the standard order. `[YANKED]` markers in version headings are preserved transparently by the parser — no commit type generates them; apply manually per spec.
+
 ---
 
 ## Stable config exports

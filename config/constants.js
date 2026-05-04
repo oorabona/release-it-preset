@@ -66,9 +66,10 @@ export const CHANGELOG_DEFAULTS = {
  */
 export const CHANGELOG_SECTIONS = {
   ADDED: '### Added',
-  FIXED: '### Fixed',
   CHANGED: '### Changed',
+  DEPRECATED: '### Deprecated',
   REMOVED: '### Removed',
+  FIXED: '### Fixed',
   SECURITY: '### Security',
   BREAKING: '### ⚠️ BREAKING CHANGES',
 };

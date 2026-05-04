@@ -229,9 +229,10 @@ export function parseCommitsWithMultiplePrefixes(
   const sections: string[] = [];
   const standardSectionOrder = [
     '### Added',
-    '### Fixed',
     '### Changed',
+    '### Deprecated',
     '### Removed',
+    '### Fixed',
     '### Security',
   ];
 

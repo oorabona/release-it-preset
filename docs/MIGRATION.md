@@ -15,6 +15,7 @@ exceptions are listed below.
 | 0.10.0 → 0.10.1 | no        | Strict commit-msg hooks now accept the new default release commit format |
 | 0.10.x → 0.11.0 | no        | Two new optional env vars (`GIT_CHANGELOG_PATH`, `NPM_TAG`)              |
 | 1.0.0-rc.0 → 1.0.0-rc.1 | yes | `republish` preset no longer publishes to npm even with `NPM_PUBLISH=true`; use `npm dist-tag add` instead |
+| 1.0.0-rc.1 → 1.0.0-rc.2 | no  | Additive: `### Deprecated` section now auto-generated from `deprecate*` commit types; section ordering changes to spec canonical order (Added, Changed, Deprecated, Removed, Fixed, Security) |
 | 0.x → 1.0       | partial   | API freeze shipped in v1.0.0-rc.0; see [Upgrade checklist for v1.0.0](#upgrade-checklist-for-v100) |
 
 ---
@@ -166,6 +167,20 @@ and GitHub release notes update, both of which remain.
   continue using `republish` — just stop setting `NPM_PUBLISH=true`
 
 See [ADR 0005](adr/0005-republish-scope-narrowing.md) for full rationale.
+
+---
+
+### 1.0.0-rc.1 → 1.0.0-rc.2 — Keep a Changelog `### Deprecated` section + spec-compliant ordering (additive)
+
+Two changes, both additive:
+
+1. **`### Deprecated` section auto-generated.** Commits of type `deprecate`, `deprecated`, or `deprecation` now emit entries under a `### Deprecated` heading. Previously these types fell through to `### Changed` (since they were unmapped). Existing changelogs are unaffected.
+
+2. **Section ordering reflects Keep a Changelog 1.1.0 canonical sequence**: Added, Changed, Deprecated, Removed, Fixed, Security. The previous order was Added, Fixed, Changed, Removed, Security. Existing version sections in `CHANGELOG.md` are not rewritten; only newly-generated `[Unreleased]` blocks adopt the new order.
+
+**Action required**: none. Both are non-breaking. If you had been using a custom `CHANGELOG_TYPE_MAP` to route deprecation commits manually (e.g., `{"deprecate": "### Deprecated"}`), you can drop that override — the built-in map now handles it.
+
+**YANKED markers**: the `[YANKED]` suffix from Keep a Changelog spec (e.g., `## [1.2.0] - 2024-01-15 [YANKED]`) is preserved transparently by the parser since v0.x — no special handling required. Apply manually post-release per spec when needed.
 
 ---
 
