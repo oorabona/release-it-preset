@@ -56,7 +56,7 @@ Most release workflows fall into one of three traps: too much manual work (plain
   - [Utility Commands](#utility-commands)
 - [Scripts](#scripts)
 - [Environment Variables](#environment-variables)
-- [Configuration Override](#configuration-override)
+- [Configuration Modes](#configuration-modes)
 - [Borrowing Scripts & Workflows](#borrowing-scripts--workflows)
 - [Release Workflow](#release-workflow)
 - [GitHub Actions Workflows](#github-actions-workflows)
@@ -78,9 +78,9 @@ Most release workflows fall into one of three traps: too much manual work (plain
 - 🔄 Republish and retry mechanisms for failed releases
 - ⚡ Hotfix release support
 - 🎯 Environment variable configuration
-- 🔍 **NEW v0.9.0:** Zero-config auto-detection mode
-- 🏢 **NEW v0.9.0:** Monorepo support with parent directory config references
-- ⚙️ **NEW v0.9.0:** Passthrough mode for custom config files
+- 🔍 Zero-config auto-detection mode
+- 🏢 Monorepo support with parent directory config references
+- ⚙️ Passthrough mode for custom config files
 
 ## Installation
 
@@ -398,7 +398,7 @@ The package provides a `release-it-preset` CLI with four operating modes:
 
 ### Zero-Config Mode (Auto-Detection)
 
-**NEW in v0.9.0** - The CLI can automatically detect which preset to use from your `.release-it.json`:
+The CLI can automatically detect which preset to use from your `.release-it.json`:
 
 ```bash
 # Just run release-it-preset with no arguments
@@ -443,7 +443,7 @@ All additional arguments are passed through to release-it.
 
 ### Passthrough Mode (Custom Config Override)
 
-**NEW in v0.9.0** - Use a custom config file and bypass preset validation:
+Use a custom config file and bypass preset validation:
 
 ```bash
 # Use custom config file
@@ -489,7 +489,7 @@ pnpm release-it-preset --config .release-it-manual.json
 
 ### Monorepo Support
 
-**NEW in v0.9.0** - Parent directory config references are now supported:
+Parent directory config references are now supported:
 
 ```bash
 # Monorepo structure
@@ -823,6 +823,9 @@ Create a `.changelog-types.json` file in your project root to override or extend
 - `NPM_SKIP_CHECKS` - Skip npm checks (default: `false`)
 - `NPM_ACCESS` - npm access level (default: `public`)
 - `NPM_TAG` - Optional. When set, the npm publish step appends `--tag <value>` (e.g. `legacy-v0.10.0`). Used to assign version-named dist-tags when republishing older versions so `latest` is not overwritten. Empty / unset = npm uses `latest`.
+
+### Hotfix
+- `HOTFIX_INCREMENT` - Increment kind passed to release-it for the `hotfix` preset (default: `patch`). Accepts any release-it increment value (`patch`, `minor`, `major`, or an explicit version).
 
 > ℹ️  By default, the presets skip GitHub releases and npm publishing. Set `GITHUB_RELEASE=true` and/or `NPM_PUBLISH=true` in the environment (typically in CI) when you are ready to perform those steps.
 
