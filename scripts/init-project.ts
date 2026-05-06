@@ -26,6 +26,7 @@ import {
 } from './lib/workspace-detect.js';
 import { ValidationError } from './lib/errors.js';
 
+
 const CHANGELOG_TEMPLATE = `# Changelog
 
 All notable changes to this project will be documented in this file.
@@ -329,6 +330,7 @@ export async function initProject(options: Options, deps: InitProjectDeps): Prom
     if (isMonorepo) {
       deps.log('   3. Release a package: pnpm -F <package-name> exec release-it-preset default --dry-run');
       deps.log('      (use `pnpm -F <package-name> exec release-it-preset default` to release)');
+      deps.log('   Note: per-package CHANGELOG.md is not auto-created — set CHANGELOG_FILE=../CHANGELOG.md per package, or run `release-it-preset update` from the root and copy entries manually.');
     } else {
       deps.log('   3. Run: pnpm release-it-preset default --dry-run');
     }
@@ -361,7 +363,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
     const options = parseArgs();
 
-    // Validate workflow name whenever explicitly provided (even without --with-workflows)
+    // Validate workflow name whenever explicitly provided (even without --with-workflows).
+    // NOTE: bin/validators.js cannot be imported here — TypeScript compiles scripts/ to
+    // dist/scripts/ so a relative '../bin/' import resolves to 'dist/bin/' at runtime
+    // (wrong). The canonical regex lives in bin/validators.js:validateWorkflowName and
+    // is kept in sync here manually (same pattern: ^[A-Za-z0-9._-]+\.ya?ml$).
     const argv = process.argv.slice(2);
     const workflowNameExplicit = argv.some(a => a.startsWith('--workflow-name='));
     if (workflowNameExplicit || options.withWorkflows) {
@@ -369,7 +375,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       if (!WORKFLOW_NAME_RE.test(options.workflowName)) {
         throw new ValidationError(
           `Invalid workflow name: "${options.workflowName}"\n` +
-          `Workflow name must match ^[A-Za-z0-9._-]+\\.ya?ml$\n` +
+          `Workflow name must match [A-Za-z0-9._-]+\\.ya?ml (no path components, no traversal).\n` +
           `Examples: release.yml, publish.yml\n` +
           `Path components and traversal (../etc.yml) are not allowed.`
         );
