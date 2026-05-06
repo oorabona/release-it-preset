@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`doctor` peer-dependency checks**: validate that the installed `release-it` version satisfies the preset's `peerDependencies.release-it` range, and advise when a newer `release-it` major has been released upstream beyond what the preset has validated. Refs #47 (checks 3+4 of the planned 4-check extension).
+
 ## [1.0.0] - 2026-05-06
 
 > **v1.0.0 stable release.** Promotes the rc.0 / rc.1 / rc.2 surface to the protected v1.0 contract. No functional code changes since [1.0.0-rc.2]. The stable surface (CLI commands, environment variables, config exports, GitHub Actions workflow inputs, exit codes) is documented in [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md) and frozen under semver — subsequent breaking changes require a v2.0.0 major bump. See [`ROADMAP.md`](ROADMAP.md) for post-v1.0 priorities and [`docs/MIGRATION.md`](docs/MIGRATION.md) for upgrade guidance.
