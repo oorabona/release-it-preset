@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-05-06
+
 > **v1.0.0 stable release.** Promotes the rc.0 / rc.1 / rc.2 surface to the protected v1.0 contract. No functional code changes since [1.0.0-rc.2]. The stable surface (CLI commands, environment variables, config exports, GitHub Actions workflow inputs, exit codes) is documented in [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md) and frozen under semver — subsequent breaking changes require a v2.0.0 major bump. See [`ROADMAP.md`](ROADMAP.md) for post-v1.0 priorities and [`docs/MIGRATION.md`](docs/MIGRATION.md) for upgrade guidance.
 
 ### Changed
@@ -472,7 +474,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.0.0-rc.2...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.0.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -519,3 +521,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [1.0.0-rc.1]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.1
 [v1.0.0-rc.2]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.2
 [1.0.0-rc.2]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.2
+[v1.0.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0
+[1.0.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0
