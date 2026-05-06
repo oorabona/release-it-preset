@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-06
+
 ### Added
 
 - **`doctor` peer-dependency checks**: validate that the installed `release-it` version satisfies the preset's `peerDependencies.release-it` range, and advise when a newer `release-it` major has been released upstream beyond what the preset has validated. Refs #47 (checks 3+4 of the planned 4-check extension).
@@ -478,7 +480,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.1.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -527,3 +529,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [1.0.0-rc.2]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0-rc.2
 [v1.0.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0
 [1.0.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0
+[v1.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.1.0
+[1.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.1.0
