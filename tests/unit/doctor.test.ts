@@ -12,6 +12,7 @@ import {
   safeExec,
   summarize,
   validateConfiguration,
+  validateReleaseItPeer,
 } from '../../scripts/doctor'
 
 // ---------------------------------------------------------------------------
@@ -333,9 +334,19 @@ describe('validateConfiguration', () => {
           return VALID_RELEASE_IT_JSON
         }
         if (p === 'package.json') {
-          return VALID_PACKAGE_JSON
+          // Return a package.json with peerDependencies so the peer range is found
+          return JSON.stringify({ name: 'my-pkg', version: '0.1.0', peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0' } })
         }
         return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return JSON.stringify({ dependencies: { 'release-it': { version: '20.10.0' } } })
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '20.10.0'
+        }
+        throw new Error(`unexpected command: ${cmd}`)
       }),
     })
     const section = validateConfiguration(deps)
@@ -717,5 +728,209 @@ describe('formatHuman', () => {
     const report = runDoctor(deps)
     const output = formatHuman(report)
     expect(output).toMatch(/Status\s*:\s*(READY|WARNINGS|BLOCKED)/)
+  })
+})
+
+
+// ---------------------------------------------------------------------------
+// validateReleaseItPeer — Check A (peer range) + Check B (major advisor)
+// ---------------------------------------------------------------------------
+
+const PRESET_PKG_WITH_PEERS = JSON.stringify({
+  name: '@oorabona/release-it-preset',
+  version: '1.0.0',
+  peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0' },
+})
+
+const LS_OUTPUT_V20 = JSON.stringify({
+  dependencies: { 'release-it': { version: '20.10.0' } },
+})
+
+const LS_OUTPUT_V19 = JSON.stringify({
+  dependencies: { 'release-it': { version: '19.5.2' } },
+})
+
+const LS_OUTPUT_V18 = JSON.stringify({
+  dependencies: { 'release-it': { version: '18.3.0' } },
+})
+
+const LS_OUTPUT_EMPTY = JSON.stringify({ dependencies: {} })
+
+describe('validateReleaseItPeer', () => {
+  // --- Check A: PASS ---
+  it('Check A PASS: installed v20 satisfies ^19||^20 peer range', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V20
+        if (cmd.includes('npm view release-it version')) return '20.10.0'
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('PASS')
+    expect(checkA?.value).toBe('20.10.0')
+  })
+
+  // --- Check A: PASS with v19 ---
+  it('Check A PASS: installed v19 satisfies ^19||^20 peer range', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V19
+        if (cmd.includes('npm view release-it version')) return '20.10.0'
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('PASS')
+    expect(checkA?.value).toBe('19.5.2')
+  })
+
+  // --- Check A: FAIL — version outside range ---
+  it('Check A FAIL: installed v18 is outside supported range', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V18
+        if (cmd.includes('npm view release-it version')) return '20.10.0'
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('FAIL')
+    expect(checkA?.value).toBe('18.3.0')
+    expect(checkA?.detail).toContain('pnpm add -D release-it@^20')
+  })
+
+  // --- Check A: FAIL — not installed (npm ls returns empty deps) ---
+  it('Check A FAIL: release-it absent from npm ls output', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_EMPTY
+        if (cmd.includes('npm view release-it version')) return '20.10.0'
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('FAIL')
+    expect(checkA?.detail).toContain('pnpm add -D release-it@^20')
+  })
+
+  // --- Check A: FAIL — exec throws (npm not available) ---
+  it('Check A FAIL: npm ls throws (exec failure)', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn().mockReturnValue(false),
+      readFileSync: vi.fn().mockReturnValue(''),
+      execSync: vi.fn().mockImplementation(() => {
+        throw new Error('command not found: npm')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('FAIL')
+    expect(checkA?.value).toBe('not found')
+  })
+
+  // --- Check B: WARN — newer major available ---
+  it('Check B WARN: npm reports v21 while peer range max is v20', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V20
+        if (cmd.includes('npm view release-it version')) return '21.0.5'
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkB = results.find(r => r.name === 'release-it major version')
+    expect(checkB?.status).toBe('WARN')
+    expect(checkB?.value).toBe('21.0.5')
+    expect(checkB?.detail).toContain('21.x available')
+    expect(checkB?.detail).toContain('peer range max is 20.x')
+  })
+
+  // --- Check B: PASS — latest major matches supported max ---
+  it('Check B PASS: latest npm version is within supported major range', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V20
+        if (cmd.includes('npm view release-it version')) return '20.11.0'
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkB = results.find(r => r.name === 'release-it major version')
+    expect(checkB?.status).toBe('PASS')
+    expect(checkB?.value).toBe('20.11.0')
+  })
+
+  // --- Check B: silently skipped on network failure ---
+  it('Check B silently skipped when npm view throws (no network)', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V20
+        if (cmd.includes('npm view release-it version')) throw new Error('ENOTFOUND')
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkB = results.find(r => r.name === 'release-it major version')
+    expect(checkB).toBeUndefined()
+    // Check A still runs and passes
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('PASS')
+  })
+
+  // --- peer range falls back to hardcoded constant when no package.json ---
+  it('uses fallback peer range when no package.json is readable', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn().mockReturnValue(false),
+      readFileSync: vi.fn().mockReturnValue(''),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V20
+        if (cmd.includes('npm view release-it version')) return '20.10.0'
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    // Should still produce Check A PASS (v20 satisfies fallback ^19||^20)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('PASS')
   })
 })

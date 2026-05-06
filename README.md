@@ -654,7 +654,7 @@ pnpm release-it-preset doctor --json
 |----------|--------|
 | Environment | Known env vars, source (env / default / unset), publish-mode consistency |
 | Repository | Git repo presence, branch vs `GIT_REQUIRE_BRANCH`, latest tag, commit count, dirty WD, upstream tracking, remote URL |
-| Configuration | `CHANGELOG.md` exists + Keep a Changelog format + `[Unreleased]` content, `.release-it.json` parseable + `extends` field, `package.json` valid semver version |
+| Configuration | `CHANGELOG.md` exists + Keep a Changelog format + `[Unreleased]` content, `.release-it.json` parseable + `extends` field, `package.json` valid semver version, `release-it` peer range satisfied, `release-it` major version advisor |
 | Readiness Summary | `PASS`/`WARN`/`FAIL` counts, score `N/M checks passing`, status (`READY`/`WARNINGS`/`BLOCKED`), actionable recommendations |
 
 **Exit codes:**

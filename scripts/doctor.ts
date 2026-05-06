@@ -478,12 +478,160 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
 
   checks.push(detectWorkspaceIntegration(deps))
 
+  for (const result of validateReleaseItPeer(deps)) {
+    checks.push(result)
+  }
+
   return { checks, status: worstStatus(checks.map((c) => c.status)) }
 }
 
 // ---------------------------------------------------------------------------
 // 4. Summary
 // ---------------------------------------------------------------------------
+
+
+// ---------------------------------------------------------------------------
+// 3b. Release-it peer-dependency checks
+// ---------------------------------------------------------------------------
+
+/**
+ * Reads the preset's declared peerDependencies.release-it range.
+ * Looks in node_modules/@oorabona/release-it-preset/package.json first
+ * (installed package context), then ./package.json (source repo / dev),
+ * then falls back to a hardcoded constant.
+ */
+function readPresetPeerRange(deps: DoctorDeps): string {
+  const FALLBACK = '^19.0.0 || ^20.0.0'
+  const candidates = [
+    'node_modules/@oorabona/release-it-preset/package.json',
+    'package.json',
+  ]
+  for (const candidate of candidates) {
+    try {
+      if (!deps.existsSync(candidate)) continue
+      const raw = deps.readFileSync(candidate, 'utf8') as string
+      const pkg = JSON.parse(raw) as Record<string, unknown>
+      const peers = pkg.peerDependencies as Record<string, string> | undefined
+      if (peers?.['release-it']) {
+        return peers['release-it']
+      }
+    } catch {
+      // continue to next candidate
+    }
+  }
+  return FALLBACK
+}
+
+/**
+ * Extracts the highest major version number from a semver range string.
+ * Handles OR-joined ranges like "^19.0.0 || ^20.0.0" → 20.
+ */
+function highestMajorFromRange(range: string): number {
+  const matches = range.match(/(\d+)\.\d+\.\d+/g) ?? []
+  let max = 0
+  for (const m of matches) {
+    const major = parseInt(m.split('.')[0], 10)
+    if (major > max) max = major
+  }
+  return max
+}
+
+/**
+ * Checks whether an installed version satisfies a simplified peer range.
+ * Supports "^X.Y.Z || ^A.B.C" — checks that the installed major matches
+ * any major present in the range.
+ */
+function satisfiesPeerRange(version: string, range: string): boolean {
+  const installedMajor = parseInt(version.replace(/^v/, '').split('.')[0], 10)
+  const allowedMajors = Array.from(
+    range.matchAll(/[~^]?(\d+)\.\d+\.\d+/g),
+    (m) => parseInt(m[1], 10),
+  )
+  return allowedMajors.includes(installedMajor)
+}
+
+/**
+ * Runs Check A (peer range satisfaction) and Check B (major version advisor).
+ * Returns an array of CheckResult to be appended into validateConfiguration.
+ * Check B is silently skipped when the npm registry is unreachable.
+ */
+export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
+  const results: CheckResult[] = []
+  const peerRange = readPresetPeerRange(deps)
+
+  // --- Check A: release-it in supported peer range ---
+  const lsOutput = safeExec('npm ls release-it --depth=0 --json', deps)
+  if (!lsOutput) {
+    results.push({
+      name: 'release-it peer dependency',
+      status: 'FAIL',
+      value: 'not found',
+      detail: 'release-it is not installed. Run: pnpm add -D release-it@^20',
+    })
+  } else {
+    let installedVersion: string | undefined
+    try {
+      const parsed = JSON.parse(lsOutput) as {
+        dependencies?: Record<string, { version?: string }>
+      }
+      installedVersion = parsed.dependencies?.['release-it']?.version
+    } catch {
+      // parse failure treated as not found
+    }
+
+    if (!installedVersion) {
+      results.push({
+        name: 'release-it peer dependency',
+        status: 'FAIL',
+        value: 'not found',
+        detail: 'release-it is not installed. Run: pnpm add -D release-it@^20',
+      })
+    } else if (!satisfiesPeerRange(installedVersion, peerRange)) {
+      results.push({
+        name: 'release-it peer dependency',
+        status: 'FAIL',
+        value: installedVersion,
+        detail: `Installed release-it ${installedVersion} is outside the supported range (${peerRange}). Run: pnpm add -D release-it@^20`,
+      })
+    } else {
+      results.push({
+        name: 'release-it peer dependency',
+        status: 'PASS',
+        value: installedVersion,
+      })
+    }
+  }
+
+  // --- Check B: release-it major version advisor ---
+  // On network failure (null), skip the check entirely — no FAIL on outage.
+  const latestOutput = safeExec('npm view release-it version', deps)
+  if (latestOutput) {
+    const latestVersion = latestOutput.trim()
+    const latestMajor = parseInt(latestVersion.replace(/^v/, '').split('.')[0], 10)
+    const supportedMaxMajor = highestMajorFromRange(peerRange)
+
+    if (!Number.isNaN(latestMajor) && !Number.isNaN(supportedMaxMajor)) {
+      if (latestMajor > supportedMaxMajor) {
+        results.push({
+          name: 'release-it major version',
+          status: 'WARN',
+          value: latestVersion,
+          detail: `release-it ${latestMajor}.x available; preset's peer range max is ${supportedMaxMajor}.x. Coordinate with the preset maintainer before upgrading.`,
+        })
+      } else {
+        results.push({
+          name: 'release-it major version',
+          status: 'PASS',
+          value: latestVersion,
+        })
+      }
+    }
+  }
+  // If latestOutput is null (network failure), push nothing for Check B.
+
+  return results
+}
+
 
 export function summarize(report: Omit<DoctorReport, 'summary'>): DoctorSummary {
   const allChecks: CheckResult[] = [

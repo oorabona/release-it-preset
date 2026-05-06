@@ -38,7 +38,7 @@ The `release-it-preset` binary (or `pnpm release-it-preset`) accepts these comma
 | `update` | `populate-unreleased-changelog` | Fill `[Unreleased]` from commits since last tag |
 | `validate` | `validate-release` | Pre-release readiness check (exit 2 on precondition failure) |
 | `check` | `check-config` | Verbose dump of env vars + git/npm state |
-| `doctor` | `doctor` | Structured diagnostic: 4-section checklist + `--json` output, exit 1 on BLOCKED |
+| `doctor` | `doctor` | Structured diagnostic: 4-section checklist + `--json` output, exit 1 on BLOCKED. Configuration checks include: `release-it peer dependency` (installed version satisfies `peerDependencies.release-it` range; FAIL if absent or out of range) and `release-it major version` (WARN when a newer upstream major exceeds the preset's validated peer range; silently skipped on network failure). |
 | `check-pr` | `check-pr-status` | PR hygiene checks for GitHub Actions consumption |
 | `retry-publish-preflight` | `retry-publish` (preflight mode) | Pre-flight checks before retry-publish runs |
 
