@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`init --with-workflows`**: scaffolds `.github/workflows/release.yml` (Node 24, OIDC trusted publishing) on first run; skips if the file already exists.
+- **`init --workflow-name=<file>`**: customise the generated workflow filename (default `release.yml`); validated against `^[A-Za-z0-9._-]+\.ya?ml# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+.
+- **`init` monorepo auto-detection**: detects `pnpm-workspace.yaml` (block-list form) or `package.json#workspaces` and scaffolds per-package `.release-it.json`; root config is skipped to avoid conflicts.
+
 ## [1.1.0] - 2026-05-06
 
 ### Added

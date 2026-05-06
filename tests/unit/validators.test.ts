@@ -6,6 +6,7 @@ import {
   validateConfigName,
   validateConfigPath,
   validateUtilityCommand,
+  validateWorkflowName,
 } from '../../bin/validators.js'
 
 const TEST_DIR = join(process.cwd(), '.test-validators')
@@ -558,5 +559,43 @@ describe('validators - validateConfigPath (v0.9.0 monorepo support)', () => {
       // Absolute path - BLOCKED
       expect(() => validateConfigPath('/etc/passwd.json')).toThrow('Absolute paths')
     })
+  })
+})
+
+describe('validators - validateWorkflowName', () => {
+  it('accepts simple .yml names', () => {
+    expect(() => validateWorkflowName('release.yml')).not.toThrow()
+    expect(() => validateWorkflowName('publish.yml')).not.toThrow()
+    expect(() => validateWorkflowName('Release.yml')).not.toThrow()
+  })
+
+  it('accepts .yaml extension', () => {
+    expect(() => validateWorkflowName('release.yaml')).not.toThrow()
+  })
+
+  it('accepts snake_case and hyphen names', () => {
+    expect(() => validateWorkflowName('release_it.yml')).not.toThrow()
+    expect(() => validateWorkflowName('my-release.yml')).not.toThrow()
+  })
+
+  it('rejects path traversal', () => {
+    expect(() => validateWorkflowName('../etc.yml')).toThrow('Invalid workflow name')
+  })
+
+  it('rejects subdirectory components', () => {
+    expect(() => validateWorkflowName('subdir/foo.yml')).toThrow('Invalid workflow name')
+  })
+
+  it('rejects wrong extension', () => {
+    expect(() => validateWorkflowName('release.txt')).toThrow('Invalid workflow name')
+    expect(() => validateWorkflowName('release.json')).toThrow('Invalid workflow name')
+  })
+
+  it('rejects empty string', () => {
+    expect(() => validateWorkflowName('')).toThrow('cannot be empty')
+  })
+
+  it('returns the name when valid', () => {
+    expect(validateWorkflowName('release.yml')).toBe('release.yml')
   })
 })

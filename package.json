@@ -72,7 +72,7 @@
     "release:validate": "node ./bin/cli.js validate",
     "release:validate:allow-dirty": "node ./bin/cli.js validate --allow-dirty",
     "release:check": "node ./bin/cli.js check",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && cp -r scripts/templates/. dist/scripts/templates",
     "clean": "rimraf dist || rm -rf dist",
     "lint": "biome check --write .",
     "lint:check": "biome check .",

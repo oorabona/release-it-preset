@@ -117,6 +117,40 @@ export function sanitizeArgs(args) {
  * @throws {Error} If validation fails (invalid extension, too deep, missing file, etc.)
  * @returns {string} Absolute path to validated config file
  */
+
+/**
+ * Validates a workflow filename for use with `init --workflow-name`.
+ *
+ * Allowed: simple filenames matching ^[A-Za-z0-9._-]+\.ya?ml$
+ * Rejected: path components (subdir/), traversal (../), wrong extension.
+ *
+ * @param {string} name - The workflow filename to validate
+ * @throws {Error} If the name contains path separators, traversal, or wrong extension
+ * @returns {string} The validated filename
+ */
+export function validateWorkflowName(name) {
+  if (!name || name.length === 0) {
+    throw new Error(
+      `Workflow name cannot be empty.\n` +
+      `Expected a simple filename like "release.yml" or "publish.yml".`
+    );
+  }
+
+  // Reject any path separators or traversal — name must be a single filename component
+  const WORKFLOW_NAME_RE = /^[A-Za-z0-9._-]+\.ya?ml$/;
+  if (!WORKFLOW_NAME_RE.test(name)) {
+    throw new Error(
+      `Invalid workflow name: "${name}"\n` +
+      `Workflow name must be a simple filename matching ^[A-Za-z0-9._-]+\\.ya?ml$\n` +
+      `Examples: release.yml, publish.yml, release_it.yml\n` +
+      `Path components (subdir/foo.yml) and traversal (../etc.yml) are not allowed.`
+    );
+  }
+
+  return name;
+}
+
+
 export function validateConfigPath(configPath) {
   // 1. Whitelist config file extensions (defense in depth)
   const allowedExtensions = ['.json', '.js', '.cjs', '.mjs', '.yaml', '.yml', '.toml'];
