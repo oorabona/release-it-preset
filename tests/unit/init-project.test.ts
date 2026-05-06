@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createChangelog,
   createReleaseItConfig,
+  detectWorkspaces,
   type InitProjectDeps,
   initProject,
   parseArgs,
   scaffoldWorkspacePackages,
   updatePackageJson,
+  writeWorkflow,
 } from '../../scripts/init-project'
 
 describe('init-project (with DI)', () => {
@@ -280,7 +282,10 @@ describe('init-project (with DI)', () => {
       vi.mocked(deps.readFileSync).mockReturnValue(JSON.stringify({ name: 'test', scripts: {} }))
       vi.mocked(deps.prompt).mockResolvedValue(true)
 
-      const results = await initProject({ yes: false, withWorkflows: false, workflowName: 'release.yml' }, deps)
+      const results = await initProject(
+        { yes: false, withWorkflows: false, workflowName: 'release.yml' },
+        deps,
+      )
 
       expect(results.changelog).toBe(true)
       expect(results.releaseIt).toBe(true)
@@ -301,8 +306,10 @@ describe('init-project (with DI)', () => {
     it('should handle all files already existing', async () => {
       // Return false for workspace files so we don't enter monorepo mode
       vi.mocked(deps.existsSync).mockImplementation((path: string) => {
-        if (String(path).endsWith('pnpm-workspace.yaml')) return false;
-        return true;
+        if (String(path).endsWith('pnpm-workspace.yaml')) {
+          return false
+        }
+        return true
       })
       vi.mocked(deps.readFileSync).mockReturnValue(
         JSON.stringify({
@@ -316,7 +323,10 @@ describe('init-project (with DI)', () => {
         }),
       )
 
-      const results = await initProject({ yes: true, withWorkflows: false, workflowName: 'release.yml' }, deps)
+      const results = await initProject(
+        { yes: true, withWorkflows: false, workflowName: 'release.yml' },
+        deps,
+      )
 
       expect(results.changelog).toBe(false)
       expect(results.releaseIt).toBe(false)
@@ -330,7 +340,10 @@ describe('init-project (with DI)', () => {
       vi.mocked(deps.existsSync).mockReturnValue(false)
       vi.mocked(deps.readFileSync).mockReturnValue(JSON.stringify({ name: 'test' }))
 
-      const results = await initProject({ yes: true, withWorkflows: false, workflowName: 'release.yml' }, deps)
+      const results = await initProject(
+        { yes: true, withWorkflows: false, workflowName: 'release.yml' },
+        deps,
+      )
 
       expect(results).toHaveProperty('changelog')
       expect(results).toHaveProperty('releaseIt')
@@ -346,7 +359,7 @@ describe('init-project (with DI)', () => {
       vi.mocked(deps.existsSync).mockReturnValue(false)
 
       const packageDirs = ['/tmp/root/packages/a', '/tmp/root/packages/b']
-      const count = await scaffoldWorkspacePackages(packageDirs, { yes: true, withWorkflows: false, workflowName: 'release.yml' }, deps)
+      const count = await scaffoldWorkspacePackages(packageDirs, deps)
 
       expect(count).toBe(2)
       expect(deps.writeFileSync).toHaveBeenCalledTimes(2)
@@ -360,11 +373,55 @@ describe('init-project (with DI)', () => {
       vi.mocked(deps.existsSync).mockReturnValue(true)
 
       const packageDirs = ['/tmp/root/packages/a']
-      const count = await scaffoldWorkspacePackages(packageDirs, { yes: true, withWorkflows: false, workflowName: 'release.yml' }, deps)
+      const count = await scaffoldWorkspacePackages(packageDirs, deps)
 
       expect(count).toBe(0)
       expect(deps.writeFileSync).not.toHaveBeenCalled()
       expect(deps.log).toHaveBeenCalledWith(expect.stringContaining('already exists'))
+    })
+  })
+
+  describe('writeWorkflow', () => {
+    it('throws ValidationError when template file cannot be read', async () => {
+      // Workflow file does not exist yet
+      vi.mocked(deps.existsSync).mockReturnValue(false)
+      // readFileSync throws (e.g. template missing from build)
+      vi.mocked(deps.readFileSync).mockImplementation(() => {
+        throw new Error('ENOENT: no such file')
+      })
+
+      const options = { yes: true, withWorkflows: true, workflowName: 'release.yml' }
+      await expect(writeWorkflow(options, deps)).rejects.toThrow(/Failed to read workflow template/)
+    })
+  })
+
+  describe('detectWorkspaces', () => {
+    it('emits a warning and returns [] when pnpm-workspace.yaml exists but packages: has no items', () => {
+      vi.mocked(deps.existsSync).mockImplementation((p: string) =>
+        String(p).endsWith('pnpm-workspace.yaml'),
+      )
+      vi.mocked(deps.readFileSync).mockReturnValue(
+        'packages:\n' as unknown as ReturnType<typeof deps.readFileSync>,
+      )
+      vi.mocked(deps.readdirSync).mockReturnValue(
+        [] as unknown as ReturnType<typeof deps.readdirSync>,
+      )
+
+      const result = detectWorkspaces('/tmp/root', deps)
+
+      expect(result).toEqual([])
+      expect(deps.warn).toHaveBeenCalledWith(
+        expect.stringMatching(/workspace.*present|no packages declared|treating as single/i),
+      )
+    })
+
+    it('returns [] and does NOT warn when no workspace config file exists', () => {
+      vi.mocked(deps.existsSync).mockReturnValue(false)
+
+      const result = detectWorkspaces('/tmp/root', deps)
+
+      expect(result).toEqual([])
+      expect(deps.warn).not.toHaveBeenCalled()
     })
   })
 })

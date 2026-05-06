@@ -1,4 +1,4 @@
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   parsePnpmWorkspaceYaml,
@@ -19,6 +19,16 @@ describe('parsePnpmWorkspaceYaml', () => {
   it('throws ValidationError for flow-style array', () => {
     const yaml = `packages: ['packages/*', 'apps/*']\n`
     expect(() => parsePnpmWorkspaceYaml(yaml)).toThrow('flow-style')
+  })
+
+  it('throws ValidationError for YAML alias reference (*alias)', () => {
+    const yaml = `packages: *pkgList\n`
+    expect(() => parsePnpmWorkspaceYaml(yaml)).toThrow(/alias|anchor|not supported/i)
+  })
+
+  it('returns empty array when packages: key has no list items', () => {
+    const yaml = `packages:\n`
+    expect(parsePnpmWorkspaceYaml(yaml)).toEqual([])
   })
 
   it('stops at next top-level key', () => {
@@ -69,9 +79,15 @@ describe('resolvePackagePaths', () => {
   it('expands single-level glob and returns dirs with package.json', () => {
     const deps = {
       existsSync: vi.fn((p: string) => {
-        if (p === join(projectRoot, 'packages')) return true
-        if (p === join(projectRoot, 'packages', 'a', 'package.json')) return true
-        if (p === join(projectRoot, 'packages', 'b', 'package.json')) return true
+        if (p === join(projectRoot, 'packages')) {
+          return true
+        }
+        if (p === join(projectRoot, 'packages', 'a', 'package.json')) {
+          return true
+        }
+        if (p === join(projectRoot, 'packages', 'b', 'package.json')) {
+          return true
+        }
         return false
       }),
       readFileSync: vi.fn(),
@@ -79,17 +95,18 @@ describe('resolvePackagePaths', () => {
     }
 
     const result = resolvePackagePaths(['packages/*'], projectRoot, deps)
-    expect(result).toEqual([
-      join(projectRoot, 'packages', 'a'),
-      join(projectRoot, 'packages', 'b'),
-    ])
+    expect(result).toEqual([join(projectRoot, 'packages', 'a'), join(projectRoot, 'packages', 'b')])
   })
 
   it('skips dirs without package.json', () => {
     const deps = {
       existsSync: vi.fn((p: string) => {
-        if (p === join(projectRoot, 'packages')) return true
-        if (p === join(projectRoot, 'packages', 'a', 'package.json')) return true
+        if (p === join(projectRoot, 'packages')) {
+          return true
+        }
+        if (p === join(projectRoot, 'packages', 'a', 'package.json')) {
+          return true
+        }
         // 'b' has no package.json
         return false
       }),
@@ -108,7 +125,9 @@ describe('resolvePackagePaths', () => {
       readdirSync: vi.fn(() => [] as unknown as string[]),
     }
 
-    expect(() => resolvePackagePaths(['../etc'], projectRoot, deps)).toThrow('outside the project root')
+    expect(() => resolvePackagePaths(['../etc'], projectRoot, deps)).toThrow(
+      'outside the project root',
+    )
   })
 
   it('returns empty when parent dir does not exist', () => {

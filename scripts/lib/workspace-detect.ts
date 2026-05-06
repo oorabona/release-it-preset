@@ -2,7 +2,9 @@
  * Workspace detection utilities for pnpm-workspace.yaml and package.json#workspaces.
  *
  * Scope: block-list `packages:` in pnpm-workspace.yaml only.
- * Flow-style arrays / anchors / YAML aliases are rejected with a clear error.
+ * Flow-style arrays ( packages: [...] ) are rejected with a clear error.
+ * Anchors and aliases are not actively rejected — they are treated as opaque pattern strings
+ * and may produce unexpected results. File an issue if you need anchor/alias support.
  *
  * All functions are pure (no direct FS access) — dependencies are injected for testability.
  */
@@ -28,8 +30,8 @@ export interface WorkspaceDetectDeps {
  * pointing users toward the block-list form.
  *
  * @param content - Raw YAML file content
- * @returns Array of glob patterns from the packages: block-list
- * @throws ValidationError if flow-style or no packages: key found
+ * @returns Array of glob patterns from the packages: block-list, or empty array if no packages: key found
+ * @throws ValidationError if flow-style array syntax is detected
  */
 export function parsePnpmWorkspaceYaml(content: string): string[] {
   const lines = content.split('\n');
@@ -40,8 +42,10 @@ export function parsePnpmWorkspaceYaml(content: string): string[] {
     return [];
   }
 
-  // Check for flow-style on the same line: packages: ['a', 'b'] or packages: [a, b]
+  // Check for unsupported syntax on the same line
   const packagesLine = lines[packagesLineIdx];
+
+  // Flow-style arrays: packages: ['a', 'b'] or packages: [a, b]
   if (/^packages\s*:\s*\[/.test(packagesLine)) {
     throw new ValidationError(
       `pnpm-workspace.yaml uses flow-style array for "packages:" which is not supported.\n` +
@@ -50,6 +54,18 @@ export function parsePnpmWorkspaceYaml(content: string): string[] {
       `    - 'packages/*'\n` +
       `    - 'apps/*'\n` +
       `If you need flow-style support, open an issue at https://github.com/oorabona/release-it-preset/issues`
+    );
+  }
+
+  // YAML alias reference: packages: *anchorName
+  if (/^packages\s*:\s*\*\S+/.test(packagesLine)) {
+    throw new ValidationError(
+      `pnpm-workspace.yaml uses a YAML alias reference for "packages:" which is not supported.\n` +
+      `Please convert to block-list form:\n` +
+      `  packages:\n` +
+      `    - 'packages/*'\n` +
+      `    - 'apps/*'\n` +
+      `Anchor/alias support is not planned; if you need it, open an issue at https://github.com/oorabona/release-it-preset/issues`
     );
   }
 

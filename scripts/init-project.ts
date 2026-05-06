@@ -208,8 +208,12 @@ export async function writeWorkflow(options: Options, deps: InitProjectDeps): Pr
   try {
     templateContent = deps.readFileSync(templatePath, 'utf8') as string;
   } catch (error) {
-    deps.warn(`❌ Failed to read workflow template: ${error}`);
-    return false;
+    throw new ValidationError(
+      `Failed to read workflow template at "${templatePath}".\n` +
+      `This is a build artifact — if it is missing, the package installation is broken.\n` +
+      `Run "pnpm build" to regenerate it, or reinstall the package.\n` +
+      `Original error: ${error}`
+    );
   }
 
   // Ensure .github/workflows/ exists
@@ -233,16 +237,27 @@ export function detectWorkspaces(projectRoot: string, deps: InitProjectDeps): st
   const packageJsonFile = join(projectRoot, 'package.json');
 
   let patterns: string[] = [];
+  let workspaceConfigExists = false;
 
   if (deps.existsSync(pnpmWorkspaceFile)) {
+    workspaceConfigExists = true;
     const content = deps.readFileSync(pnpmWorkspaceFile, 'utf8') as string;
     patterns = parsePnpmWorkspaceYaml(content);
   } else if (deps.existsSync(packageJsonFile)) {
     const content = deps.readFileSync(packageJsonFile, 'utf8') as string;
     patterns = parseWorkspacesFromPackageJson(content);
+    if (patterns.length > 0) {
+      workspaceConfigExists = true;
+    }
   }
 
   if (patterns.length === 0) {
+    if (workspaceConfigExists) {
+      deps.warn(
+        `ℹ️  Workspace config file found but no packages declared/resolved — ` +
+        `treating as single-package init.`
+      );
+    }
     return [];
   }
 
@@ -256,7 +271,6 @@ export function detectWorkspaces(projectRoot: string, deps: InitProjectDeps): st
  */
 export async function scaffoldWorkspacePackages(
   packageDirs: string[],
-  options: Options,
   deps: InitProjectDeps
 ): Promise<number> {
   let created = 0;
@@ -300,7 +314,7 @@ export async function initProject(options: Options, deps: InitProjectDeps): Prom
     releaseIt: isMonorepo ? false : await createReleaseItConfig(options, deps),
     packageJson: isMonorepo ? false : await updatePackageJson(options, deps),
     workflow: options.withWorkflows ? await writeWorkflow(options, deps) : false,
-    monorepoPackages: isMonorepo ? await scaffoldWorkspacePackages(workspaceDirs, options, deps) : 0,
+    monorepoPackages: isMonorepo ? await scaffoldWorkspacePackages(workspaceDirs, deps) : 0,
   };
 
   deps.log('\n📊 Summary:');

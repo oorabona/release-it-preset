@@ -49,23 +49,39 @@ function execCLI(
 
     let stdout = ''
     let stderr = ''
+    let settled = false
 
-    child.stdout?.on('data', d => { stdout += d.toString() })
-    child.stderr?.on('data', d => { stderr += d.toString() })
+    const settle = (result: { code: number | null; stdout: string; stderr: string }) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timeoutHandle)
+      resolve(result)
+    }
 
-    child.on('close', code => resolve({ code, stdout, stderr }))
-    child.on('error', err => resolve({ code: 1, stdout, stderr: err.message }))
+    child.stdout?.on('data', d => {
+      stdout += d.toString()
+    })
+    child.stderr?.on('data', d => {
+      stderr += d.toString()
+    })
 
-    setTimeout(() => {
+    child.on('close', code => settle({ code, stdout, stderr }))
+    child.on('error', err => settle({ code: 1, stdout, stderr: err.message }))
+
+    const timeoutHandle = setTimeout(() => {
       child.kill()
-      resolve({ code: 1, stdout, stderr: 'Test timeout after 10s' })
+      settle({ code: 1, stdout, stderr: 'Test timeout after 10s' })
     }, 10_000)
   })
 }
 
 function createTestDir(name: string, files: Record<string, string>): string {
   const dir = join(TEST_BASE, name)
-  if (existsSync(dir)) rmSync(dir, { recursive: true, force: true })
+  if (existsSync(dir)) {
+    rmSync(dir, { recursive: true, force: true })
+  }
   mkdirSync(dir, { recursive: true })
 
   for (const [relPath, content] of Object.entries(files)) {
@@ -78,7 +94,9 @@ function createTestDir(name: string, files: Record<string, string>): string {
 }
 
 afterEach(() => {
-  if (existsSync(TEST_BASE)) rmSync(TEST_BASE, { recursive: true, force: true })
+  if (existsSync(TEST_BASE)) {
+    rmSync(TEST_BASE, { recursive: true, force: true })
+  }
 })
 
 // ---------------------------------------------------------------------------
@@ -111,6 +129,13 @@ describe('Scenario A — greenfield single + --with-workflows', () => {
     expect(workflowContent).toMatch(/NODE_VERSION.*'?24'?|node-version.*24/i)
     expect(workflowContent).toContain('retry-publish-preflight')
     expect(workflowContent).toContain('OIDC')
+    // HIGH fix: publish step must use release-it directly (not release-it-preset retry-publish)
+    // to avoid CLI mismatch check when .release-it.json extends a preset config.
+    expect(workflowContent).toMatch(
+      /require\.resolve\(['"]@oorabona\/release-it-preset\/config\/retry-publish['"]\)/,
+    )
+    expect(workflowContent).toContain('release-it --ci --config')
+    expect(workflowContent).not.toContain('release-it-preset retry-publish --ci')
 
     // stdout confirms creation
     expect(stdout + stderr).toMatch(/Created.*release\.yml|workflow.*Created/i)
@@ -164,7 +189,10 @@ describe('Scenario C — monorepo auto-detection', () => {
     expect(existsSync(configB), 'packages/b/.release-it.json should exist').toBe(true)
 
     // Root .release-it.json NOT created
-    expect(existsSync(join(dir, '.release-it.json')), 'root .release-it.json should NOT exist').toBe(false)
+    expect(
+      existsSync(join(dir, '.release-it.json')),
+      'root .release-it.json should NOT exist',
+    ).toBe(false)
 
     // Post-init guidance printed
     expect(stdout + stderr).toMatch(/pnpm -F .* exec release-it-preset/i)
@@ -225,5 +253,51 @@ describe('Scenario F — path-traversal workspace pattern', () => {
 
     expect(code).not.toBe(0)
     expect(stderr + stdout).toMatch(/outside the project root|containment/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario G — pnpm-workspace.yaml with empty packages: → single-package mode + warning
+// ---------------------------------------------------------------------------
+describe('Scenario G — workspace config exists but no packages declared', () => {
+  it('proceeds in single-package mode and emits a warning', async () => {
+    const dir = createTestDir('G', {
+      'package.json': JSON.stringify({ name: 'my-pkg', version: '0.0.1' }),
+      // packages: key present but no list items beneath it
+      'pnpm-workspace.yaml': `packages:\n`,
+    })
+
+    const { code, stdout, stderr } = await execCLI(['init', '--yes'], dir)
+
+    // Should exit successfully (soft warning, not fatal)
+    expect(code, `stderr: ${stderr}`).toBe(0)
+
+    // Single-package config created at root (not per-package)
+    expect(existsSync(join(dir, '.release-it.json')), 'root .release-it.json should exist').toBe(
+      true,
+    )
+
+    // Root config should NOT be absent (i.e., did not enter monorepo mode)
+    expect(existsSync(join(dir, 'packages')), 'packages/ dir should not be created').toBe(false)
+
+    // Warning emitted to stdout/stderr
+    expect(stdout + stderr).toMatch(/workspace.*present|no packages declared|treating as single/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario H — pnpm-workspace.yaml with YAML alias reference → exit non-zero
+// ---------------------------------------------------------------------------
+describe('Scenario H — pnpm-workspace.yaml with YAML alias reference', () => {
+  it('exits non-zero with unsupported alias error', async () => {
+    const dir = createTestDir('H', {
+      'package.json': JSON.stringify({ name: 'my-monorepo', version: '0.0.0' }),
+      'pnpm-workspace.yaml': `packages: *pkgList\n`,
+    })
+
+    const { code, stderr, stdout } = await execCLI(['init', '--yes'], dir)
+
+    expect(code).not.toBe(0)
+    expect(stderr + stdout).toMatch(/alias|anchor|not supported/i)
   })
 })
