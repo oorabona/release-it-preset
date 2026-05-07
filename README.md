@@ -902,7 +902,7 @@ pnpm release-it-preset default
 - The `extends` field loads the preset
 - release-it merges your overrides on top via c12
 - **Your values take precedence** over preset defaults
-- CLI validates that `extends` matches the command
+- CLI validates that `extends` is present; mismatched preset name warns and uses the invoked preset's config for that run
 
 **Pros:**
 - ✅ **Recommended for customization**
@@ -957,7 +957,7 @@ pnpm release-it-preset default
 
 **Why `extends` is required:** Without it, release-it only loads your config file and uses release-it's own defaults. The preset is never loaded, so you lose important defaults like `npm.publish: false`.
 
-#### Error 2: Preset mismatch
+#### Note: Preset mismatch (warning, not error)
 
 ```bash
 # .release-it.json extends "default":
@@ -968,14 +968,13 @@ pnpm release-it-preset default
 # But you run:
 pnpm release-it-preset hotfix
 
-# ❌ Configuration mismatch error!
-#    CLI preset:               hotfix
-#    .release-it.json extends: default
-#
-#    Either:
-#      1. Run: release-it-preset default
-#      2. Update .release-it.json extends to: "@oorabona/release-it-preset/config/hotfix"
+# ⚠️  Note: your .release-it.json extends "default"
+#    but you invoked the "hotfix" preset.
+#    Using "hotfix" config directly; .release-it.json customizations are ignored for this run.
+#    To use your customizations, run: release-it-preset default
 ```
+
+> **Note**: invoking a preset different from your `.release-it.json` extends value now warns and uses the invoked preset's config (was: hard error). Use the matching name to keep your customizations.
 
 ---
 

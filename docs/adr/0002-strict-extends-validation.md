@@ -1,6 +1,6 @@
 # ADR-0002: Strict `extends` validation in `.release-it.json`
 
-- **Status**: Accepted
+- **Status**: Amended (2026-05-07) — see [ADR-0006](./0006-relaxed-mismatch-policy.md) for the relaxed mismatch policy. The first invariant ("extends required") remains in force.
 - **Date**: 2025-10-06
 - **Deciders**: maintainers
 
@@ -36,6 +36,14 @@ The pattern is consistent with how other configuration-extension tools work:
 Without an explicit `extends`, the tool has no way to discover the preset.
 
 ## Decision
+
+> **Note (2026-05-07)**: The "hard-error on mismatch" invariant below has been
+> superseded by [ADR-0006](./0006-relaxed-mismatch-policy.md). The CLI now warns
+> and uses the invoked preset's config via `--config <path>` for that run.
+> The first invariant in this ADR — `extends` is required when `.release-it.json`
+> exists — REMAINS in force.
+
+(Original decision text below preserved for historical context.)
 
 When `.release-it.json` exists in the working directory, `bin/cli.js` validates
 that it contains an `extends` field pointing to the invoked preset. Specifically:

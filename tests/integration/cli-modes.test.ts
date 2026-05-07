@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -63,6 +63,83 @@ function execCLI(
     }, 5000)
   })
 }
+
+
+/**
+ * Helper to execute CLI with a mock `release-it` binary injected into PATH.
+ * The mock prints all received arguments to stderr as "MOCK_ARGS: <json>".
+ * This lets tests assert that `--config <preset-path>` is forwarded to
+ * release-it without having to read cli.js internals.
+ */
+function execCLIWithArgCapture(
+  args: string[],
+  cwd: string = TEST_DIR,
+): Promise<{
+  code: number | null
+  stdout: string
+  stderr: string
+}> {
+  // Create a local bin/ directory with a fake `release-it` that echoes its args
+  const mockBinDir = join(cwd, '.mock-bin')
+  if (!existsSync(mockBinDir)) {
+    mkdirSync(mockBinDir, { recursive: true })
+  }
+  const mockReleaseIt = join(mockBinDir, 'release-it')
+  writeFileSync(
+    mockReleaseIt,
+    '#!/usr/bin/env node\nprocess.stderr.write("MOCK_ARGS: " + JSON.stringify(process.argv.slice(2)) + "\\n");\nprocess.exit(0);\n',
+    'utf8',
+  )
+  chmodSync(mockReleaseIt, 0o755)
+
+  return new Promise(resolve => {
+    const child = spawn('node', [CLI_PATH, ...args], {
+      cwd,
+      env: {
+        ...process.env,
+        NO_COLOR: '1',
+        PATH: `${mockBinDir}:${process.env.PATH}`, // Intercept release-it lookup
+      },
+    })
+
+    let stdout = ''
+    let stderr = ''
+    let settled = false
+    // Declared before `settle` to avoid TDZ: if spawn errors immediately (before
+    // setTimeout runs), the error event fires synchronously and settle() would
+    // reference timeoutHandle while it is still in the temporal dead zone.
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+
+    const settle = (result: { code: number | null; stdout: string; stderr: string }) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      if (timeoutHandle !== undefined) {
+        clearTimeout(timeoutHandle)
+      }
+      resolve(result)
+    }
+
+    child.stdout?.on('data', data => {
+      stdout += data.toString()
+    })
+
+    child.stderr?.on('data', data => {
+      stderr += data.toString()
+    })
+
+    child.on('close', code => settle({ code, stdout, stderr }))
+    child.on('error', error => settle({ code: 1, stdout, stderr: error.message }))
+
+    // Timeout after 10 seconds to prevent hanging
+    timeoutHandle = setTimeout(() => {
+      child.kill()
+      settle({ code: 1, stdout, stderr: 'Test timeout after 10s' })
+    }, 10_000)
+  })
+}
+
 
 /**
  * Helper to create a test directory structure
@@ -367,7 +444,7 @@ describe('CLI Modes - Config Validation and Security', () => {
     expect(result.stderr).toContain('missing the required "extends" field')
   })
 
-  it('should validate extends matches CLI preset command', async () => {
+  it('warns on mismatch and uses preset config directly', async () => {
     createTestEnv({
       '.release-it.json': JSON.stringify({
         extends: '@oorabona/release-it-preset/config/hotfix',
@@ -377,8 +454,46 @@ describe('CLI Modes - Config Validation and Security', () => {
 
     const result = await execCLI(['default']) // Mismatch: CLI says default, config says hotfix
 
-    expect(result.code).toBe(1)
-    expect(result.stderr).toContain('Configuration mismatch')
+    // CLI no longer hard-errors on mismatch — warns and uses the invoked preset directly.
+    // Exit code may still be non-zero if release-it itself fails on git/npm preconditions
+    // (no git repo, no tag, etc.), but the old "Configuration mismatch error!" must be gone.
+    expect(result.stderr).toContain('Note: your .release-it.json extends "hotfix"')
+    expect(result.stderr).toContain('but you invoked the "default" preset')
+    expect(result.stderr).toContain('.release-it.json customizations are ignored for this run')
+    expect(result.stderr).not.toContain('Configuration mismatch error!')
+  })
+
+  it('user with .release-it.json extends default invokes retry-publish — no error, warning printed, retry-publish.js used', async () => {
+    createTestEnv({
+      '.release-it.json': JSON.stringify({
+        extends: '@oorabona/release-it-preset/config/default',
+      }),
+      'package.json': JSON.stringify({ name: 'test', version: '1.0.0' }),
+    })
+
+    // Use the arg-capturing variant so we can verify --config is forwarded.
+    // A regression that drops ['--config', configPath] from cli.js:169 would
+    // silently fall back to .release-it.json's "extends: default" — the mock
+    // shows exactly what release-it receives and fails this assertion.
+    const result = await execCLIWithArgCapture(['retry-publish', '--dry-run'])
+
+    // Should warn and override to retry-publish.js, not exit 1 on mismatch
+    expect(result.stderr).toContain('Note: your .release-it.json extends "default"')
+    expect(result.stderr).toContain('but you invoked the "retry-publish" preset')
+    expect(result.stderr).toContain('customizations are ignored for this run')
+    // The key assertion: no "Configuration mismatch error!" in output
+    expect(result.stderr).not.toContain('Configuration mismatch error!')
+
+    // Verify --config <retry-publish.js> was actually forwarded to release-it.
+    // If this line is missing from cli.js, MOCK_ARGS will not contain --config
+    // and the preset fallback assertion below fails.
+    expect(result.stderr).toContain('"--config"')
+    const mockArgsMatch = result.stderr.match(/MOCK_ARGS: (\[.*?\])/)
+    expect(mockArgsMatch).not.toBeNull()
+    const spawnArgs: string[] = JSON.parse(mockArgsMatch![1])
+    const configFlagIdx = spawnArgs.indexOf('--config')
+    expect(configFlagIdx).toBeGreaterThanOrEqual(0)
+    expect(spawnArgs[configFlagIdx + 1]).toMatch(/retry-publish\.js$/)
   })
 })
 
