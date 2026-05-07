@@ -1,0 +1,93 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in release-it-preset
+title: "[Bug]: "
+labels:
+  - bug
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. This tracker is for **bugs and confirmed regressions** only.
+
+        - For questions or usage help → [Discussions](https://github.com/oorabona/release-it-preset/discussions)
+        - For security vulnerabilities → see [SECURITY.md](https://github.com/oorabona/release-it-preset/blob/main/SECURITY.md) (do NOT open a public issue)
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug — steps to reproduce, expected behavior, and actual behavior.
+      placeholder: |
+        Steps to reproduce:
+        1. Run `pnpm release-it-preset ...`
+        2. ...
+
+        Expected: ...
+        Actual: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output / error messages
+      description: Paste the full command output or error message. Redact any secrets or tokens.
+      render: shell
+    validations:
+      required: false
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      description: Output of `node --version`
+      placeholder: "v20.19.0"
+    validations:
+      required: true
+
+  - type: input
+    id: package-manager-version
+    attributes:
+      label: Package manager version
+      description: Output of `pnpm --version` (or npm/yarn equivalent)
+      placeholder: "pnpm 9.15.4"
+    validations:
+      required: true
+
+  - type: input
+    id: release-it-version
+    attributes:
+      label: release-it version
+      description: Output of `pnpm list release-it` or check package.json
+      placeholder: "20.x.x"
+    validations:
+      required: true
+
+  - type: input
+    id: preset-version
+    attributes:
+      label: "@oorabona/release-it-preset version"
+      description: Output of `pnpm list @oorabona/release-it-preset`
+      placeholder: "1.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / platform
+      description: Operating system and architecture
+      placeholder: "Ubuntu 24.04 / macOS 15 / Windows 11"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched [existing issues](https://github.com/oorabona/release-it-preset/issues) and did not find a duplicate
+          required: true
+        - label: I checked [CHANGELOG.md](https://github.com/oorabona/release-it-preset/blob/main/CHANGELOG.md) and [MIGRATION.md](https://github.com/oorabona/release-it-preset/blob/main/docs/MIGRATION.md) in case this is a known breaking change
+          required: true

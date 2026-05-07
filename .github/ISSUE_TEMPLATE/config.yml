@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions / discussion
+    url: https://github.com/oorabona/release-it-preset/discussions
+    about: Ask questions, share usage tips, or discuss ideas before opening an issue.
+  - name: Security vulnerability
+    url: https://github.com/oorabona/release-it-preset/security/policy
+    about: Please follow the disclosure process in SECURITY.md (do NOT open a public issue).
