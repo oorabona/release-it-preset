@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-07
+
 ### Added
 
 - **`init --with-workflows`**: scaffolds `.github/workflows/release.yml` (Node 24, OIDC trusted publishing) on first run; skips if the file already exists.
@@ -493,7 +495,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.2.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -544,3 +546,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [1.0.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.0.0
 [v1.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.1.0
 [1.1.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.1.0
+[v1.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.2.0
+[1.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.2.0
