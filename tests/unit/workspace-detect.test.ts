@@ -90,7 +90,6 @@ describe('resolvePackagePaths', () => {
         }
         return false
       }),
-      readFileSync: vi.fn(),
       readdirSync: vi.fn((_p: string) => ['a', 'b'] as unknown as string[]),
     }
 
@@ -110,7 +109,6 @@ describe('resolvePackagePaths', () => {
         // 'b' has no package.json
         return false
       }),
-      readFileSync: vi.fn(),
       readdirSync: vi.fn(() => ['a', 'b'] as unknown as string[]),
     }
 
@@ -121,7 +119,6 @@ describe('resolvePackagePaths', () => {
   it('throws ValidationError for path-traversal pattern', () => {
     const deps = {
       existsSync: vi.fn(() => true),
-      readFileSync: vi.fn(),
       readdirSync: vi.fn(() => [] as unknown as string[]),
     }
 
@@ -133,7 +130,6 @@ describe('resolvePackagePaths', () => {
   it('returns empty when parent dir does not exist', () => {
     const deps = {
       existsSync: vi.fn(() => false),
-      readFileSync: vi.fn(),
       readdirSync: vi.fn(() => [] as unknown as string[]),
     }
 
@@ -145,7 +141,6 @@ describe('resolvePackagePaths', () => {
     const pkgDir = join(projectRoot, 'my-app')
     const deps = {
       existsSync: vi.fn((p: string) => p === join(pkgDir, 'package.json')),
-      readFileSync: vi.fn(),
       readdirSync: vi.fn(() => [] as unknown as string[]),
     }
 

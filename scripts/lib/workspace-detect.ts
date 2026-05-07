@@ -15,7 +15,6 @@ import { ValidationError } from './errors.js';
 
 export interface WorkspaceDetectDeps {
   existsSync: (path: string) => boolean;
-  readFileSync: (path: string, encoding: 'utf8') => string;
   readdirSync: (path: string) => string[];
 }
 

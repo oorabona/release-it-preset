@@ -402,6 +402,39 @@ describe('init-project (with DI)', () => {
       const options = { yes: true, withWorkflows: true, workflowName: 'release.yml' }
       await expect(writeWorkflow(options, deps)).rejects.toThrow(/Failed to read workflow template/)
     })
+
+    it('falls back to source-position template when compiled-position does not exist', async () => {
+      // workflow output file does not exist → proceed
+      // compiled template path does not exist → fall back to source path
+      // source template path exists → use it
+      vi.mocked(deps.existsSync).mockImplementation((p: string) => {
+        // workflowPath check: .github/workflows/release.yml → false (create it)
+        if (String(p).includes('.github')) {
+          return false
+        }
+        // compiledPath: contains both 'dist' and 'scripts' segments → false
+        if (String(p).includes('dist')) {
+          return false
+        }
+        // sourcePath: sibling templates/... → true
+        return true
+      })
+      vi.mocked(deps.readFileSync).mockReturnValue('# workflow template content')
+
+      const options = { yes: true, withWorkflows: true, workflowName: 'release.yml' }
+      const result = await writeWorkflow(options, deps)
+
+      expect(result).toBe(true)
+      // readFileSync must have been called with a path that does NOT go through dist/
+      const readCall = vi.mocked(deps.readFileSync).mock.calls[0][0] as string
+      expect(readCall).not.toContain('dist')
+      expect(readCall).toContain('templates')
+    })
+
+    it('throws ValidationError for invalid workflow name', async () => {
+      const options = { yes: true, withWorkflows: true, workflowName: '../evil.yml' }
+      await expect(writeWorkflow(options, deps)).rejects.toThrow(/Invalid workflow name/)
+    })
   })
 
   describe('detectWorkspaces', () => {

@@ -27,6 +27,26 @@ import {
 import { ValidationError } from './lib/errors.js';
 
 
+
+// Single source of truth for workflow name validation within this file.
+// NOTE: bin/validators.js cannot be imported here — TypeScript compiles scripts/ to
+// dist/scripts/ so a relative '../bin/' import resolves to 'dist/bin/' at runtime
+// (wrong). The canonical regex lives in bin/validators.js:validateWorkflowName and
+// is kept in sync here manually (same pattern: ^[A-Za-z0-9._-]+\.ya?ml$).
+const WORKFLOW_NAME_REGEX = /^[A-Za-z0-9._-]+\.ya?ml$/;
+
+function assertValidWorkflowName(name: string): void {
+  if (!WORKFLOW_NAME_REGEX.test(name)) {
+    throw new ValidationError(
+      `Invalid workflow name: "${name}"\n` +
+      `Workflow name must match [A-Za-z0-9._-]+\\.ya?ml (no path components, no traversal).\n` +
+      `Examples: release.yml, publish.yml\n` +
+      `Path components and traversal (../etc.yml) are not allowed.`
+    );
+  }
+}
+
+
 const CHANGELOG_TEMPLATE = `# Changelog
 
 All notable changes to this project will be documented in this file.
@@ -195,13 +215,7 @@ export async function updatePackageJson(options: Options, deps: InitProjectDeps)
 export async function writeWorkflow(options: Options, deps: InitProjectDeps): Promise<boolean> {
   // Defense-in-depth: validate workflow name before any path computation.
   // The CLI entry point also validates, but programmatic callers (tests, library use) bypass it.
-  const WORKFLOW_NAME_REGEX = /^[A-Za-z0-9._-]+\.ya?ml$/;
-  if (!WORKFLOW_NAME_REGEX.test(options.workflowName)) {
-    throw new ValidationError(
-      `Invalid workflow name: "${options.workflowName}" — must match ${WORKFLOW_NAME_REGEX} ` +
-      `(no path components, no traversal).`
-    );
-  }
+  assertValidWorkflowName(options.workflowName);
 
   const workflowDir = join('.github', 'workflows');
   const workflowPath = join(workflowDir, options.workflowName);
@@ -212,13 +226,14 @@ export async function writeWorkflow(options: Options, deps: InitProjectDeps): Pr
     return false;
   }
 
-  // Resolve template path relative to this compiled script.
-  // At install time: node_modules/.../dist/scripts/init-project.js → ../../scripts/templates/...
-  // At dev time:     dist/scripts/init-project.js → ../../scripts/templates/...
-  // Both resolve to <package-root>/scripts/templates/workflows/release.yml.template
+  // Resolve template path: try compiled position first, fall back to source position.
+  //   compiled: dist/scripts/init-project.js → ../../scripts/templates/... (2 hops up)
+  //   source:   scripts/init-project.ts     → ./templates/...             (sibling dir)
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
-  const templatePath = join(__dirname, '..', '..', 'scripts', 'templates', 'workflows', 'release.yml.template');
+  const compiledPath = join(__dirname, '..', '..', 'scripts', 'templates', 'workflows', 'release.yml.template');
+  const sourcePath = join(__dirname, 'templates', 'workflows', 'release.yml.template');
+  const templatePath = deps.existsSync(compiledPath) ? compiledPath : sourcePath;
 
   let templateContent: string;
   try {
@@ -393,22 +408,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const options = parseArgs();
 
     // Validate workflow name whenever explicitly provided (even without --with-workflows).
-    // NOTE: bin/validators.js cannot be imported here — TypeScript compiles scripts/ to
-    // dist/scripts/ so a relative '../bin/' import resolves to 'dist/bin/' at runtime
-    // (wrong). The canonical regex lives in bin/validators.js:validateWorkflowName and
-    // is kept in sync here manually (same pattern: ^[A-Za-z0-9._-]+\.ya?ml$).
     const argv = process.argv.slice(2);
     const workflowNameExplicit = argv.some(a => a.startsWith('--workflow-name='));
     if (workflowNameExplicit || options.withWorkflows) {
-      const WORKFLOW_NAME_RE = /^[A-Za-z0-9._-]+\.ya?ml$/;
-      if (!WORKFLOW_NAME_RE.test(options.workflowName)) {
-        throw new ValidationError(
-          `Invalid workflow name: "${options.workflowName}"\n` +
-          `Workflow name must match [A-Za-z0-9._-]+\\.ya?ml (no path components, no traversal).\n` +
-          `Examples: release.yml, publish.yml\n` +
-          `Path components and traversal (../etc.yml) are not allowed.`
-        );
-      }
+      assertValidWorkflowName(options.workflowName);
     }
 
     await initProject(options, {
