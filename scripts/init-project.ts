@@ -14,9 +14,38 @@
  *   --yes    Skip prompts and use defaults
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { runScript } from './lib/run-script.js';
+import {
+  parsePnpmWorkspaceYaml,
+  parseWorkspacesFromPackageJson,
+  resolvePackagePaths,
+} from './lib/workspace-detect.js';
+import { ValidationError } from './lib/errors.js';
+
+
+
+// Single source of truth for workflow name validation within this file.
+// NOTE: bin/validators.js cannot be imported here — TypeScript compiles scripts/ to
+// dist/scripts/ so a relative '../bin/' import resolves to 'dist/bin/' at runtime
+// (wrong). The canonical regex lives in bin/validators.js:validateWorkflowName and
+// is kept in sync here manually (same pattern: ^[A-Za-z0-9._-]+\.ya?ml$).
+const WORKFLOW_NAME_REGEX = /^[A-Za-z0-9._-]+\.ya?ml$/;
+
+function assertValidWorkflowName(name: string): void {
+  if (!WORKFLOW_NAME_REGEX.test(name)) {
+    throw new ValidationError(
+      `Invalid workflow name: "${name}"\n` +
+      `Workflow name must match [A-Za-z0-9._-]+\\.ya?ml (no path components, no traversal).\n` +
+      `Examples: release.yml, publish.yml\n` +
+      `Path components and traversal (../etc.yml) are not allowed.`
+    );
+  }
+}
+
 
 const CHANGELOG_TEMPLATE = `# Changelog
 
@@ -38,6 +67,9 @@ const RELEASE_IT_CONFIG = `{
 
 const SUGGESTED_SCRIPTS = {
   'release': 'release-it-preset default',
+  'release:patch': 'release-it-preset default patch',
+  'release:minor': 'release-it-preset default minor',
+  'release:major': 'release-it-preset default major',
   'release:hotfix': 'release-it-preset hotfix',
   'release:dry': 'release-it-preset default --dry-run',
   'changelog:update': 'release-it-preset update',
@@ -45,12 +77,16 @@ const SUGGESTED_SCRIPTS = {
 
 interface Options {
   yes: boolean;
+  withWorkflows: boolean;
+  workflowName: string;
 }
 
 export interface InitProjectDeps {
   existsSync: typeof existsSync;
   readFileSync: typeof readFileSync;
   writeFileSync: typeof writeFileSync;
+  mkdirSync: typeof mkdirSync;
+  readdirSync: typeof readdirSync;
   prompt: (question: string) => Promise<boolean>;
   log: (message: string) => void;
   warn: (message: string) => void;
@@ -59,8 +95,15 @@ export interface InitProjectDeps {
 export function parseArgs(args?: string[]): Options {
   /* c8 ignore next */
   const argv = args || process.argv.slice(2);
+
+  // Extract --workflow-name=<value>
+  const workflowNameArg = argv.find(a => a.startsWith('--workflow-name='));
+  const workflowName = workflowNameArg ? workflowNameArg.slice('--workflow-name='.length) : 'release.yml';
+
   return {
     yes: argv.includes('--yes') || argv.includes('-y'),
+    withWorkflows: argv.includes('--with-workflows'),
+    workflowName,
   };
 }
 
@@ -164,10 +207,125 @@ export async function updatePackageJson(options: Options, deps: InitProjectDeps)
   }
 }
 
+
+/**
+ * Write the GitHub Actions workflow file to .github/workflows/<name>.
+ * Skips silently if the file already exists (existing skip-on-conflict policy).
+ */
+export async function writeWorkflow(options: Options, deps: InitProjectDeps): Promise<boolean> {
+  // Defense-in-depth: validate workflow name before any path computation.
+  // The CLI entry point also validates, but programmatic callers (tests, library use) bypass it.
+  assertValidWorkflowName(options.workflowName);
+
+  const workflowDir = join('.github', 'workflows');
+  const workflowPath = join(workflowDir, options.workflowName);
+
+  if (deps.existsSync(workflowPath)) {
+    deps.log(`ℹ️  ${workflowPath} already exists — skipping.`);
+    deps.log(`   To integrate manually, review the template and merge into your existing workflow.`);
+    return false;
+  }
+
+  // Resolve template path: try compiled position first, fall back to source position.
+  //   compiled: dist/scripts/init-project.js → ../../scripts/templates/... (2 hops up)
+  //   source:   scripts/init-project.ts     → ./templates/...             (sibling dir)
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  const compiledPath = join(__dirname, '..', '..', 'scripts', 'templates', 'workflows', 'release.yml.template');
+  const sourcePath = join(__dirname, 'templates', 'workflows', 'release.yml.template');
+  const templatePath = deps.existsSync(compiledPath) ? compiledPath : sourcePath;
+
+  let templateContent: string;
+  try {
+    templateContent = deps.readFileSync(templatePath, 'utf8') as string;
+  } catch (error) {
+    throw new ValidationError(
+      `Failed to read workflow template at "${templatePath}".\n` +
+      `The template ships in scripts/templates/ — if it is missing, reinstall the package.\n` +
+      `Original error: ${error}`
+    );
+  }
+
+  // Ensure .github/workflows/ exists
+  if (!deps.existsSync(workflowDir)) {
+    deps.mkdirSync(workflowDir, { recursive: true } as Parameters<typeof mkdirSync>[1]);
+  }
+
+  deps.writeFileSync(workflowPath, templateContent);
+  deps.log(`✅ Created ${workflowPath}`);
+  return true;
+}
+
+/**
+ * Detect workspaces from pnpm-workspace.yaml or package.json#workspaces.
+ * Returns resolved absolute package directory paths.
+ * Returns empty array if no workspace config found.
+ * Throws ValidationError if workspace patterns escape the project root.
+ */
+export function detectWorkspaces(projectRoot: string, deps: InitProjectDeps): string[] {
+  const pnpmWorkspaceFile = join(projectRoot, 'pnpm-workspace.yaml');
+  const packageJsonFile = join(projectRoot, 'package.json');
+
+  let patterns: string[] = [];
+  let workspaceConfigExists = false;
+
+  if (deps.existsSync(pnpmWorkspaceFile)) {
+    workspaceConfigExists = true;
+    const content = deps.readFileSync(pnpmWorkspaceFile, 'utf8') as string;
+    patterns = parsePnpmWorkspaceYaml(content);
+  } else if (deps.existsSync(packageJsonFile)) {
+    const content = deps.readFileSync(packageJsonFile, 'utf8') as string;
+    patterns = parseWorkspacesFromPackageJson(content);
+    if (patterns.length > 0) {
+      workspaceConfigExists = true;
+    }
+  }
+
+  if (patterns.length === 0) {
+    if (workspaceConfigExists) {
+      deps.warn(
+        `ℹ️  Workspace config file found but no packages declared/resolved — ` +
+        `treating as single-package init.`
+      );
+    }
+    return [];
+  }
+
+  return resolvePackagePaths(patterns, projectRoot, deps);
+}
+
+/**
+ * Scaffold per-package .release-it.json for each detected workspace package.
+ * Skips packages that already have .release-it.json (skip-on-conflict policy).
+ * Does NOT write a root .release-it.json (would conflict with per-package configs).
+ */
+export async function scaffoldWorkspacePackages(
+  packageDirs: string[],
+  deps: InitProjectDeps
+): Promise<number> {
+  let created = 0;
+
+  for (const pkgDir of packageDirs) {
+    const configPath = join(pkgDir, '.release-it.json');
+    if (deps.existsSync(configPath)) {
+      deps.log(`ℹ️  ${configPath} already exists — skipping`);
+      continue;
+    }
+    deps.writeFileSync(configPath, RELEASE_IT_CONFIG);
+    deps.log(`✅ Created ${configPath}`);
+    created++;
+  }
+
+  return created;
+}
+
+
 export async function initProject(options: Options, deps: InitProjectDeps): Promise<{
   changelog: boolean;
   releaseIt: boolean;
   packageJson: boolean;
+  workflow: boolean;
+  monorepoPackages: number;
 }> {
   deps.log('🚀 Initializing project with release-it-preset\n');
 
@@ -175,25 +333,51 @@ export async function initProject(options: Options, deps: InitProjectDeps): Prom
     deps.log('ℹ️  Running in --yes mode (non-interactive)\n');
   }
 
+  // Detect monorepo workspaces before deciding what to scaffold
+  const projectRoot = process.cwd();
+  const workspaceDirs = detectWorkspaces(projectRoot, deps);
+  const isMonorepo = workspaceDirs.length > 0;
+
   const results = {
     changelog: await createChangelog(options, deps),
-    releaseIt: await createReleaseItConfig(options, deps),
-    packageJson: await updatePackageJson(options, deps),
+    // In monorepo mode: per-package configs, NO root .release-it.json
+    releaseIt: isMonorepo ? false : await createReleaseItConfig(options, deps),
+    packageJson: isMonorepo ? false : await updatePackageJson(options, deps),
+    workflow: options.withWorkflows ? await writeWorkflow(options, deps) : false,
+    monorepoPackages: isMonorepo ? await scaffoldWorkspacePackages(workspaceDirs, deps) : 0,
   };
 
   deps.log('\n📊 Summary:');
   deps.log(`   CHANGELOG.md: ${results.changelog ? '✅ Created' : '⏭️  Skipped'}`);
-  deps.log(`   .release-it.json: ${results.releaseIt ? '✅ Created' : '⏭️  Skipped'}`);
-  deps.log(`   package.json: ${results.packageJson ? '✅ Updated' : '⏭️  Skipped'}`);
+  if (isMonorepo) {
+    deps.log(`   workspace packages: ${results.monorepoPackages} .release-it.json created`);
+  } else {
+    deps.log(`   .release-it.json: ${results.releaseIt ? '✅ Created' : '⏭️  Skipped'}`);
+    deps.log(`   package.json: ${results.packageJson ? '✅ Updated' : '⏭️  Skipped'}`);
+  }
+  if (options.withWorkflows) {
+    deps.log(`   workflow: ${results.workflow ? '✅ Created' : '⏭️  Skipped'}`);
+  }
 
-  const anyCreated = Object.values(results).some((v) => v);
+  const anyCreated =
+    results.changelog ||
+    results.releaseIt ||
+    results.packageJson ||
+    results.workflow ||
+    results.monorepoPackages > 0;
 
   if (anyCreated) {
     deps.log('\n🎉 Initialization complete!');
     deps.log('\nNext steps:');
     deps.log('   1. Review the generated files');
     deps.log('   2. Update CHANGELOG.md [Unreleased] section');
-    deps.log('   3. Run: pnpm release-it-preset default --dry-run');
+    if (isMonorepo) {
+      deps.log('   3. Release a package: pnpm -F <package-name> exec release-it-preset default --dry-run');
+      deps.log('      (use `pnpm -F <package-name> exec release-it-preset default` to release)');
+      deps.log('   Note: per-package CHANGELOG.md is not auto-created — set CHANGELOG_FILE=../CHANGELOG.md per package, or run `release-it-preset update` from the root and copy entries manually.');
+    } else {
+      deps.log('   3. Run: pnpm release-it-preset default --dry-run');
+    }
   } else {
     deps.log('\n✨ All files already exist, nothing to do!');
   }
@@ -223,10 +407,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
     const options = parseArgs();
 
+    // Validate workflow name whenever explicitly provided (even without --with-workflows).
+    const argv = process.argv.slice(2);
+    const workflowNameExplicit = argv.some(a => a.startsWith('--workflow-name='));
+    if (workflowNameExplicit || options.withWorkflows) {
+      assertValidWorkflowName(options.workflowName);
+    }
+
     await initProject(options, {
       existsSync,
       readFileSync,
       writeFileSync,
+      mkdirSync,
+      readdirSync,
       prompt: realPrompt,
       log: console.log,
       warn: console.warn,

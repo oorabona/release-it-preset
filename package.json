@@ -53,6 +53,7 @@
     "config",
     "dist/scripts",
     "dist/types",
+    "scripts/templates",
     "README.md",
     "LICENSE"
   ],

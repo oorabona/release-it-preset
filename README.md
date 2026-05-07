@@ -575,6 +575,12 @@ pnpm release-it-preset init
 
 # Non-interactive mode (skip prompts, use defaults)
 pnpm release-it-preset init --yes
+
+# Also scaffold a GitHub Actions publish workflow
+pnpm release-it-preset init --yes --with-workflows
+
+# Use a custom workflow filename (default: release.yml)
+pnpm release-it-preset init --yes --with-workflows --workflow-name=publish.yml
 ```
 
 **What it does:**
