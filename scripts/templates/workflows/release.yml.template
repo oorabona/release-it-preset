@@ -60,6 +60,4 @@ jobs:
           GITHUB_RELEASE: 'true'
           NPM_SKIP_CHECKS: 'true'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          CONFIG_PATH=$(node -e "console.log(require.resolve('@oorabona/release-it-preset/config/retry-publish'))")
-          pnpm exec release-it --ci --config "$CONFIG_PATH"
+        run: pnpm exec release-it-preset retry-publish --ci

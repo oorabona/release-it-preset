@@ -160,21 +160,19 @@ function handleReleaseCommand(configName, args) {
       const extendsPreset = extendsMatch?.[1];
 
       if (extendsPreset && extendsPreset !== configName) {
-        console.error(`\n❌ Configuration mismatch error!`);
-        console.error(`   CLI preset:               ${configName}`);
-        console.error(`   .release-it.json extends: ${extendsPreset}`);
-        console.error(``);
-        console.error(`Either:`);
-        console.error(`  1. Run: release-it-preset ${extendsPreset}`);
-        console.error(`     → Use the preset specified in your config file`);
-        console.error(``);
-        console.error(`  2. Update .release-it.json extends to: "${expectedExtends}"`);
-        console.error(`     → Match your config file to the CLI command\n`);
-        process.exit(1);
+        console.warn(`⚠️  Note: your .release-it.json extends "${extendsPreset}"`);
+        console.warn(`   but you invoked the "${configName}" preset.`);
+        console.warn(`   Using "${configName}" config directly; .release-it.json customizations are ignored for this run.`);
+        console.warn(`   To use your customizations, run: release-it-preset ${extendsPreset}`);
+        console.warn(``);
+        // Force --config flag to use OUR preset, ignore user's .release-it.json
+        fullArgs = ['--config', configPath, ...args];
+      } else {
+        console.log(`✅ Config validated: preset "${configName}"`);
+        console.log(`📝 Using: ${userConfigPath}\n`);
+        // Let release-it discover .release-it.json and merge via extends
+        fullArgs = [...args];
       }
-
-      console.log(`✅ Config validated: preset "${configName}"`);
-      console.log(`📝 Using: ${userConfigPath}\n`);
     } catch (error) {
       if (error instanceof SyntaxError) {
         console.error(`❌ Failed to parse .release-it.json: ${error.message}`);
@@ -183,9 +181,6 @@ function handleReleaseCommand(configName, args) {
       }
       process.exit(1);
     }
-
-    // Let release-it discover .release-it.json and merge via extends
-    fullArgs = [...args];
   } else {
     // No user config - use preset directly
     console.log(`📝 Using preset config directly: ${configPath}`);

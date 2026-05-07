@@ -367,7 +367,7 @@ describe('CLI Modes - Config Validation and Security', () => {
     expect(result.stderr).toContain('missing the required "extends" field')
   })
 
-  it('should validate extends matches CLI preset command', async () => {
+  it('warns on mismatch and uses preset config directly', async () => {
     createTestEnv({
       '.release-it.json': JSON.stringify({
         extends: '@oorabona/release-it-preset/config/hotfix',
@@ -377,8 +377,32 @@ describe('CLI Modes - Config Validation and Security', () => {
 
     const result = await execCLI(['default']) // Mismatch: CLI says default, config says hotfix
 
-    expect(result.code).toBe(1)
-    expect(result.stderr).toContain('Configuration mismatch')
+    // CLI no longer hard-errors on mismatch — warns and uses the invoked preset directly.
+    // Exit code may still be non-zero if release-it itself fails on git/npm preconditions
+    // (no git repo, no tag, etc.), but the old "Configuration mismatch error!" must be gone.
+    expect(result.stderr).toContain('Note: your .release-it.json extends "hotfix"')
+    expect(result.stderr).toContain('but you invoked the "default" preset')
+    expect(result.stderr).toContain('.release-it.json customizations are ignored for this run')
+    expect(result.stderr).not.toContain('Configuration mismatch error!')
+  })
+
+  it('user with .release-it.json extends default invokes retry-publish — no error, warning printed, retry-publish.js used', async () => {
+    createTestEnv({
+      '.release-it.json': JSON.stringify({
+        extends: '@oorabona/release-it-preset/config/default',
+      }),
+      'package.json': JSON.stringify({ name: 'test', version: '1.0.0' }),
+    })
+
+    const result = await execCLI(['retry-publish', '--dry-run'])
+
+    // Should warn and override to retry-publish.js, not exit 1 on mismatch
+    expect(result.stderr).toContain('Note: your .release-it.json extends "default"')
+    expect(result.stderr).toContain('but you invoked the "retry-publish" preset')
+    expect(result.stderr).toContain('customizations are ignored for this run')
+    // Exit code may be non-zero from release-it itself (git/npm preconditions) but not from CLI mismatch check
+    // The key assertion: no "Configuration mismatch error!" in output
+    expect(result.stderr).not.toContain('Configuration mismatch error!')
   })
 })
 

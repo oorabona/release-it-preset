@@ -135,13 +135,13 @@ describe('Scenario A — greenfield single + --with-workflows', () => {
     expect(workflowContent).toMatch(/NODE_VERSION.*'?24'?|node-version.*24/i)
     expect(workflowContent).toContain('retry-publish-preflight')
     expect(workflowContent).toContain('OIDC')
-    // HIGH fix: publish step must use release-it directly (not release-it-preset retry-publish)
-    // to avoid CLI mismatch check when .release-it.json extends a preset config.
-    expect(workflowContent).toMatch(
+    // CLI now handles mismatch gracefully (warn + override), so the template can
+    // use the simpler native CLI form instead of the require.resolve workaround.
+    expect(workflowContent).toContain('release-it-preset retry-publish --ci')
+    expect(workflowContent).not.toMatch(
       /require\.resolve\(['"]@oorabona\/release-it-preset\/config\/retry-publish['"]\)/,
     )
-    expect(workflowContent).toContain('release-it --ci --config')
-    expect(workflowContent).not.toContain('release-it-preset retry-publish --ci')
+    expect(workflowContent).not.toContain('release-it --ci --config "$CONFIG_PATH"')
 
     // stdout confirms creation
     expect(stdout + stderr).toMatch(/Created.*release\.yml|workflow.*Created/i)
