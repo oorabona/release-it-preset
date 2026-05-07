@@ -190,6 +190,9 @@ describe('init-project (with DI)', () => {
       expect(deps.writeFileSync).toHaveBeenCalled()
       const writtenContent = JSON.parse(vi.mocked(deps.writeFileSync).mock.calls[0][1] as string)
       expect(writtenContent.scripts).toHaveProperty('release')
+      expect(writtenContent.scripts).toHaveProperty('release:patch')
+      expect(writtenContent.scripts).toHaveProperty('release:minor')
+      expect(writtenContent.scripts).toHaveProperty('release:major')
       expect(writtenContent.scripts).toHaveProperty('release:hotfix')
     })
 
@@ -198,6 +201,9 @@ describe('init-project (with DI)', () => {
         name: 'test-package',
         scripts: {
           release: 'existing-command',
+          'release:patch': 'existing-command',
+          'release:minor': 'existing-command',
+          'release:major': 'existing-command',
           'release:hotfix': 'existing-command',
           'release:dry': 'existing-command',
           'changelog:update': 'existing-command',
@@ -316,6 +322,9 @@ describe('init-project (with DI)', () => {
           name: 'test',
           scripts: {
             release: 'existing',
+            'release:patch': 'existing',
+            'release:minor': 'existing',
+            'release:major': 'existing',
             'release:hotfix': 'existing',
             'release:dry': 'existing',
             'changelog:update': 'existing',

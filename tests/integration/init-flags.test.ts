@@ -50,13 +50,19 @@ function execCLI(
     let stdout = ''
     let stderr = ''
     let settled = false
+    // Declared before `settle` to avoid TDZ: if spawn errors immediately (before
+    // setTimeout runs), the error event fires synchronously and settle() would
+    // reference timeoutHandle while it is still in the temporal dead zone.
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
 
     const settle = (result: { code: number | null; stdout: string; stderr: string }) => {
       if (settled) {
         return
       }
       settled = true
-      clearTimeout(timeoutHandle)
+      if (timeoutHandle !== undefined) {
+        clearTimeout(timeoutHandle)
+      }
       resolve(result)
     }
 
@@ -70,7 +76,7 @@ function execCLI(
     child.on('close', code => settle({ code, stdout, stderr }))
     child.on('error', err => settle({ code: 1, stdout, stderr: err.message }))
 
-    const timeoutHandle = setTimeout(() => {
+    timeoutHandle = setTimeout(() => {
       child.kill()
       settle({ code: 1, stdout, stderr: 'Test timeout after 10s' })
     }, 10_000)

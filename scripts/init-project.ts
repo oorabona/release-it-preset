@@ -47,6 +47,9 @@ const RELEASE_IT_CONFIG = `{
 
 const SUGGESTED_SCRIPTS = {
   'release': 'release-it-preset default',
+  'release:patch': 'release-it-preset default patch',
+  'release:minor': 'release-it-preset default minor',
+  'release:major': 'release-it-preset default major',
   'release:hotfix': 'release-it-preset hotfix',
   'release:dry': 'release-it-preset default --dry-run',
   'changelog:update': 'release-it-preset update',
@@ -190,6 +193,16 @@ export async function updatePackageJson(options: Options, deps: InitProjectDeps)
  * Skips silently if the file already exists (existing skip-on-conflict policy).
  */
 export async function writeWorkflow(options: Options, deps: InitProjectDeps): Promise<boolean> {
+  // Defense-in-depth: validate workflow name before any path computation.
+  // The CLI entry point also validates, but programmatic callers (tests, library use) bypass it.
+  const WORKFLOW_NAME_REGEX = /^[A-Za-z0-9._-]+\.ya?ml$/;
+  if (!WORKFLOW_NAME_REGEX.test(options.workflowName)) {
+    throw new ValidationError(
+      `Invalid workflow name: "${options.workflowName}" — must match ${WORKFLOW_NAME_REGEX} ` +
+      `(no path components, no traversal).`
+    );
+  }
+
   const workflowDir = join('.github', 'workflows');
   const workflowPath = join(workflowDir, options.workflowName);
 
@@ -199,10 +212,13 @@ export async function writeWorkflow(options: Options, deps: InitProjectDeps): Pr
     return false;
   }
 
-  // Resolve template path relative to this compiled script
+  // Resolve template path relative to this compiled script.
+  // At install time: node_modules/.../dist/scripts/init-project.js → ../../scripts/templates/...
+  // At dev time:     dist/scripts/init-project.js → ../../scripts/templates/...
+  // Both resolve to <package-root>/scripts/templates/workflows/release.yml.template
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
-  const templatePath = join(__dirname, 'templates', 'workflows', 'release.yml.template');
+  const templatePath = join(__dirname, '..', '..', 'scripts', 'templates', 'workflows', 'release.yml.template');
 
   let templateContent: string;
   try {
@@ -210,8 +226,7 @@ export async function writeWorkflow(options: Options, deps: InitProjectDeps): Pr
   } catch (error) {
     throw new ValidationError(
       `Failed to read workflow template at "${templatePath}".\n` +
-      `This is a build artifact — if it is missing, the package installation is broken.\n` +
-      `Run "pnpm build" to regenerate it, or reinstall the package.\n` +
+      `The template ships in scripts/templates/ — if it is missing, reinstall the package.\n` +
       `Original error: ${error}`
     );
   }

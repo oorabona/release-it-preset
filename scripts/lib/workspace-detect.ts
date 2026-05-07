@@ -3,13 +3,14 @@
  *
  * Scope: block-list `packages:` in pnpm-workspace.yaml only.
  * Flow-style arrays ( packages: [...] ) are rejected with a clear error.
- * Anchors and aliases are not actively rejected — they are treated as opaque pattern strings
- * and may produce unexpected results. File an issue if you need anchor/alias support.
+ * Block-list of strings supported. Flow-style arrays AND alias references (`*alias`) are
+ * rejected with `ValidationError`. Anchors (`&name`) on entries are silently treated as
+ * opaque pattern strings.
  *
  * All functions are pure (no direct FS access) — dependencies are injected for testability.
  */
 
-import { join, resolve, relative } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { ValidationError } from './errors.js';
 
 export interface WorkspaceDetectDeps {
@@ -151,9 +152,11 @@ export function resolvePackagePaths(
   for (const pattern of patterns) {
     const resolved = resolve(projectRoot, pattern);
 
-    // Containment check: relative path must NOT start with '..'
+    // Containment check: relative path must NOT start with '..' or be absolute
+    // (isAbsolute guard handles Windows cross-drive paths where relative() returns
+    //  an absolute path that doesn't start with '..', bypassing the startsWith check)
     const rel = relative(projectRoot, resolved);
-    if (rel.startsWith('..')) {
+    if (isAbsolute(rel) || rel === '..' || rel.startsWith(`..${sep}`)) {
       throw new ValidationError(
         `Workspace pattern "${pattern}" resolves outside the project root.\n` +
         `Resolved: ${resolved}\n` +
@@ -166,9 +169,9 @@ export function resolvePackagePaths(
     if (pattern.endsWith('/*')) {
       const parentDir = resolve(projectRoot, pattern.slice(0, -2));
 
-      // Containment check on the parent dir too
+      // Containment check on the parent dir too (same isAbsolute guard)
       const parentRel = relative(projectRoot, parentDir);
-      if (parentRel.startsWith('..')) {
+      if (isAbsolute(parentRel) || parentRel === '..' || parentRel.startsWith(`..${sep}`)) {
         throw new ValidationError(
           `Workspace pattern "${pattern}" resolves outside the project root.\n` +
           `Resolved parent: ${parentDir}\n` +

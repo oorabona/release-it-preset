@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`init --with-workflows`**: scaffolds `.github/workflows/release.yml` (Node 24, OIDC trusted publishing) on first run; skips if the file already exists.
 - **`init --workflow-name=<file>`**: customise the generated workflow filename (default `release.yml`); validated against `[A-Za-z0-9._-]+\.ya?ml` (no path components, no traversal).
 - **`init` monorepo auto-detection**: detects `pnpm-workspace.yaml` (block-list form) or `package.json#workspaces` and scaffolds per-package `.release-it.json`; root config is skipped to avoid conflicts.
+- **`init` adds `release:patch`, `release:minor`, `release:major` scripts** to the standard set so users can type `pnpm release:minor` directly (the existing `pnpm release minor` passthrough still works too).
 
 ## [1.1.0] - 2026-05-06
 
