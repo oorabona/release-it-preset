@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -63,6 +63,72 @@ function execCLI(
     }, 5000)
   })
 }
+
+
+/**
+ * Helper to execute CLI with a mock `release-it` binary injected into PATH.
+ * The mock prints all received arguments to stderr as "MOCK_ARGS: <json>".
+ * This lets tests assert that `--config <preset-path>` is forwarded to
+ * release-it without having to read cli.js internals.
+ */
+function execCLIWithArgCapture(
+  args: string[],
+  cwd: string = TEST_DIR,
+): Promise<{
+  code: number | null
+  stdout: string
+  stderr: string
+}> {
+  // Create a local bin/ directory with a fake `release-it` that echoes its args
+  const mockBinDir = join(cwd, '.mock-bin')
+  if (!existsSync(mockBinDir)) {
+    mkdirSync(mockBinDir, { recursive: true })
+  }
+  const mockReleaseIt = join(mockBinDir, 'release-it')
+  writeFileSync(
+    mockReleaseIt,
+    '#!/usr/bin/env node\nprocess.stderr.write("MOCK_ARGS: " + JSON.stringify(process.argv.slice(2)) + "\\n");\nprocess.exit(0);\n',
+    'utf8',
+  )
+  chmodSync(mockReleaseIt, 0o755)
+
+  return new Promise(resolve => {
+    const child = spawn('node', [CLI_PATH, ...args], {
+      cwd,
+      env: {
+        ...process.env,
+        NO_COLOR: '1',
+        PATH: `${mockBinDir}:${process.env.PATH}`, // Intercept release-it lookup
+      },
+    })
+
+    let stdout = ''
+    let stderr = ''
+
+    child.stdout?.on('data', data => {
+      stdout += data.toString()
+    })
+
+    child.stderr?.on('data', data => {
+      stderr += data.toString()
+    })
+
+    child.on('close', code => {
+      resolve({ code, stdout, stderr })
+    })
+
+    child.on('error', error => {
+      resolve({ code: 1, stdout, stderr: error.message })
+    })
+
+    // Timeout after 5 seconds to prevent hanging
+    setTimeout(() => {
+      child.kill()
+      resolve({ code: 1, stdout, stderr: 'Test timeout after 5s' })
+    }, 5000)
+  })
+}
+
 
 /**
  * Helper to create a test directory structure
@@ -394,15 +460,29 @@ describe('CLI Modes - Config Validation and Security', () => {
       'package.json': JSON.stringify({ name: 'test', version: '1.0.0' }),
     })
 
-    const result = await execCLI(['retry-publish', '--dry-run'])
+    // Use the arg-capturing variant so we can verify --config is forwarded.
+    // A regression that drops ['--config', configPath] from cli.js:169 would
+    // silently fall back to .release-it.json's "extends: default" — the mock
+    // shows exactly what release-it receives and fails this assertion.
+    const result = await execCLIWithArgCapture(['retry-publish', '--dry-run'])
 
     // Should warn and override to retry-publish.js, not exit 1 on mismatch
     expect(result.stderr).toContain('Note: your .release-it.json extends "default"')
     expect(result.stderr).toContain('but you invoked the "retry-publish" preset')
     expect(result.stderr).toContain('customizations are ignored for this run')
-    // Exit code may be non-zero from release-it itself (git/npm preconditions) but not from CLI mismatch check
     // The key assertion: no "Configuration mismatch error!" in output
     expect(result.stderr).not.toContain('Configuration mismatch error!')
+
+    // Verify --config <retry-publish.js> was actually forwarded to release-it.
+    // If this line is missing from cli.js, MOCK_ARGS will not contain --config
+    // and the preset fallback assertion below fails.
+    expect(result.stderr).toContain('"--config"')
+    const mockArgsMatch = result.stderr.match(/MOCK_ARGS: (\[.*?\])/)
+    expect(mockArgsMatch).not.toBeNull()
+    const spawnArgs: string[] = JSON.parse(mockArgsMatch![1])
+    const configFlagIdx = spawnArgs.indexOf('--config')
+    expect(configFlagIdx).toBeGreaterThanOrEqual(0)
+    expect(spawnArgs[configFlagIdx + 1]).toMatch(/retry-publish\.js$/)
   })
 })
 

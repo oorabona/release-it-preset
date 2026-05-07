@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **CLI no longer errors on `.release-it.json` extends/preset mismatch.** When the user has `.release-it.json` extending one preset (e.g. `default`) and invokes a different preset (e.g. `retry-publish`), the CLI now uses the invoked preset's config directly (via `--config`) and prints a warning instead of failing. The user's `.release-it.json` customizations are skipped for that run. Use the matching preset name to keep customizations.
 - **Generated workflow template simplified**: `init --with-workflows` now emits `pnpm exec release-it-preset retry-publish --ci` instead of the previous `release-it --ci --config $(node -e require.resolve(...))` workaround.
+- **Tooling that depended on the previous exit-1 mismatch error must adapt**: wrappers checking for exit code 1 to gate on misconfigured extends should now parse the new `⚠️ Note: your .release-it.json extends ...` warning prefix on stderr, or pre-check the `extends` field manually. The hard `extends`-required check still exits 1 (unchanged).
 
 ## [1.1.0] - 2026-05-06
 

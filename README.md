@@ -902,7 +902,7 @@ pnpm release-it-preset default
 - The `extends` field loads the preset
 - release-it merges your overrides on top via c12
 - **Your values take precedence** over preset defaults
-- CLI validates that `extends` matches the command
+- CLI validates that `extends` is present; mismatched preset name warns and uses the invoked preset's config for that run
 
 **Pros:**
 - ✅ **Recommended for customization**

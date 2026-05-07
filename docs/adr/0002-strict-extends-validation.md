@@ -1,6 +1,6 @@
 # ADR-0002: Strict `extends` validation in `.release-it.json`
 
-- **Status**: Accepted
+- **Status**: Amended (2026-05-07) — see [ADR-0006](./0006-relaxed-mismatch-policy.md) for the relaxed mismatch policy. The first invariant ("extends required") remains in force.
 - **Date**: 2025-10-06
 - **Deciders**: maintainers
 
