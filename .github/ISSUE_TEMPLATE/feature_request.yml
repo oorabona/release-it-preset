@@ -1,0 +1,56 @@
+name: Feature Request
+description: Propose a clear, well-defined feature with a concrete use case
+title: "[Feature]: "
+labels:
+  - enhancement
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template is for **clear feature requests with a defined use case**.
+
+        If you're still exploring an idea or want to discuss whether something is a good fit, start a [Discussion](https://github.com/oorabona/release-it-preset/discussions) first — that's the right venue for early-stage brainstorming.
+
+        Features that align with the preset's scope (solo / small-team JS maintainers, Keep a Changelog, GitHub Actions CI) are most likely to be accepted.
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: What's the use case?
+      description: |
+        Describe the **concrete scenario** where this feature would help. Be specific — "I'm doing X and can't because Y" is more actionable than abstract capability descriptions.
+      placeholder: |
+        When I release a package in a monorepo with independent versioning, I need to...
+        Currently I have to work around it by...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution (optional)
+      description: If you have a specific idea for how this could work — CLI flag, env var, config option, new preset, workflow change — sketch it here. API examples are welcome.
+      placeholder: |
+        Add a `--foo` flag to `release-it-preset update` that...
+        Or a new env var `GIT_CHANGELOG_FOO` that controls...
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternative approaches have you tried or considered?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched [existing issues](https://github.com/oorabona/release-it-preset/issues) and [discussions](https://github.com/oorabona/release-it-preset/discussions) and did not find this already proposed
+          required: true
+        - label: I am willing to contribute a PR for this feature (optional — leave unchecked if not)
+          required: false
