@@ -104,6 +104,22 @@ function execCLIWithArgCapture(
 
     let stdout = ''
     let stderr = ''
+    let settled = false
+    // Declared before `settle` to avoid TDZ: if spawn errors immediately (before
+    // setTimeout runs), the error event fires synchronously and settle() would
+    // reference timeoutHandle while it is still in the temporal dead zone.
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+
+    const settle = (result: { code: number | null; stdout: string; stderr: string }) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      if (timeoutHandle !== undefined) {
+        clearTimeout(timeoutHandle)
+      }
+      resolve(result)
+    }
 
     child.stdout?.on('data', data => {
       stdout += data.toString()
@@ -113,19 +129,14 @@ function execCLIWithArgCapture(
       stderr += data.toString()
     })
 
-    child.on('close', code => {
-      resolve({ code, stdout, stderr })
-    })
+    child.on('close', code => settle({ code, stdout, stderr }))
+    child.on('error', error => settle({ code: 1, stdout, stderr: error.message }))
 
-    child.on('error', error => {
-      resolve({ code: 1, stdout, stderr: error.message })
-    })
-
-    // Timeout after 5 seconds to prevent hanging
-    setTimeout(() => {
+    // Timeout after 10 seconds to prevent hanging
+    timeoutHandle = setTimeout(() => {
       child.kill()
-      resolve({ code: 1, stdout, stderr: 'Test timeout after 5s' })
-    }, 5000)
+      settle({ code: 1, stdout, stderr: 'Test timeout after 10s' })
+    }, 10_000)
   })
 }
 

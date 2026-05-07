@@ -37,6 +37,14 @@ Without an explicit `extends`, the tool has no way to discover the preset.
 
 ## Decision
 
+> **Note (2026-05-07)**: The "hard-error on mismatch" invariant below has been
+> superseded by [ADR-0006](./0006-relaxed-mismatch-policy.md). The CLI now warns
+> and uses the invoked preset's config via `--config <path>` for that run.
+> The first invariant in this ADR — `extends` is required when `.release-it.json`
+> exists — REMAINS in force.
+
+(Original decision text below preserved for historical context.)
+
 When `.release-it.json` exists in the working directory, `bin/cli.js` validates
 that it contains an `extends` field pointing to the invoked preset. Specifically:
 

@@ -90,7 +90,7 @@
     "release:minor": "node ./bin/cli.js default minor",
     "release:major": "node ./bin/cli.js default major",
     "release:dry": "node ./bin/cli.js default --dry-run",
-    "changelog:update": "release-it-preset update"
+    "changelog:update": "node ./bin/cli.js update"
   },
   "peerDependencies": {
     "release-it": "^19.0.0 || ^20.0.0"
