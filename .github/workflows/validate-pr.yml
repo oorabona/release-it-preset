@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Create or update summary comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const releaseValidation = '${{ needs.validate.outputs.release_validation }}';
