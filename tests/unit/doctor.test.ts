@@ -682,6 +682,26 @@ describe('Workspace integration check', () => {
 // Publish workflow freshness
 // ---------------------------------------------------------------------------
 
+describe('validateConfiguration changelog read failure', () => {
+  it('WARN instead of throwing when CHANGELOG.md vanishes between existsSync and read', () => {
+    // Mutation lock: the unguarded readFileSync used to let the TOCTOU race
+    // throw out of runDoctor.
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'CHANGELOG.md'),
+      readFileSync: vi.fn(() => {
+        throw new Error('ENOENT: vanished')
+      }),
+    })
+
+    const section = validateConfiguration(deps)
+
+    const format = section.checks.find(c => c.name === 'Keep a Changelog format')
+    expect(format?.status).toBe('WARN')
+    expect(format?.value).toBe('not evaluated')
+    expect(format?.detail).toContain('vanished')
+  })
+})
+
 describe('publish workflow freshness check', () => {
   it('omitted when no workflow directory exists', () => {
     // Mutation lock: emitting a PASS for the absent-domain case would break

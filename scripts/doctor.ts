@@ -1493,9 +1493,20 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
   } else {
     checks.push({ name: `${changelogPath} exists`, status: 'PASS', value: 'yes' })
 
-    const content = deps.readFileSync(changelogPath, 'utf8') as string
+    let content: string | null = null
+    try {
+      content = deps.readFileSync(changelogPath, 'utf8') as string
+    } catch (error) {
+      checks.push({
+        name: 'Keep a Changelog format',
+        status: 'WARN',
+        value: 'not evaluated',
+        detail: `${changelogPath} could not be read: ${error instanceof Error ? error.message : String(error)}`,
+      })
+    }
 
-    const hasKacHeader = /^# Changelog/m.test(content)
+    if (content !== null) {
+      const hasKacHeader = /^# Changelog/m.test(content)
     if (!hasKacHeader) {
       checks.push({
         name: 'Keep a Changelog format',
@@ -1527,6 +1538,7 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
         })
       } else {
         checks.push({ name: '[Unreleased] section', status: 'PASS', value: 'has content' })
+      }
       }
     }
   }
