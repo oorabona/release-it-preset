@@ -298,7 +298,8 @@ The patterns above release each package **independently**. If instead all your w
   "extends": "@oorabona/release-it-preset/config/default",
   "plugins": {
     "@release-it-plugins/workspaces": {
-      "publish": false
+      "publish": false,
+      "skipChecks": true
     }
   }
 }
@@ -308,7 +309,7 @@ The patterns above release each package **independently**. If instead all your w
 pnpm add -D @oorabona/release-it-preset @release-it-plugins/workspaces release-it@^19
 ```
 
-**Publishing caveat (important):** the workspaces plugin brings its **own npm publish lifecycle** for each workspace package, and it does NOT honor this preset's `NPM_PUBLISH` opt-in — with the plugin configured as bare `true`, a release attempts to publish every workspace package even though the preset's own npm publishing is disabled by default. Keep `"publish": false` in the plugin options (as above) until you deliberately want the plugin to publish, then enable it together with proper npm auth.
+**Publishing caveat (important):** the workspaces plugin brings its **own npm publish lifecycle** for each workspace package, and it does NOT honor this preset's `NPM_PUBLISH` opt-in — with the plugin configured as bare `true`, a release attempts to publish every workspace package even though the preset's own npm publishing is disabled by default. The plugin also runs npm registry/auth preflight checks at startup unless `"skipChecks": true` is set. Keep both options as shown (the exact configuration exercised by this repo's e2e suite) until you deliberately want the plugin to publish — then remove both together, with proper npm auth.
 
 **Version constraint (important):** `@release-it-plugins/workspaces` v5.0.3 declares peer `release-it ^17 || ^18 || ^19`, while this preset supports `^19 || ^20`. The supported intersection is **release-it `^19`** — with `release-it@20` installed, the plugin fails at module load with an unmet peer dependency error. Pin release-it to v19 when composing; use v20 standalone otherwise.
 
