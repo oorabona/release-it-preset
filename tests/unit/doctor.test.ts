@@ -58,18 +58,22 @@ const GENERATED_WORKFLOW = `# GitHub Actions workflow for npm + GitHub release p
 name: Publish Package
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 env:
   NPM_PUBLISH: 'true'
-`
 
-const STALE_GENERATED_WORKFLOW = `${GENERATED_WORKFLOW}
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - run: pnpm exec release-it-preset retry-publish --ci
 `
+
+const STALE_GENERATED_WORKFLOW = GENERATED_WORKFLOW.replace('id-token: write', 'id-token: read')
 
 function makeWorkspaceDeps(
   packages: Record<string, Record<string, unknown>>,
@@ -770,7 +774,7 @@ describe('npm provenance readiness check', () => {
     expect(check).toBeNull()
   })
 
-  it('PASS when NPM_PUBLISH=true and a workflow grants id-token: write', () => {
+  it('PASS when NPM_PUBLISH=true and the publishing job grants id-token: write', () => {
     const deps = makeWorkflowDeps(
       {
         [join('.github', 'workflows', 'release.yml')]: GENERATED_WORKFLOW,
@@ -782,13 +786,20 @@ describe('npm provenance readiness check', () => {
 
     expect(check.status).toBe('PASS')
     expect(check.value).toContain('id-token: write detected')
+    expect(check.detail).toContain(`${join('.github', 'workflows', 'release.yml')}#publish`)
   })
 
-  it('WARN when NPM_PUBLISH=true and workflows lack id-token: write', () => {
+  it('WARN when NPM_PUBLISH=true and the publishing job lacks id-token: write', () => {
     const deps = makeWorkflowDeps(
       {
-        [join('.github', 'workflows', 'release.yml')]:
-          'permissions:\n  contents: write\nenv:\n  NPM_PUBLISH: true\n',
+        [join('.github', 'workflows', 'release.yml')]: [
+          'jobs:',
+          '  publish:',
+          '    runs-on: ubuntu-latest',
+          '    steps:',
+          '      - run: pnpm exec release-it-preset retry-publish --ci',
+          '',
+        ].join('\n'),
       },
       { NPM_PUBLISH: 'true' },
     )
@@ -798,12 +809,103 @@ describe('npm provenance readiness check', () => {
     expect(check.status).toBe('WARN')
     expect(check.value).toBe('id-token: write not detected')
     expect(check.detail).toContain('NPM_PUBLISH=true')
+    expect(check.detail).toContain('jobs.<publishing-job>.permissions')
+    expect(check.detail).toContain(`${join('.github', 'workflows', 'release.yml')}#publish`)
+  })
+
+  it('WARN when id-token: write is only granted at workflow level', () => {
+    const deps = makeWorkflowDeps(
+      {
+        [join('.github', 'workflows', 'release.yml')]: [
+          'permissions:',
+          '  contents: write',
+          '  id-token: write',
+          'jobs:',
+          '  publish:',
+          '    runs-on: ubuntu-latest',
+          '    steps:',
+          '      - run: npm publish',
+          '',
+        ].join('\n'),
+      },
+      { NPM_PUBLISH: 'true' },
+    )
+
+    const check = validateNpmProvenanceReadiness(deps)
+
+    expect(check.status).toBe('WARN')
+    expect(check.value).toBe('id-token: write not detected')
+    expect(check.detail).toContain('workflow-level permissions are not sufficient')
+  })
+
+  it('WARN when job-level permissions override a workflow-level id-token grant', () => {
+    const deps = makeWorkflowDeps(
+      {
+        [join('.github', 'workflows', 'release.yml')]: [
+          'permissions:',
+          '  contents: write',
+          '  id-token: write',
+          'jobs:',
+          '  publish:',
+          '    runs-on: ubuntu-latest',
+          '    permissions:',
+          '      contents: write',
+          '    steps:',
+          '      - run: pnpm exec release-it-preset retry-publish --ci',
+          '',
+        ].join('\n'),
+      },
+      { NPM_PUBLISH: 'true' },
+    )
+
+    const check = validateNpmProvenanceReadiness(deps)
+
+    expect(check.status).toBe('WARN')
+    expect(check.value).toBe('id-token: write not detected')
+    expect(check.detail).toContain(`${join('.github', 'workflows', 'release.yml')}#publish`)
+  })
+
+  it('WARN when id-token: write is granted only on a non-publishing job', () => {
+    const deps = makeWorkflowDeps(
+      {
+        [join('.github', 'workflows', 'release.yml')]: [
+          'jobs:',
+          '  verify:',
+          '    runs-on: ubuntu-latest',
+          '    permissions:',
+          '      id-token: write',
+          '    steps:',
+          '      - run: pnpm test',
+          '  publish:',
+          '    runs-on: ubuntu-latest',
+          '    steps:',
+          '      - run: pnpm exec release-it-preset retry-publish --ci',
+          '',
+        ].join('\n'),
+      },
+      { NPM_PUBLISH: 'true' },
+    )
+
+    const check = validateNpmProvenanceReadiness(deps)
+
+    expect(check.status).toBe('WARN')
+    expect(check.value).toBe('id-token: write not detected')
+    expect(check.detail).toContain(`${join('.github', 'workflows', 'release.yml')}#publish`)
   })
 
   it('WARN when id-token: write appears only in workflows without npm publish intent', () => {
     const deps = makeWorkflowDeps(
       {
-        [join('.github', 'workflows', 'ci.yml')]: 'permissions:\n  id-token: write\n',
+        [join('.github', 'workflows', 'ci.yml')]: [
+          'jobs:',
+          '  ci:',
+          '    runs-on: ubuntu-latest',
+          '    permissions:',
+          '      id-token: write',
+          '    steps:',
+          '      - run: pnpm test',
+          '',
+        ].join('\n'),
       },
       { NPM_PUBLISH: 'true' },
     )
@@ -813,6 +915,48 @@ describe('npm provenance readiness check', () => {
     expect(check.status).toBe('WARN')
     expect(check.value).toBe('npm publish workflow not detected')
     expect(check.detail).toContain('Supported signals')
+  })
+
+  it('WARN not-evaluated when npm publish intent cannot be mapped to a job', () => {
+    const deps = makeWorkflowDeps(
+      {
+        [join('.github', 'workflows', 'release.yml')]: [
+          'env:',
+          '  NPM_PUBLISH: true',
+          'jobs:',
+          '  release:',
+          '    runs-on: ubuntu-latest',
+          '    permissions:',
+          '      id-token: write',
+          '    steps:',
+          '      - run: pnpm release-it-preset default --ci',
+          '',
+        ].join('\n'),
+      },
+      { NPM_PUBLISH: 'true' },
+    )
+
+    const check = validateNpmProvenanceReadiness(deps)
+
+    expect(check.status).toBe('WARN')
+    expect(check.value).toBe('publishing job permissions not evaluated')
+    expect(check.detail).toContain('no concrete publishing job could be identified')
+  })
+
+  it('WARN not-evaluated for inline jobs maps instead of guessing', () => {
+    const deps = makeWorkflowDeps(
+      {
+        [join('.github', 'workflows', 'release.yml')]:
+          'env:\n  NPM_PUBLISH: true\njobs: { publish: { permissions: { id-token: write } } }\n',
+      },
+      { NPM_PUBLISH: 'true' },
+    )
+
+    const check = validateNpmProvenanceReadiness(deps)
+
+    expect(check.status).toBe('WARN')
+    expect(check.value).toBe('publishing job permissions not evaluated')
+    expect(check.detail).toContain('inline or dynamic value')
   })
 
   it('WARN when NPM_PUBLISH=true and no workflow files exist', () => {
@@ -831,8 +975,13 @@ describe('npm provenance readiness check', () => {
       ),
     ).toBe(true)
     expect(
-      workflowHasIdTokenWritePermission('permissions: { contents: write, id-token: write }\n'),
+      workflowHasIdTokenWritePermission(
+        'jobs:\n  publish:\n    permissions: { contents: write, id-token: write }\n',
+      ),
     ).toBe(true)
+    expect(
+      workflowHasIdTokenWritePermission('permissions: { contents: write, id-token: write }\n'),
+    ).toBe(false)
     expect(
       workflowHasIdTokenWritePermission('# id-token: write\npermissions:\n  id-token: read\n'),
     ).toBe(false)

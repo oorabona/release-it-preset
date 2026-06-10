@@ -590,56 +590,348 @@ function countIndent(line: string): number {
   return line.match(/^\s*/)?.[0].length ?? 0
 }
 
-export function workflowHasIdTokenWritePermission(content: string): boolean {
-  let permissionsIndent: number | null = null
+interface YamlLine {
+  index: number
+  text: string
+  trimmed: string
+  indent: number
+}
 
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = stripYamlComment(rawLine)
-    if (line.trim() === '') {
+interface YamlMapping {
+  key: string
+  value: string
+}
+
+interface WorkflowJobBlock {
+  id: string
+  content: string
+  indent: number
+}
+
+type WorkflowJobsParseResult =
+  | {
+      ok: true
+      jobs: WorkflowJobBlock[]
+    }
+  | {
+      ok: false
+      reason: string
+    }
+
+type JobPermissionEvaluation = 'GRANTED' | 'MISSING' | 'NOT_EVALUATED'
+
+interface WorkflowNpmProvenanceEvaluation {
+  publishJobIds: string[]
+  idTokenJobIds: string[]
+  missingJobIds: string[]
+  notEvaluatedReason?: string
+}
+
+function toYamlLines(content: string): { rawLines: string[]; lines: YamlLine[] } {
+  const rawLines = content.split(/\r?\n/)
+  return {
+    rawLines,
+    lines: rawLines
+      .map((rawLine, index) => {
+        const text = stripYamlComment(rawLine)
+        return {
+          index,
+          text,
+          trimmed: text.trim(),
+          indent: countIndent(text),
+        }
+      })
+      .filter((line) => line.trimmed !== ''),
+  }
+}
+
+function parseYamlMapping(trimmed: string): YamlMapping | null {
+  if (trimmed.startsWith('- ')) {
+    return null
+  }
+
+  const match = trimmed.match(/^("[^"]+"|'[^']+'|[A-Za-z0-9_-]+)\s*:\s*(.*)$/)
+  if (!match) {
+    return null
+  }
+
+  const rawKey = match[1]
+  const key =
+    (rawKey.startsWith('"') && rawKey.endsWith('"')) ||
+    (rawKey.startsWith("'") && rawKey.endsWith("'"))
+      ? rawKey.slice(1, -1)
+      : rawKey
+
+  return {
+    key,
+    value: match[2].trim(),
+  }
+}
+
+function parseWorkflowJobs(content: string): WorkflowJobsParseResult {
+  const { rawLines, lines } = toYamlLines(content)
+  const jobsLines = lines.filter((line) => {
+    const mapping = parseYamlMapping(line.trimmed)
+    return line.indent === 0 && mapping?.key === 'jobs'
+  })
+
+  if (jobsLines.length === 0) {
+    return { ok: false, reason: 'top-level jobs block not detected' }
+  }
+  if (jobsLines.length > 1) {
+    return { ok: false, reason: 'multiple top-level jobs blocks detected' }
+  }
+
+  const jobsLine = jobsLines[0]
+  const jobsMapping = parseYamlMapping(jobsLine.trimmed)
+  if (!jobsMapping || jobsMapping.value !== '') {
+    return { ok: false, reason: 'top-level jobs block uses an inline or dynamic value' }
+  }
+
+  const firstAfterJobs = lines.findIndex((line) => line.index > jobsLine.index)
+  const jobsBlockEnd =
+    firstAfterJobs === -1
+      ? rawLines.length
+      : (lines.slice(firstAfterJobs).find((line) => line.indent <= jobsLine.indent)?.index ??
+        rawLines.length)
+
+  const jobLines = lines.filter((line) => line.index > jobsLine.index && line.index < jobsBlockEnd)
+  if (jobLines.length === 0) {
+    return { ok: false, reason: 'jobs block is empty' }
+  }
+
+  const jobIndent = jobLines[0].indent
+  if (jobIndent <= jobsLine.indent) {
+    return { ok: false, reason: 'jobs block has no nested job definitions' }
+  }
+
+  const jobStarts: Array<{ id: string; index: number }> = []
+  for (const line of jobLines) {
+    if (line.indent !== jobIndent) {
       continue
     }
 
-    if (/^\s*permissions\s*:\s*\{[^}]*\bid-token\s*:\s*['"]?write['"]?[^}]*\}\s*$/.test(line)) {
-      return true
+    const mapping = parseYamlMapping(line.trimmed)
+    if (!mapping) {
+      return { ok: false, reason: 'jobs block contains an unsupported child entry' }
+    }
+    if (mapping.value !== '') {
+      return { ok: false, reason: `job "${mapping.key}" uses an inline or dynamic value` }
     }
 
-    const indent = countIndent(line)
-    if (permissionsIndent !== null && indent <= permissionsIndent) {
-      permissionsIndent = null
-    }
+    jobStarts.push({ id: mapping.key, index: line.index })
+  }
 
-    const permissionsMatch = line.match(/^(\s*)permissions\s*:\s*$/)
-    if (permissionsMatch) {
-      permissionsIndent = permissionsMatch[1].length
+  if (jobStarts.length === 0) {
+    return { ok: false, reason: 'jobs block has no supported job definitions' }
+  }
+
+  const jobs = jobStarts.map((job, index): WorkflowJobBlock => {
+    const nextJob = jobStarts[index + 1]
+    const endIndex = nextJob?.index ?? jobsBlockEnd
+    return {
+      id: job.id,
+      content: rawLines.slice(job.index, endIndex).join('\n'),
+      indent: jobIndent,
+    }
+  })
+
+  return { ok: true, jobs }
+}
+
+function stripYamlQuotes(value: string): string {
+  const trimmed = value.trim()
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
+
+function inlinePermissionsMapHasIdTokenWrite(value: string): boolean | null {
+  const trimmed = value.trim()
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+    return null
+  }
+
+  return /(?:^|,)\s*['"]?id-token['"]?\s*:\s*['"]?write['"]?\s*(?:,|$)/.test(
+    trimmed.slice(1, -1),
+  )
+}
+
+function isDynamicYamlValue(value: string): boolean {
+  return (
+    value.startsWith('*') ||
+    value.startsWith('&') ||
+    value.startsWith('[') ||
+    value.includes('${{')
+  )
+}
+
+function evaluateJobIdTokenWritePermission(job: WorkflowJobBlock): JobPermissionEvaluation {
+  const { lines } = toYamlLines(job.content)
+  const childLines = lines.filter((line) => line.index > 0 && line.indent > job.indent)
+  if (childLines.length === 0) {
+    return 'MISSING'
+  }
+
+  const childIndent = childLines[0].indent
+  const permissionsLines = childLines.filter((line) => {
+    const mapping = parseYamlMapping(line.trimmed)
+    return line.indent === childIndent && mapping?.key === 'permissions'
+  })
+
+  if (permissionsLines.length === 0) {
+    return 'MISSING'
+  }
+  if (permissionsLines.length > 1) {
+    return 'NOT_EVALUATED'
+  }
+
+  const permissionsLine = permissionsLines[0]
+  const permissions = parseYamlMapping(permissionsLine.trimmed)
+  if (!permissions) {
+    return 'NOT_EVALUATED'
+  }
+
+  if (permissions.value !== '') {
+    const inlineResult = inlinePermissionsMapHasIdTokenWrite(permissions.value)
+    if (inlineResult !== null) {
+      return inlineResult ? 'GRANTED' : 'MISSING'
+    }
+    return isDynamicYamlValue(permissions.value) ? 'NOT_EVALUATED' : 'MISSING'
+  }
+
+  const permissionChildLines = childLines.filter((line) => line.index > permissionsLine.index)
+  const permissionBlockLines: YamlLine[] = []
+  for (const line of permissionChildLines) {
+    if (line.indent <= permissionsLine.indent) {
+      break
+    }
+    permissionBlockLines.push(line)
+  }
+
+  if (permissionBlockLines.length === 0) {
+    return 'MISSING'
+  }
+
+  const permissionChildIndent = permissionBlockLines[0].indent
+  for (const line of permissionBlockLines) {
+    if (line.indent !== permissionChildIndent) {
       continue
     }
 
-    if (permissionsIndent !== null && indent > permissionsIndent) {
-      if (/^id-token\s*:\s*['"]?write['"]?\s*$/.test(line.trim())) {
-        return true
-      }
+    const mapping = parseYamlMapping(line.trimmed)
+    if (!mapping || mapping.key === '<<' || isDynamicYamlValue(mapping.value)) {
+      return 'NOT_EVALUATED'
+    }
+    if (mapping.key === 'id-token' && stripYamlQuotes(mapping.value) === 'write') {
+      return 'GRANTED'
     }
   }
 
-  return false
+  return 'MISSING'
+}
+
+export function workflowHasIdTokenWritePermission(content: string): boolean {
+  const parsed = parseWorkflowJobs(content)
+  if (!parsed.ok) {
+    return false
+  }
+
+  return parsed.jobs.some((job) => evaluateJobIdTokenWritePermission(job) === 'GRANTED')
+}
+
+function contentWithoutYamlComments(content: string): string {
+  return content
+    .split(/\r?\n/)
+    .map((line) => stripYamlComment(line))
+    .join('\n')
 }
 
 function workflowHasNpmPublishIntent(content: string): boolean {
-  return /\bNPM_PUBLISH\s*:/.test(content) || /\bretry-publish\b/.test(content) || /\bnpm publish\b/.test(content)
+  const body = contentWithoutYamlComments(content)
+  return (
+    /\bNPM_PUBLISH\s*:\s*(?:['"]?true['"]?|\$\{\{)/.test(body) ||
+    /\bretry-publish(?![-\w])/.test(body) ||
+    /\bnpm\s+publish\b/.test(body)
+  )
+}
+
+function evaluateWorkflowNpmProvenance(content: string): WorkflowNpmProvenanceEvaluation {
+  if (!workflowHasNpmPublishIntent(content)) {
+    return {
+      publishJobIds: [],
+      idTokenJobIds: [],
+      missingJobIds: [],
+    }
+  }
+
+  const parsed = parseWorkflowJobs(content)
+  if (!parsed.ok) {
+    return {
+      publishJobIds: [],
+      idTokenJobIds: [],
+      missingJobIds: [],
+      notEvaluatedReason: parsed.reason,
+    }
+  }
+
+  const publishJobs = parsed.jobs.filter((job) => workflowHasNpmPublishIntent(job.content))
+  if (publishJobs.length === 0) {
+    return {
+      publishJobIds: [],
+      idTokenJobIds: [],
+      missingJobIds: [],
+      notEvaluatedReason:
+        'npm-publish signal is present, but no concrete publishing job could be identified',
+    }
+  }
+
+  const idTokenJobIds: string[] = []
+  const missingJobIds: string[] = []
+  const notEvaluatedJobIds: string[] = []
+
+  for (const job of publishJobs) {
+    const permission = evaluateJobIdTokenWritePermission(job)
+    if (permission === 'GRANTED') {
+      idTokenJobIds.push(job.id)
+    } else if (permission === 'MISSING') {
+      missingJobIds.push(job.id)
+    } else {
+      notEvaluatedJobIds.push(job.id)
+    }
+  }
+
+  return {
+    publishJobIds: publishJobs.map((job) => job.id),
+    idTokenJobIds,
+    missingJobIds,
+    notEvaluatedReason:
+      notEvaluatedJobIds.length > 0
+        ? `job-level permissions not evaluated for: ${notEvaluatedJobIds.join(', ')}`
+        : undefined,
+  }
 }
 
 type NpmProvenanceReadinessState =
   | 'NPM_PUBLISH_DISABLED'
   | 'WORKFLOW_DIR_UNREADABLE'
+  | 'WORKFLOW_FILES_UNREADABLE'
   | 'NO_WORKFLOW_FILES'
   | 'NO_NPM_PUBLISH_WORKFLOW'
+  | 'PUBLISHING_JOB_NOT_EVALUATED'
   | 'ID_TOKEN_WRITE_FOUND'
   | 'ID_TOKEN_WRITE_MISSING'
 
 interface NpmProvenanceReadinessContext {
   scan: WorkflowScan
-  publishWorkflowPaths: string[]
-  idTokenWorkflowPaths: string[]
+  publishJobRefs: string[]
+  idTokenJobRefs: string[]
+  missingJobRefs: string[]
+  notEvaluatedWorkflowDetails: string[]
   npmPublish: string | undefined
 }
 
@@ -648,16 +940,21 @@ function classifyNpmProvenanceReadiness(
 ): NpmProvenanceReadinessState {
   if (context.npmPublish !== 'true') return 'NPM_PUBLISH_DISABLED'
   if (context.scan.error) return 'WORKFLOW_DIR_UNREADABLE'
-  if (context.scan.files.length === 0) return 'NO_WORKFLOW_FILES'
-  if (context.publishWorkflowPaths.length === 0) return 'NO_NPM_PUBLISH_WORKFLOW'
-  if (context.idTokenWorkflowPaths.length > 0) return 'ID_TOKEN_WRITE_FOUND'
+  if (context.scan.files.length === 0 && context.scan.unreadableFilePaths.length === 0) {
+    return 'NO_WORKFLOW_FILES'
+  }
+  if (context.scan.unreadableFilePaths.length > 0) return 'WORKFLOW_FILES_UNREADABLE'
+  if (context.notEvaluatedWorkflowDetails.length > 0) return 'PUBLISHING_JOB_NOT_EVALUATED'
+  if (context.publishJobRefs.length === 0) return 'NO_NPM_PUBLISH_WORKFLOW'
+  if (context.missingJobRefs.length === 0) return 'ID_TOKEN_WRITE_FOUND'
   return 'ID_TOKEN_WRITE_MISSING'
 }
 
 function npmProvenanceMissingDetail(context: NpmProvenanceReadinessContext): string {
   return [
-    'NPM_PUBLISH=true is set, but no allowlisted npm-publish workflow declares permissions: id-token: write.',
-    'Add id-token: write to the workflow that runs npm publish, or scaffold the generated workflow with release-it-preset init --with-workflows.',
+    'NPM_PUBLISH=true is set, but no evaluated publishing job declares permissions: id-token: write.',
+    'Add id-token: write under jobs.<publishing-job>.permissions; workflow-level permissions are not sufficient because job-level permissions override them.',
+    ...context.missingJobRefs.map((ref) => `- missing on ${ref}`),
     ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
     ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
   ].join('\n')
@@ -672,6 +969,16 @@ const NPM_PROVENANCE_READINESS_DECISIONS = {
     status: 'WARN',
     value: 'workflow directory not evaluated',
     detail: context.scan.error,
+  }),
+  WORKFLOW_FILES_UNREADABLE: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'workflow files not evaluated',
+    detail: [
+      'One or more workflow files could not be read, so npm provenance readiness was not fully evaluated.',
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+    ].join('\n'),
   }),
   NO_WORKFLOW_FILES: (context: NpmProvenanceReadinessContext): CheckResult => ({
     name: 'npm provenance readiness',
@@ -690,11 +997,24 @@ const NPM_PROVENANCE_READINESS_DECISIONS = {
       ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
     ].join('\n'),
   }),
+  PUBLISHING_JOB_NOT_EVALUATED: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'publishing job permissions not evaluated',
+    detail: [
+      'NPM_PUBLISH=true is set, but one or more npm-publish workflow structures could not be mapped to concrete jobs.',
+      'Doctor only passes this check when the publishing job itself declares permissions: id-token: write.',
+      'Not evaluated:',
+      ...context.notEvaluatedWorkflowDetails.map((detail) => `- ${detail}`),
+      ...context.missingJobRefs.map((ref) => `- missing on ${ref}`),
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+    ].join('\n'),
+  }),
   ID_TOKEN_WRITE_FOUND: (context: NpmProvenanceReadinessContext): CheckResult => ({
     name: 'npm provenance readiness',
     status: 'PASS',
-    value: `id-token: write detected in ${context.idTokenWorkflowPaths.length} workflow(s)`,
-    detail: context.idTokenWorkflowPaths.map((path) => `- ${path}`).join('\n'),
+    value: `id-token: write detected on ${context.idTokenJobRefs.length} publishing job(s)`,
+    detail: context.idTokenJobRefs.map((ref) => `- ${ref}`).join('\n'),
   }),
   ID_TOKEN_WRITE_MISSING: (context: NpmProvenanceReadinessContext): CheckResult => ({
     name: 'npm provenance readiness',
@@ -709,13 +1029,27 @@ const NPM_PROVENANCE_READINESS_DECISIONS = {
 
 export function validateNpmProvenanceReadiness(deps: DoctorDeps): CheckResult | null {
   const scan = listWorkflowFiles(deps)
-  const publishWorkflowFiles = scan.files.filter((file) => workflowHasNpmPublishIntent(file.content))
+  const publishJobRefs: string[] = []
+  const idTokenJobRefs: string[] = []
+  const missingJobRefs: string[] = []
+  const notEvaluatedWorkflowDetails: string[] = []
+
+  for (const file of scan.files) {
+    const evaluation = evaluateWorkflowNpmProvenance(file.content)
+    publishJobRefs.push(...evaluation.publishJobIds.map((jobId) => `${file.path}#${jobId}`))
+    idTokenJobRefs.push(...evaluation.idTokenJobIds.map((jobId) => `${file.path}#${jobId}`))
+    missingJobRefs.push(...evaluation.missingJobIds.map((jobId) => `${file.path}#${jobId}`))
+    if (evaluation.notEvaluatedReason) {
+      notEvaluatedWorkflowDetails.push(`${file.path}: ${evaluation.notEvaluatedReason}`)
+    }
+  }
+
   const context: NpmProvenanceReadinessContext = {
     scan,
-    publishWorkflowPaths: publishWorkflowFiles.map((file) => file.path),
-    idTokenWorkflowPaths: publishWorkflowFiles
-      .filter((file) => workflowHasIdTokenWritePermission(file.content))
-      .map((file) => file.path),
+    publishJobRefs,
+    idTokenJobRefs,
+    missingJobRefs,
+    notEvaluatedWorkflowDetails,
     npmPublish: deps.getEnv('NPM_PUBLISH'),
   }
   const state = classifyNpmProvenanceReadiness(context)
