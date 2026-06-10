@@ -140,3 +140,9 @@ vite.config.ts.timestamp-*
 
 # Private working memory (per CLAUDE.md TODO.local convention)
 *.local.md
+
+# Local AI-assistant session artifacts (never part of the package)
+.claude/
+.codex
+docs/plans/
+.workflow-state.json
