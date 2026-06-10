@@ -327,10 +327,14 @@ pnpm add -D @oorabona/release-it-preset @release-it-plugins/workspaces release-i
 {
   "extends": "@oorabona/release-it-preset/config/default",
   "plugins": {
-    "@release-it-plugins/workspaces": true
+    "@release-it-plugins/workspaces": {
+      "publish": false
+    }
   }
 }
 ```
+
+**Publishing caveat:** the workspaces plugin runs its **own npm publish step** per workspace package and does not honor this preset's `NPM_PUBLISH` opt-in — configured as bare `true`, it attempts to publish every package even while the preset's npm publishing stays disabled. Keep `"publish": false` until you deliberately enable workspace publishing (with npm auth in place).
 
 **Peer compatibility note:** `@release-it-plugins/workspaces` v5.0.3 declares peer `release-it ^17 || ^18 || ^19`. The intersection with this preset's `^19 || ^20` is `^19`, so when composing with the workspaces plugin you must pin release-it to v19. If `release-it@20` is installed, the plugin fails at module load with an unmet peer dependency error. v20 standalone is recommended for new non-workspaces projects.
 

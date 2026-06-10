@@ -297,7 +297,9 @@ The patterns above release each package **independently**. If instead all your w
 {
   "extends": "@oorabona/release-it-preset/config/default",
   "plugins": {
-    "@release-it-plugins/workspaces": true
+    "@release-it-plugins/workspaces": {
+      "publish": false
+    }
   }
 }
 ```
@@ -306,9 +308,11 @@ The patterns above release each package **independently**. If instead all your w
 pnpm add -D @oorabona/release-it-preset @release-it-plugins/workspaces release-it@^19
 ```
 
+**Publishing caveat (important):** the workspaces plugin brings its **own npm publish lifecycle** for each workspace package, and it does NOT honor this preset's `NPM_PUBLISH` opt-in — with the plugin configured as bare `true`, a release attempts to publish every workspace package even though the preset's own npm publishing is disabled by default. Keep `"publish": false` in the plugin options (as above) until you deliberately want the plugin to publish, then enable it together with proper npm auth.
+
 **Version constraint (important):** `@release-it-plugins/workspaces` v5.0.3 declares peer `release-it ^17 || ^18 || ^19`, while this preset supports `^19 || ^20`. The supported intersection is **release-it `^19`** — with `release-it@20` installed, the plugin fails at module load with an unmet peer dependency error. Pin release-it to v19 when composing; use v20 standalone otherwise.
 
-This composition is exercised end-to-end in this repository's CI: `tests/e2e/workspaces-composition.test.ts` runs a dry-run release in a real temp monorepo and asserts the plugin bumps workspace package versions and rewrites internal dependency ranges while the preset's changelog machinery runs alongside. The release-it 20 incompatibility is itself locked by a test, so the guidance above will be updated when the plugin widens its peer range.
+This composition is exercised end-to-end in this repository's CI: `tests/e2e/workspaces-composition.test.ts` runs a real local release (`patch --ci`, git/github/npm publishing disabled) in a temp monorepo and asserts the plugin bumps workspace package versions and rewrites internal dependency ranges with the preset configuration loaded via `extends`. The release-it 20 incompatibility is itself locked by a test, so the guidance above will be updated when the plugin widens its peer range.
 
 ## GitHub Actions Integration
 
