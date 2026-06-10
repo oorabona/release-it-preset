@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   type CheckResult,
@@ -13,6 +14,7 @@ import {
   summarize,
   validateConfiguration,
   validateReleaseItPeer,
+  validateWorkspaceDependencyRanges,
 } from '../../scripts/doctor'
 
 // ---------------------------------------------------------------------------
@@ -23,8 +25,10 @@ function makeDeps(overrides: Partial<DoctorDeps> = {}): DoctorDeps {
   return {
     execSync: vi.fn(),
     existsSync: vi.fn().mockReturnValue(false),
+    readdirSync: vi.fn(),
     readFileSync: vi.fn(),
     getEnv: vi.fn((_key: string) => undefined),
+    cwd: vi.fn(() => '/repo'),
     ...overrides,
   }
 }
@@ -44,6 +48,42 @@ const VALID_PACKAGE_JSON = JSON.stringify({ name: 'my-pkg', version: '0.1.0' })
 const VALID_RELEASE_IT_JSON = JSON.stringify({
   extends: '@oorabona/release-it-preset/config/default',
 })
+
+function makeWorkspaceDeps(
+  packages: Record<string, Record<string, unknown>>,
+  rootPackage: Record<string, unknown> = { name: 'root', version: '1.0.0' },
+): DoctorDeps {
+  const root = '/repo'
+  const packageNames = Object.keys(packages)
+  const files = new Map<string, string>([
+    ['pnpm-workspace.yaml', "packages:\n  - 'packages/*'\n"],
+    ['package.json', JSON.stringify(rootPackage)],
+  ])
+
+  for (const [dirName, pkg] of Object.entries(packages)) {
+    files.set(join(root, 'packages', dirName, 'package.json'), JSON.stringify(pkg))
+  }
+
+  return makeDeps({
+    cwd: vi.fn(() => root),
+    existsSync: vi.fn((p: string) => {
+      if (p === 'pnpm-workspace.yaml' || p === 'package.json') {
+        return true
+      }
+      if (p === join(root, 'packages')) {
+        return true
+      }
+      return files.has(p)
+    }),
+    readdirSync: vi.fn((p: string) => {
+      if (p === join(root, 'packages')) {
+        return packageNames
+      }
+      return []
+    }),
+    readFileSync: vi.fn((p: string) => files.get(p) ?? ''),
+  })
+}
 
 // ---------------------------------------------------------------------------
 // safeExec
@@ -335,7 +375,11 @@ describe('validateConfiguration', () => {
         }
         if (p === 'package.json') {
           // Return a package.json with peerDependencies so the peer range is found
-          return JSON.stringify({ name: 'my-pkg', version: '0.1.0', peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0' } })
+          return JSON.stringify({
+            name: 'my-pkg',
+            version: '0.1.0',
+            peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0' },
+          })
         }
         return ''
       }),
@@ -454,7 +498,9 @@ describe('Workspace integration check', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return pkgWithWorkspaces
+        if (p === 'package.json') {
+          return pkgWithWorkspaces
+        }
         return ''
       }),
     })
@@ -488,7 +534,9 @@ describe('Workspace integration check', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return pkgWithWorkspacesObject
+        if (p === 'package.json') {
+          return pkgWithWorkspacesObject
+        }
         return ''
       }),
     })
@@ -509,7 +557,9 @@ describe('Workspace integration check', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return pkgEmptyArray
+        if (p === 'package.json') {
+          return pkgEmptyArray
+        }
         return ''
       }),
     })
@@ -530,7 +580,9 @@ describe('Workspace integration check', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return pkgBadWorkspaces
+        if (p === 'package.json') {
+          return pkgBadWorkspaces
+        }
         return ''
       }),
     })
@@ -549,7 +601,9 @@ describe('Workspace integration check', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return pkgWeirdShape
+        if (p === 'package.json') {
+          return pkgWeirdShape
+        }
         return ''
       }),
     })
@@ -557,6 +611,188 @@ describe('Workspace integration check', () => {
     const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
     // Locks the F-003 fix: 'packages' in ws alone was too lenient
     expect(wsCheck?.status).toBe('PASS')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Workspace dependency ranges
+// ---------------------------------------------------------------------------
+
+describe('Workspace dependency ranges check', () => {
+  it('PASS when internal dependency uses the workspace protocol', () => {
+    const deps = makeWorkspaceDeps({
+      a: {
+        name: '@scope/a',
+        version: '1.0.0',
+        dependencies: { '@scope/b': 'workspace:*' },
+      },
+      b: { name: '@scope/b', version: '2.0.0' },
+    })
+
+    const check = validateWorkspaceDependencyRanges(deps)
+    expect(check?.status).toBe('PASS')
+    expect(check?.value).toContain('1/1 internal range(s) coherent')
+  })
+
+  it('PASS when an internal semver range includes the current workspace version', () => {
+    const deps = makeWorkspaceDeps({
+      a: {
+        name: '@scope/a',
+        version: '1.0.0',
+        dependencies: { '@scope/b': '^2.0.0' },
+      },
+      b: { name: '@scope/b', version: '2.1.0' },
+    })
+
+    const check = validateWorkspaceDependencyRanges(deps)
+    expect(check?.status).toBe('PASS')
+    expect(check?.value).toContain('1/1 internal range(s) coherent')
+  })
+
+  it('WARN when an internal semver range excludes the current workspace version', () => {
+    const deps = makeWorkspaceDeps({
+      a: {
+        name: '@scope/a',
+        version: '1.0.0',
+        dependencies: { '@scope/b': '^1.0.0' },
+      },
+      b: { name: '@scope/b', version: '2.0.0' },
+    })
+
+    const check = validateWorkspaceDependencyRanges(deps)
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toBe('1 stale internal range(s)')
+    expect(check?.detail).toContain('@scope/a dependencies.@scope/b="^1.0.0"')
+    expect(check?.detail).toContain('workspace: protocol')
+  })
+
+  it('does not emit the check when no workspace layout exists', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') {
+          return JSON.stringify({ name: 'single-package', version: '1.0.0' })
+        }
+        return ''
+      }),
+    })
+
+    expect(validateWorkspaceDependencyRanges(deps)).toBeNull()
+  })
+
+  it('skips unsupported range syntax without warning', () => {
+    const deps = makeWorkspaceDeps({
+      a: {
+        name: '@scope/a',
+        version: '1.0.0',
+        dependencies: { '@scope/b': '>=2.0.0 <3.0.0' },
+      },
+      b: { name: '@scope/b', version: '2.1.0' },
+    })
+
+    const check = validateWorkspaceDependencyRanges(deps)
+    expect(check?.status).toBe('PASS')
+    expect(check?.value).toContain('1 skipped')
+    expect(check?.detail).toContain('unsupported range syntax')
+  })
+
+  it('includes the check in JSON output for workspace projects', () => {
+    const deps = makeWorkspaceDeps(
+      {
+        a: {
+          name: '@scope/a',
+          version: '1.0.0',
+          dependencies: { '@scope/b': '^2.0.0' },
+        },
+        b: { name: '@scope/b', version: '2.1.0' },
+      },
+      {
+        name: 'root',
+        version: '1.0.0',
+        peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0' },
+      },
+    )
+    deps.existsSync = vi.fn((p: string) => {
+      if (p === 'CHANGELOG.md' || p === '.release-it.json') {
+        return true
+      }
+      if (p === 'pnpm-workspace.yaml' || p === 'package.json') {
+        return true
+      }
+      if (p === join('/repo', 'packages')) {
+        return true
+      }
+      if (p === join('/repo', 'packages', 'a', 'package.json')) {
+        return true
+      }
+      if (p === join('/repo', 'packages', 'b', 'package.json')) {
+        return true
+      }
+      return false
+    })
+    deps.readFileSync = vi.fn((p: string) => {
+      if (p === 'CHANGELOG.md') {
+        return VALID_CHANGELOG
+      }
+      if (p === '.release-it.json') {
+        return VALID_RELEASE_IT_JSON
+      }
+      if (p === 'pnpm-workspace.yaml') {
+        return "packages:\n  - 'packages/*'\n"
+      }
+      if (p === 'package.json') {
+        return JSON.stringify({
+          name: 'root',
+          version: '1.0.0',
+          peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0' },
+        })
+      }
+      if (p === join('/repo', 'packages', 'a', 'package.json')) {
+        return JSON.stringify({
+          name: '@scope/a',
+          version: '1.0.0',
+          dependencies: { '@scope/b': '^2.0.0' },
+        })
+      }
+      if (p === join('/repo', 'packages', 'b', 'package.json')) {
+        return JSON.stringify({ name: '@scope/b', version: '2.1.0' })
+      }
+      return ''
+    })
+    deps.execSync = vi.fn((cmd: string) => {
+      if (cmd.includes('rev-parse --git-dir')) {
+        return '.git'
+      }
+      if (cmd.includes('rev-parse --abbrev-ref HEAD')) {
+        return 'main'
+      }
+      if (cmd.includes('describe --tags')) {
+        return 'v1.0.0'
+      }
+      if (cmd.includes('rev-list') && cmd.includes('--count')) {
+        return '1'
+      }
+      if (cmd.includes('status --porcelain')) {
+        return ''
+      }
+      if (cmd.includes('rev-parse --abbrev-ref @{u}')) {
+        return 'origin/main'
+      }
+      if (cmd.includes('config --get remote.origin.url')) {
+        return 'https://github.com/o/r'
+      }
+      if (cmd.includes('npm ls release-it')) {
+        return JSON.stringify({ dependencies: { 'release-it': { version: '20.10.0' } } })
+      }
+      if (cmd.includes('npm view release-it version')) {
+        return '20.10.0'
+      }
+      return ''
+    })
+
+    const parsed = JSON.parse(formatJson(runDoctor(deps))) as DoctorReport
+    const check = parsed.configuration.checks.find(c => c.name === 'Workspace dependency ranges')
+    expect(check?.status).toBe('PASS')
   })
 })
 
@@ -731,7 +967,6 @@ describe('formatHuman', () => {
   })
 })
 
-
 // ---------------------------------------------------------------------------
 // validateReleaseItPeer — Check A (peer range) + Check B (major advisor)
 // ---------------------------------------------------------------------------
@@ -762,12 +997,18 @@ describe('validateReleaseItPeer', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        if (p === 'package.json') {
+          return PRESET_PKG_WITH_PEERS
+        }
         return ''
       }),
       execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V20
-        if (cmd.includes('npm view release-it version')) return '20.10.0'
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V20
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '20.10.0'
+        }
         throw new Error('unexpected command')
       }),
     })
@@ -782,12 +1023,18 @@ describe('validateReleaseItPeer', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        if (p === 'package.json') {
+          return PRESET_PKG_WITH_PEERS
+        }
         return ''
       }),
       execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V19
-        if (cmd.includes('npm view release-it version')) return '20.10.0'
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V19
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '20.10.0'
+        }
         throw new Error('unexpected command')
       }),
     })
@@ -802,12 +1049,18 @@ describe('validateReleaseItPeer', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        if (p === 'package.json') {
+          return PRESET_PKG_WITH_PEERS
+        }
         return ''
       }),
       execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V18
-        if (cmd.includes('npm view release-it version')) return '20.10.0'
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V18
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '20.10.0'
+        }
         throw new Error('unexpected command')
       }),
     })
@@ -823,12 +1076,18 @@ describe('validateReleaseItPeer', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        if (p === 'package.json') {
+          return PRESET_PKG_WITH_PEERS
+        }
         return ''
       }),
       execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_EMPTY
-        if (cmd.includes('npm view release-it version')) return '20.10.0'
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_EMPTY
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '20.10.0'
+        }
         throw new Error('unexpected command')
       }),
     })
@@ -858,12 +1117,18 @@ describe('validateReleaseItPeer', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        if (p === 'package.json') {
+          return PRESET_PKG_WITH_PEERS
+        }
         return ''
       }),
       execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V20
-        if (cmd.includes('npm view release-it version')) return '21.0.5'
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V20
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '21.0.5'
+        }
         throw new Error('unexpected command')
       }),
     })
@@ -880,12 +1145,18 @@ describe('validateReleaseItPeer', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        if (p === 'package.json') {
+          return PRESET_PKG_WITH_PEERS
+        }
         return ''
       }),
       execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V20
-        if (cmd.includes('npm view release-it version')) return '20.11.0'
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V20
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '20.11.0'
+        }
         throw new Error('unexpected command')
       }),
     })
@@ -900,12 +1171,18 @@ describe('validateReleaseItPeer', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') return PRESET_PKG_WITH_PEERS
+        if (p === 'package.json') {
+          return PRESET_PKG_WITH_PEERS
+        }
         return ''
       }),
       execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V20
-        if (cmd.includes('npm view release-it version')) throw new Error('ENOTFOUND')
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V20
+        }
+        if (cmd.includes('npm view release-it version')) {
+          throw new Error('ENOTFOUND')
+        }
         throw new Error('unexpected command')
       }),
     })
@@ -923,8 +1200,12 @@ describe('validateReleaseItPeer', () => {
       existsSync: vi.fn().mockReturnValue(false),
       readFileSync: vi.fn().mockReturnValue(''),
       execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) return LS_OUTPUT_V20
-        if (cmd.includes('npm view release-it version')) return '20.10.0'
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V20
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '20.10.0'
+        }
         throw new Error('unexpected command')
       }),
     })
