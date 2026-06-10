@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import {
+  appendFileSync,
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -95,9 +96,21 @@ export function linkReleaseItCompositionModules(
 ): void {
   const releaseItPackage = RELEASE_IT_PACKAGES[releaseItMajor]
 
+  ignoreNodeModules(repo)
   symlinkDir(PROJECT_ROOT, join(repo.cwd, 'node_modules/@oorabona/release-it-preset'))
   symlinkDir(releaseItPackage.packageRoot, join(repo.cwd, 'node_modules/release-it'))
   linkWorkspacesPlugin(repo, releaseItPackage.packageRoot)
+}
+
+// The temp-repo commit helper stages with `git add -A`; without this the
+// fixture would commit the node_modules symlinks, including one pointing
+// back at the project root (unfaithful fixture, junction hazards on Windows).
+function ignoreNodeModules(repo: TempRepo): void {
+  const gitignorePath = join(repo.cwd, '.gitignore')
+  if (existsSync(gitignorePath) && readFileSync(gitignorePath, 'utf8').includes('node_modules/')) {
+    return
+  }
+  appendFileSync(gitignorePath, 'node_modules/\n')
 }
 
 export function runReleaseIt(

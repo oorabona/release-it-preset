@@ -6,6 +6,7 @@
  * See #61.
  */
 
+import { spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import {
   isWorkspacesReleaseIt20PeerMismatch,
@@ -90,6 +91,16 @@ function seedWorkspaceFixture(
   repo.commit('feat: update workspace package', {
     'packages/pkg-a/src/index.js': 'export const value = "a2";\n',
   })
+
+  // Mutation lock: linkReleaseItCompositionModules runs before the commits
+  // above and temp-repo commits stage with `git add -A`; without the helper's
+  // .gitignore the fixture would track node_modules symlinks (including one
+  // pointing back at the project root).
+  const tracked = spawnSync('git', ['ls-files', 'node_modules'], {
+    cwd: repo.cwd,
+    encoding: 'utf8',
+  })
+  expect(tracked.stdout.trim()).toBe('')
 }
 
 function expectReleaseItSuccess(result: ReleaseItResult, label: string): void {
