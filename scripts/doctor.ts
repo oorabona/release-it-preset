@@ -15,8 +15,14 @@
 
 import type { ExecSyncOptions } from 'node:child_process'
 import { execSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { isValidSemver } from './lib/semver-utils.js'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { isValidSemver, rangeIncludesVersion } from './lib/semver-utils.js'
+import {
+  parsePnpmWorkspaceYaml,
+  parseWorkspacesFromPackageJson,
+  resolvePackagePaths,
+} from './lib/workspace-detect.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,8 +80,10 @@ export interface DoctorReport {
 export interface DoctorDeps {
   execSync: (command: string, options?: ExecSyncOptions) => Buffer | string
   existsSync: typeof existsSync
+  readdirSync: typeof readdirSync
   readFileSync: typeof readFileSync
   getEnv: (key: string) => string | undefined
+  cwd: () => string
 }
 
 // ---------------------------------------------------------------------------
@@ -336,6 +344,356 @@ function detectWorkspaceIntegration(deps: DoctorDeps): CheckResult {
   }
 }
 
+type DependencyField = 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies'
+
+interface WorkspacePackage {
+  name: string
+  version: string
+  dependencies: Array<{
+    field: DependencyField
+    name: string
+    range: string
+  }>
+}
+
+const DEPENDENCY_FIELDS: DependencyField[] = [
+  'dependencies',
+  'devDependencies',
+  'peerDependencies',
+  'optionalDependencies',
+]
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false
+  }
+  return Object.values(value).every((v) => typeof v === 'string')
+}
+
+function collectDependencyRanges(pkg: Record<string, unknown>): WorkspacePackage['dependencies'] {
+  const dependencies: WorkspacePackage['dependencies'] = []
+  for (const field of DEPENDENCY_FIELDS) {
+    const entries = pkg[field]
+    if (!isStringRecord(entries)) {
+      continue
+    }
+    for (const [name, range] of Object.entries(entries)) {
+      dependencies.push({ field, name, range })
+    }
+  }
+  return dependencies
+}
+
+function isSupportedWorkspacePattern(pattern: string): boolean {
+  if (/[?{}[\]]/.test(pattern)) {
+    return false
+  }
+
+  const starCount = (pattern.match(/\*/g) ?? []).length
+  if (starCount === 0) {
+    return true
+  }
+
+  return starCount === 1 && pattern.endsWith('/*')
+}
+
+function classifyWorkspacePatterns(patterns: string[]): {
+  supportedPatterns: string[]
+  unsupportedPatterns: string[]
+  negatedPatterns: string[]
+} {
+  const supportedPatterns: string[] = []
+  const unsupportedPatterns: string[] = []
+  const negatedPatterns: string[] = []
+
+  for (const pattern of patterns) {
+    if (pattern.startsWith('!')) {
+      negatedPatterns.push(pattern)
+    } else if (isSupportedWorkspacePattern(pattern)) {
+      supportedPatterns.push(pattern)
+    } else {
+      unsupportedPatterns.push(pattern)
+    }
+  }
+
+  return { supportedPatterns, unsupportedPatterns, negatedPatterns }
+}
+
+function formatUnsupportedPatternDetails(patterns: string[]): string[] {
+  if (patterns.length === 0) {
+    return []
+  }
+
+  return [
+    'Unsupported workspace pattern(s) were not evaluated:',
+    ...patterns.map((pattern) => `- ${pattern}: pattern not supported by this check`),
+  ]
+}
+
+function formatNegatedPatternDetails(patterns: string[]): string {
+  return [
+    'Negated workspace pattern(s) are not supported by this check; internal dependency ranges were not evaluated.',
+    ...patterns.map((pattern) => `- ${pattern}: exclusion pattern not supported`),
+    'Remove negated workspace patterns or verify internal dependency ranges manually.',
+  ].join('\n')
+}
+
+function formatUnreadableManifestDetail(unreadableManifestCount: number): string | undefined {
+  return unreadableManifestCount > 0
+    ? `${unreadableManifestCount} manifest(s) unreadable; those packages were not evaluated.`
+    : undefined
+}
+
+function readWorkspacePatterns(deps: DoctorDeps): { patterns: string[]; error?: string } | null {
+  if (deps.existsSync('pnpm-workspace.yaml')) {
+    try {
+      const content = deps.readFileSync('pnpm-workspace.yaml', 'utf8') as string
+      return { patterns: parsePnpmWorkspaceYaml(content) }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'unknown parser error'
+      return {
+        patterns: [],
+        error: [
+          'pnpm-workspace.yaml could not be parsed; internal dependency ranges were not verified.',
+          reason,
+        ].join('\n'),
+      }
+    }
+  }
+
+  if (!deps.existsSync('package.json')) {
+    return null
+  }
+
+  try {
+    const content = deps.readFileSync('package.json', 'utf8') as string
+    const patterns = parseWorkspacesFromPackageJson(content)
+    return patterns.length > 0 ? { patterns } : null
+  } catch (error) {
+    return {
+      patterns: [],
+      error: [
+        'package.json workspaces field could not be read; internal dependency ranges were not verified.',
+        error instanceof Error ? error.message : 'unknown parser error',
+      ].join('\n'),
+    }
+  }
+}
+
+function readWorkspacePackages(packageDirs: string[], deps: DoctorDeps): {
+  packages: WorkspacePackage[]
+  unreadableManifestCount: number
+} {
+  const packages: WorkspacePackage[] = []
+  let unreadableManifestCount = 0
+
+  for (const packageDir of packageDirs) {
+    try {
+      const raw = deps.readFileSync(join(packageDir, 'package.json'), 'utf8') as string
+      const parsed = JSON.parse(raw) as unknown
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        unreadableManifestCount += 1
+        continue
+      }
+
+      const pkg = parsed as Record<string, unknown>
+      if (typeof pkg.name !== 'string' || typeof pkg.version !== 'string') {
+        unreadableManifestCount += 1
+        continue
+      }
+      if (!isValidSemver(pkg.version)) {
+        unreadableManifestCount += 1
+        continue
+      }
+      packages.push({
+        name: pkg.name,
+        version: pkg.version,
+        dependencies: collectDependencyRanges(pkg),
+      })
+    } catch {
+      unreadableManifestCount += 1
+    }
+  }
+
+  return { packages, unreadableManifestCount }
+}
+
+export function validateWorkspaceDependencyRanges(deps: DoctorDeps): CheckResult | null {
+  const workspacePatterns = readWorkspacePatterns(deps)
+  if (workspacePatterns === null) {
+    return null
+  }
+
+  if (workspacePatterns.error) {
+    return {
+      name: 'Workspace dependency ranges',
+      status: 'WARN',
+      value: 'workspace configuration not evaluated',
+      detail: workspacePatterns.error,
+    }
+  }
+
+  const { patterns } = workspacePatterns
+  if (patterns.length === 0) {
+    return {
+      name: 'Workspace dependency ranges',
+      status: 'PASS',
+      value: 'no workspace packages declared',
+    }
+  }
+
+  const { supportedPatterns, unsupportedPatterns, negatedPatterns } = classifyWorkspacePatterns(patterns)
+  if (negatedPatterns.length > 0) {
+    return {
+      name: 'Workspace dependency ranges',
+      status: 'WARN',
+      value: 'not evaluated',
+      detail: formatNegatedPatternDetails(negatedPatterns),
+    }
+  }
+
+  let packageDirs: string[]
+  try {
+    packageDirs =
+      supportedPatterns.length > 0
+        ? resolvePackagePaths(supportedPatterns, deps.cwd(), {
+            existsSync: deps.existsSync,
+            readdirSync: deps.readdirSync,
+          })
+        : []
+  } catch (error) {
+    return {
+      name: 'Workspace dependency ranges',
+      status: 'WARN',
+      value: 'not evaluated',
+      detail: [
+        error instanceof Error ? error.message : 'Could not resolve workspace package paths',
+        ...formatUnsupportedPatternDetails(unsupportedPatterns),
+      ].join('\n'),
+    }
+  }
+
+  if (packageDirs.length === 0) {
+    if (unsupportedPatterns.length > 0) {
+      return {
+        name: 'Workspace dependency ranges',
+        status: 'WARN',
+        value: 'workspace ranges partially evaluated',
+        detail: [
+          supportedPatterns.length > 0
+            ? 'Supported workspace pattern(s) did not resolve any package directories; ranges were not evaluated.'
+            : 'No supported workspace patterns were available; ranges were not evaluated.',
+          ...formatUnsupportedPatternDetails(unsupportedPatterns),
+        ].join('\n'),
+      }
+    }
+
+    return {
+      name: 'Workspace dependency ranges',
+      status: 'WARN',
+      value: 'workspace packages not resolved — ranges not evaluated',
+      detail: [
+        'Declared workspace pattern(s) did not resolve any package directories.',
+        ...supportedPatterns.map((pattern) => `- ${pattern}`),
+      ].join('\n'),
+    }
+  }
+
+  const { packages, unreadableManifestCount } = readWorkspacePackages(packageDirs, deps)
+  if (packages.length === 0) {
+    return {
+      name: 'Workspace dependency ranges',
+      status: 'WARN',
+      value: 'workspace manifests unreadable — ranges not evaluated',
+      detail: [
+        'Resolved workspace package path(s) did not contain readable, valid package.json manifests.',
+        formatUnreadableManifestDetail(unreadableManifestCount),
+        ...formatUnsupportedPatternDetails(unsupportedPatterns),
+      ].filter(Boolean).join('\n'),
+    }
+  }
+
+  const versionByName = new Map(packages.map((pkg) => [pkg.name, pkg.version]))
+  const staleRanges: string[] = []
+  const skippedRanges: string[] = []
+  let coherentRangeCount = 0
+  let internalRangeCount = 0
+
+  for (const pkg of packages) {
+    for (const dependency of pkg.dependencies) {
+      const internalVersion = versionByName.get(dependency.name)
+      if (!internalVersion) {
+        continue
+      }
+
+      internalRangeCount += 1
+      const includesVersion = rangeIncludesVersion(dependency.range, internalVersion)
+      if (includesVersion === true) {
+        coherentRangeCount += 1
+      } else if (includesVersion === false) {
+        staleRanges.push(
+          `${pkg.name} ${dependency.field}.${dependency.name}="${dependency.range}" does not include ${internalVersion}`,
+        )
+      } else {
+        skippedRanges.push(`${pkg.name} ${dependency.field}.${dependency.name}="${dependency.range}"`)
+      }
+    }
+  }
+
+  if (staleRanges.length > 0) {
+    return {
+      name: 'Workspace dependency ranges',
+      status: 'WARN',
+      value: `${staleRanges.length} stale internal range(s)`,
+      detail: [
+        ...staleRanges.slice(0, 10).map((item) => `- ${item}`),
+        staleRanges.length > 10 ? `- ...and ${staleRanges.length - 10} more` : '',
+        'Update the range to include the current internal package version, or use the workspace: protocol.',
+        formatUnreadableManifestDetail(unreadableManifestCount),
+        ...formatUnsupportedPatternDetails(unsupportedPatterns),
+      ].filter(Boolean).join('\n'),
+    }
+  }
+
+  const partialEvaluationDetails = [
+    formatUnreadableManifestDetail(unreadableManifestCount),
+    ...formatUnsupportedPatternDetails(unsupportedPatterns),
+  ].filter(Boolean)
+
+  if (partialEvaluationDetails.length > 0) {
+    return {
+      name: 'Workspace dependency ranges',
+      status: 'WARN',
+      value: 'workspace ranges partially evaluated',
+      detail: [
+        internalRangeCount === 0
+          ? 'No internal package dependencies were found in readable workspace manifests.'
+          : `${coherentRangeCount}/${internalRangeCount} internal range(s) coherent in readable workspace manifests.`,
+        ...partialEvaluationDetails,
+      ].join('\n'),
+    }
+  }
+
+  if (internalRangeCount === 0) {
+    return {
+      name: 'Workspace dependency ranges',
+      status: 'PASS',
+      value: 'no internal package dependencies',
+    }
+  }
+
+  return {
+    name: 'Workspace dependency ranges',
+    status: 'PASS',
+    value: skippedRanges.length > 0
+      ? `${coherentRangeCount}/${internalRangeCount} internal range(s) coherent; ${skippedRanges.length} skipped`
+      : `${coherentRangeCount}/${internalRangeCount} internal range(s) coherent`,
+    detail: skippedRanges.length > 0
+      ? `Skipped unsupported range syntax: ${skippedRanges.slice(0, 5).join(', ')}`
+      : undefined,
+  }
+}
+
 
 export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
   const checks: CheckResult[] = []
@@ -477,6 +835,10 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
   }
 
   checks.push(detectWorkspaceIntegration(deps))
+  const workspaceDependencyRanges = validateWorkspaceDependencyRanges(deps)
+  if (workspaceDependencyRanges) {
+    checks.push(workspaceDependencyRanges)
+  }
 
   for (const result of validateReleaseItPeer(deps)) {
     checks.push(result)
@@ -768,8 +1130,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const deps: DoctorDeps = {
     execSync,
     existsSync,
+    readdirSync,
     readFileSync,
     getEnv: (key: string) => process.env[key],
+    cwd: () => process.cwd(),
   }
 
   const report = runDoctor(deps)
