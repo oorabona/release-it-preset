@@ -618,7 +618,8 @@ type WorkflowJobsParseResult =
       reason: string
     }
 
-type JobPermissionEvaluation = 'GRANTED' | 'MISSING' | 'NOT_EVALUATED'
+type PermissionEvaluation = 'GRANTED' | 'MISSING' | 'NOT_EVALUATED'
+type JobPermissionEvaluation = PermissionEvaluation | 'INHERIT'
 
 interface WorkflowNpmProvenanceEvaluation {
   publishJobIds: string[]
@@ -761,6 +762,17 @@ function inlinePermissionsMapHasIdTokenWrite(value: string): boolean | null {
   )
 }
 
+function scalarPermissionsValueHasIdTokenWrite(value: string): PermissionEvaluation | null {
+  const scalar = stripYamlQuotes(value)
+  if (scalar === 'write-all') {
+    return 'GRANTED'
+  }
+  if (scalar === 'read-all') {
+    return 'MISSING'
+  }
+  return null
+}
+
 function isDynamicYamlValue(value: string): boolean {
   return (
     value.startsWith('*') ||
@@ -770,41 +782,31 @@ function isDynamicYamlValue(value: string): boolean {
   )
 }
 
-function evaluateJobIdTokenWritePermission(job: WorkflowJobBlock): JobPermissionEvaluation {
-  const { lines } = toYamlLines(job.content)
-  const childLines = lines.filter((line) => line.index > 0 && line.indent > job.indent)
-  if (childLines.length === 0) {
-    return 'MISSING'
+function evaluatePermissionsValue(value: string): PermissionEvaluation {
+  const scalarResult = scalarPermissionsValueHasIdTokenWrite(value)
+  if (scalarResult !== null) {
+    return scalarResult
   }
 
-  const childIndent = childLines[0].indent
-  const permissionsLines = childLines.filter((line) => {
-    const mapping = parseYamlMapping(line.trimmed)
-    return line.indent === childIndent && mapping?.key === 'permissions'
-  })
-
-  if (permissionsLines.length === 0) {
-    return 'MISSING'
-  }
-  if (permissionsLines.length > 1) {
-    return 'NOT_EVALUATED'
+  const inlineResult = inlinePermissionsMapHasIdTokenWrite(value)
+  if (inlineResult !== null) {
+    return inlineResult ? 'GRANTED' : 'MISSING'
   }
 
-  const permissionsLine = permissionsLines[0]
+  return isDynamicYamlValue(value) ? 'NOT_EVALUATED' : 'MISSING'
+}
+
+function evaluatePermissionsLine(lines: YamlLine[], permissionsLine: YamlLine): PermissionEvaluation {
   const permissions = parseYamlMapping(permissionsLine.trimmed)
   if (!permissions) {
     return 'NOT_EVALUATED'
   }
 
   if (permissions.value !== '') {
-    const inlineResult = inlinePermissionsMapHasIdTokenWrite(permissions.value)
-    if (inlineResult !== null) {
-      return inlineResult ? 'GRANTED' : 'MISSING'
-    }
-    return isDynamicYamlValue(permissions.value) ? 'NOT_EVALUATED' : 'MISSING'
+    return evaluatePermissionsValue(permissions.value)
   }
 
-  const permissionChildLines = childLines.filter((line) => line.index > permissionsLine.index)
+  const permissionChildLines = lines.filter((line) => line.index > permissionsLine.index)
   const permissionBlockLines: YamlLine[] = []
   for (const line of permissionChildLines) {
     if (line.indent <= permissionsLine.indent) {
@@ -835,13 +837,64 @@ function evaluateJobIdTokenWritePermission(job: WorkflowJobBlock): JobPermission
   return 'MISSING'
 }
 
+function evaluateWorkflowIdTokenWritePermission(content: string): PermissionEvaluation {
+  const { lines } = toYamlLines(content)
+  const permissionsLines = lines.filter((line) => {
+    const mapping = parseYamlMapping(line.trimmed)
+    return line.indent === 0 && mapping?.key === 'permissions'
+  })
+
+  if (permissionsLines.length === 0) {
+    return 'MISSING'
+  }
+  if (permissionsLines.length > 1) {
+    return 'NOT_EVALUATED'
+  }
+
+  return evaluatePermissionsLine(lines, permissionsLines[0])
+}
+
+function evaluateJobIdTokenWritePermission(job: WorkflowJobBlock): JobPermissionEvaluation {
+  const { lines } = toYamlLines(job.content)
+  const childLines = lines.filter((line) => line.index > 0 && line.indent > job.indent)
+  if (childLines.length === 0) {
+    return 'INHERIT'
+  }
+
+  const childIndent = childLines[0].indent
+  const permissionsLines = childLines.filter((line) => {
+    const mapping = parseYamlMapping(line.trimmed)
+    return line.indent === childIndent && mapping?.key === 'permissions'
+  })
+
+  if (permissionsLines.length === 0) {
+    return 'INHERIT'
+  }
+  if (permissionsLines.length > 1) {
+    return 'NOT_EVALUATED'
+  }
+
+  return evaluatePermissionsLine(childLines, permissionsLines[0])
+}
+
+function resolveJobIdTokenWritePermission(
+  job: WorkflowJobBlock,
+  workflowPermission: PermissionEvaluation,
+): PermissionEvaluation {
+  const jobPermission = evaluateJobIdTokenWritePermission(job)
+  return jobPermission === 'INHERIT' ? workflowPermission : jobPermission
+}
+
 export function workflowHasIdTokenWritePermission(content: string): boolean {
   const parsed = parseWorkflowJobs(content)
   if (!parsed.ok) {
     return false
   }
 
-  return parsed.jobs.some((job) => evaluateJobIdTokenWritePermission(job) === 'GRANTED')
+  const workflowPermission = evaluateWorkflowIdTokenWritePermission(content)
+  return parsed.jobs.some(
+    (job) => resolveJobIdTokenWritePermission(job, workflowPermission) === 'GRANTED',
+  )
 }
 
 function contentWithoutYamlComments(content: string): string {
@@ -893,9 +946,10 @@ function evaluateWorkflowNpmProvenance(content: string): WorkflowNpmProvenanceEv
   const idTokenJobIds: string[] = []
   const missingJobIds: string[] = []
   const notEvaluatedJobIds: string[] = []
+  const workflowPermission = evaluateWorkflowIdTokenWritePermission(content)
 
   for (const job of publishJobs) {
-    const permission = evaluateJobIdTokenWritePermission(job)
+    const permission = resolveJobIdTokenWritePermission(job, workflowPermission)
     if (permission === 'GRANTED') {
       idTokenJobIds.push(job.id)
     } else if (permission === 'MISSING') {
@@ -911,7 +965,7 @@ function evaluateWorkflowNpmProvenance(content: string): WorkflowNpmProvenanceEv
     missingJobIds,
     notEvaluatedReason:
       notEvaluatedJobIds.length > 0
-        ? `job-level permissions not evaluated for: ${notEvaluatedJobIds.join(', ')}`
+        ? `resolved permissions not evaluated for: ${notEvaluatedJobIds.join(', ')}`
         : undefined,
   }
 }
@@ -953,7 +1007,7 @@ function classifyNpmProvenanceReadiness(
 function npmProvenanceMissingDetail(context: NpmProvenanceReadinessContext): string {
   return [
     'NPM_PUBLISH=true is set, but no evaluated publishing job declares permissions: id-token: write.',
-    'Add id-token: write under jobs.<publishing-job>.permissions; workflow-level permissions are not sufficient because job-level permissions override them.',
+    'Add id-token: write under top-level permissions or jobs.<publishing-job>.permissions; job-level permissions override workflow-level permissions.',
     ...context.missingJobRefs.map((ref) => `- missing on ${ref}`),
     ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
     ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
@@ -1002,8 +1056,8 @@ const NPM_PROVENANCE_READINESS_DECISIONS = {
     status: 'WARN',
     value: 'publishing job permissions not evaluated',
     detail: [
-      'NPM_PUBLISH=true is set, but one or more npm-publish workflow structures could not be mapped to concrete jobs.',
-      'Doctor only passes this check when the publishing job itself declares permissions: id-token: write.',
+      'NPM_PUBLISH=true is set, but one or more npm-publish workflow structures or permissions could not be evaluated.',
+      'Doctor passes this check when the publishing job resolves to permissions: id-token: write, either directly or by inheriting workflow-level permissions.',
       'Not evaluated:',
       ...context.notEvaluatedWorkflowDetails.map((detail) => `- ${detail}`),
       ...context.missingJobRefs.map((ref) => `- missing on ${ref}`),

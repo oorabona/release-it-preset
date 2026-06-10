@@ -813,7 +813,7 @@ describe('npm provenance readiness check', () => {
     expect(check.detail).toContain(`${join('.github', 'workflows', 'release.yml')}#publish`)
   })
 
-  it('WARN when id-token: write is only granted at workflow level', () => {
+  it('PASS when a publishing job inherits workflow-level id-token: write', () => {
     const deps = makeWorkflowDeps(
       {
         [join('.github', 'workflows', 'release.yml')]: [
@@ -833,9 +833,9 @@ describe('npm provenance readiness check', () => {
 
     const check = validateNpmProvenanceReadiness(deps)
 
-    expect(check.status).toBe('WARN')
-    expect(check.value).toBe('id-token: write not detected')
-    expect(check.detail).toContain('workflow-level permissions are not sufficient')
+    expect(check.status).toBe('PASS')
+    expect(check.value).toContain('id-token: write detected')
+    expect(check.detail).toContain(`${join('.github', 'workflows', 'release.yml')}#publish`)
   })
 
   it('WARN when job-level permissions override a workflow-level id-token grant', () => {
@@ -863,6 +863,75 @@ describe('npm provenance readiness check', () => {
     expect(check.status).toBe('WARN')
     expect(check.value).toBe('id-token: write not detected')
     expect(check.detail).toContain(`${join('.github', 'workflows', 'release.yml')}#publish`)
+  })
+
+  it('resolves inherited and scalar permissions for publishing jobs', () => {
+    const workflowPath = join('.github', 'workflows', 'release.yml')
+    const cases = [
+      {
+        name: 'workflow write-all inherited',
+        content: [
+          'permissions: write-all',
+          'jobs:',
+          '  publish:',
+          '    runs-on: ubuntu-latest',
+          '    steps:',
+          '      - run: npm publish',
+          '',
+        ].join('\n'),
+        status: 'PASS',
+      },
+      {
+        name: 'workflow read-all inherited',
+        content: [
+          'permissions: read-all',
+          'jobs:',
+          '  publish:',
+          '    runs-on: ubuntu-latest',
+          '    steps:',
+          '      - run: npm publish',
+          '',
+        ].join('\n'),
+        status: 'WARN',
+      },
+      {
+        name: 'job write-all overrides workflow read-all',
+        content: [
+          'permissions: read-all',
+          'jobs:',
+          '  publish:',
+          '    runs-on: ubuntu-latest',
+          '    permissions: write-all',
+          '    steps:',
+          '      - run: npm publish',
+          '',
+        ].join('\n'),
+        status: 'PASS',
+      },
+      {
+        name: 'job read-all overrides workflow write-all',
+        content: [
+          'permissions: write-all',
+          'jobs:',
+          '  publish:',
+          '    runs-on: ubuntu-latest',
+          '    permissions: read-all',
+          '    steps:',
+          '      - run: npm publish',
+          '',
+        ].join('\n'),
+        status: 'WARN',
+      },
+    ] as const
+
+    for (const testCase of cases) {
+      const check = validateNpmProvenanceReadiness(
+        makeWorkflowDeps({ [workflowPath]: testCase.content }, { NPM_PUBLISH: 'true' }),
+      )
+
+      expect(check.status, testCase.name).toBe(testCase.status)
+      expect(check.detail, testCase.name).toContain(`${workflowPath}#publish`)
+    }
   })
 
   it('WARN when id-token: write is granted only on a non-publishing job', () => {
@@ -968,7 +1037,7 @@ describe('npm provenance readiness check', () => {
     expect(check.value).toBe('id-token: write not detected')
   })
 
-  it('detects id-token: write only inside permissions blocks or inline permissions maps', () => {
+  it('detects id-token: write only inside resolved workflow or job permissions', () => {
     expect(
       workflowHasIdTokenWritePermission(
         'jobs:\n  publish:\n    permissions:\n      id-token: write\n',
@@ -979,6 +1048,26 @@ describe('npm provenance readiness check', () => {
         'jobs:\n  publish:\n    permissions: { contents: write, id-token: write }\n',
       ),
     ).toBe(true)
+    expect(
+      workflowHasIdTokenWritePermission(
+        'permissions: { contents: write, id-token: write }\njobs:\n  publish:\n    runs-on: ubuntu-latest\n',
+      ),
+    ).toBe(true)
+    expect(
+      workflowHasIdTokenWritePermission(
+        'permissions: write-all\njobs:\n  publish:\n    runs-on: ubuntu-latest\n',
+      ),
+    ).toBe(true)
+    expect(
+      workflowHasIdTokenWritePermission(
+        'permissions: read-all\njobs:\n  publish:\n    runs-on: ubuntu-latest\n',
+      ),
+    ).toBe(false)
+    expect(
+      workflowHasIdTokenWritePermission(
+        'permissions: write-all\njobs:\n  publish:\n    permissions: read-all\n',
+      ),
+    ).toBe(false)
     expect(
       workflowHasIdTokenWritePermission('permissions: { contents: write, id-token: write }\n'),
     ).toBe(false)
