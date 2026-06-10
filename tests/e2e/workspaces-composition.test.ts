@@ -47,9 +47,6 @@ function releaseConfig(withWorkspacesPlugin: boolean): Record<string, unknown> {
           '@release-it-plugins/workspaces': {
             skipChecks: true,
             publish: false,
-            additionalManifests: {
-              versionUpdates: [],
-            },
           },
         }
       : {},
