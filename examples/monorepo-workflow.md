@@ -287,6 +287,29 @@ pnpm release:core
 pnpm release:all
 ```
 
+### Pattern 5: Synchronized Versions with `@release-it-plugins/workspaces` (CI-tested)
+
+The patterns above release each package **independently**. If instead all your workspace packages share **one synchronized version** (bumped together, internal dependency ranges updated automatically), compose the preset with [`@release-it-plugins/workspaces`](https://github.com/release-it-plugins/workspaces):
+
+**File: `.release-it.json` (root)**
+
+```json
+{
+  "extends": "@oorabona/release-it-preset/config/default",
+  "plugins": {
+    "@release-it-plugins/workspaces": true
+  }
+}
+```
+
+```bash
+pnpm add -D @oorabona/release-it-preset @release-it-plugins/workspaces release-it@^19
+```
+
+**Version constraint (important):** `@release-it-plugins/workspaces` v5.0.3 declares peer `release-it ^17 || ^18 || ^19`, while this preset supports `^19 || ^20`. The supported intersection is **release-it `^19`** — with `release-it@20` installed, the plugin fails at module load with an unmet peer dependency error. Pin release-it to v19 when composing; use v20 standalone otherwise.
+
+This composition is exercised end-to-end in this repository's CI: `tests/e2e/workspaces-composition.test.ts` runs a dry-run release in a real temp monorepo and asserts the plugin bumps workspace package versions and rewrites internal dependency ranges while the preset's changelog machinery runs alongside. The release-it 20 incompatibility is itself locked by a test, so the guidance above will be updated when the plugin widens its peer range.
+
 ## GitHub Actions Integration
 
 ### Reusable Workflow for Package Releases

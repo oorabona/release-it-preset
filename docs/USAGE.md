@@ -332,7 +332,7 @@ pnpm add -D @oorabona/release-it-preset @release-it-plugins/workspaces release-i
 }
 ```
 
-**Peer compatibility note:** `@release-it-plugins/workspaces` v5.0.3 declares peer `release-it ^17 || ^18 || ^19`. The intersection with this preset's `^19 || ^20` is `^19`, so when composing with the workspaces plugin you must pin release-it to v19. v20 standalone is recommended for new projects.
+**Peer compatibility note:** `@release-it-plugins/workspaces` v5.0.3 declares peer `release-it ^17 || ^18 || ^19`. The intersection with this preset's `^19 || ^20` is `^19`, so when composing with the workspaces plugin you must pin release-it to v19. If `release-it@20` is installed, the plugin fails at module load with an unmet peer dependency error. v20 standalone is recommended for new non-workspaces projects.
 
 When this composition is right for you:
 - You release multiple packages with **synchronized versions** (all bumped together)
