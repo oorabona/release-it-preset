@@ -23,6 +23,11 @@ import {
   parseWorkspacesFromPackageJson,
   resolvePackagePaths,
 } from './lib/workspace-detect.js'
+import {
+  hasGeneratedWorkflowMarker,
+  normalizeWorkflowContent,
+  readWorkflowTemplate,
+} from './lib/workflow-template.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -342,6 +347,785 @@ function detectWorkspaceIntegration(deps: DoctorDeps): CheckResult {
       'Skip if you only need per-package CHANGELOG (use GIT_CHANGELOG_PATH).',
     ].join('\n'),
   }
+}
+
+const WORKFLOW_DIR = join('.github', 'workflows')
+const WORKFLOW_FILE_NAME_REGEX = /^[A-Za-z0-9._-]+\.ya?ml$/
+
+interface WorkflowFile {
+  path: string
+  content: string
+}
+
+interface WorkflowScan {
+  files: WorkflowFile[]
+  skippedFileNames: string[]
+  unreadableFilePaths: string[]
+  error?: string
+}
+
+function listWorkflowFiles(deps: DoctorDeps): WorkflowScan {
+  if (!deps.existsSync(WORKFLOW_DIR)) {
+    return { files: [], skippedFileNames: [], unreadableFilePaths: [] }
+  }
+
+  let entries: unknown
+  try {
+    entries = deps.readdirSync(WORKFLOW_DIR)
+  } catch (error) {
+    return {
+      files: [],
+      skippedFileNames: [],
+      unreadableFilePaths: [],
+      error: error instanceof Error ? error.message : 'workflow directory could not be read',
+    }
+  }
+
+  if (!Array.isArray(entries)) {
+    return {
+      files: [],
+      skippedFileNames: [],
+      unreadableFilePaths: [],
+      error: 'workflow directory listing did not return file names',
+    }
+  }
+
+  const files: WorkflowFile[] = []
+  const skippedFileNames: string[] = []
+  const unreadableFilePaths: string[] = []
+
+  for (const entry of entries) {
+    if (typeof entry !== 'string' || !WORKFLOW_FILE_NAME_REGEX.test(entry)) {
+      skippedFileNames.push(String(entry))
+      continue
+    }
+
+    const path = join(WORKFLOW_DIR, entry)
+    try {
+      files.push({
+        path,
+        content: deps.readFileSync(path, 'utf8') as string,
+      })
+    } catch {
+      unreadableFilePaths.push(path)
+    }
+  }
+
+  return { files, skippedFileNames, unreadableFilePaths }
+}
+
+function formatSkippedWorkflowFiles(skippedFileNames: string[]): string[] {
+  if (skippedFileNames.length === 0) {
+    return []
+  }
+
+  return [
+    'Skipped workflow file name(s) outside the generated-template allowlist:',
+    ...skippedFileNames.map((name) => `- ${name}`),
+  ]
+}
+
+function formatUnreadableWorkflowFiles(unreadableFilePaths: string[]): string[] {
+  if (unreadableFilePaths.length === 0) {
+    return []
+  }
+
+  return [
+    'Unreadable workflow file(s) were not evaluated:',
+    ...unreadableFilePaths.map((path) => `- ${path}`),
+  ]
+}
+
+type PublishWorkflowFreshnessState =
+  | 'WORKFLOW_DIR_UNREADABLE'
+  | 'WORKFLOW_FILES_UNREADABLE'
+  | 'NO_WORKFLOW_FILES'
+  | 'NO_GENERATED_WORKFLOW'
+  | 'TEMPLATE_UNAVAILABLE'
+  | 'TEMPLATE_MISSING_MARKER'
+  | 'GENERATED_WORKFLOWS_FRESH'
+  | 'GENERATED_WORKFLOWS_STALE'
+
+interface PublishWorkflowFreshnessContext {
+  scan: WorkflowScan
+  generatedWorkflowPaths: string[]
+  staleWorkflowPaths: string[]
+  templateError?: string
+  templateMissingMarker: boolean
+}
+
+function classifyPublishWorkflowFreshness(
+  context: PublishWorkflowFreshnessContext,
+): PublishWorkflowFreshnessState {
+  if (context.scan.error) return 'WORKFLOW_DIR_UNREADABLE'
+  if (context.scan.files.length === 0) {
+    return context.scan.unreadableFilePaths.length > 0 ? 'WORKFLOW_FILES_UNREADABLE' : 'NO_WORKFLOW_FILES'
+  }
+  if (context.generatedWorkflowPaths.length === 0) {
+    return context.scan.unreadableFilePaths.length > 0 ? 'WORKFLOW_FILES_UNREADABLE' : 'NO_GENERATED_WORKFLOW'
+  }
+  if (context.templateError) return 'TEMPLATE_UNAVAILABLE'
+  if (context.templateMissingMarker) return 'TEMPLATE_MISSING_MARKER'
+  if (context.staleWorkflowPaths.length > 0) return 'GENERATED_WORKFLOWS_STALE'
+  // Skipped files (name outside the supported pattern) could hold a stale
+  // generated workflow — a clean PASS must never hide unscanned files.
+  if (context.scan.unreadableFilePaths.length > 0 || context.scan.skippedFileNames.length > 0) {
+    return 'WORKFLOW_FILES_UNREADABLE'
+  }
+  return 'GENERATED_WORKFLOWS_FRESH'
+}
+
+const PUBLISH_WORKFLOW_FRESHNESS_DECISIONS = {
+  WORKFLOW_DIR_UNREADABLE: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'WARN',
+    value: 'workflow directory not evaluated',
+    detail: context.scan.error,
+  }),
+  WORKFLOW_FILES_UNREADABLE: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'WARN',
+    value: 'workflow files partially evaluated',
+    detail: [
+      'One or more workflow files could not be read, so generated workflow freshness was not fully evaluated.',
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+    ].join('\n'),
+  }),
+  // Omitted, not PASS: no workflow files at all means the domain is absent
+  // (same not-applicable convention as the workspace ranges check).
+  NO_WORKFLOW_FILES: (): null => null,
+  NO_GENERATED_WORKFLOW: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'PASS',
+    value: 'custom workflow(s) not evaluated',
+    detail: [
+      'No workflow generated by release-it-preset init --with-workflows was detected.',
+      'Only files carrying the generated workflow marker are compared to the shipped template.',
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+    ].join('\n'),
+  }),
+  TEMPLATE_UNAVAILABLE: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'WARN',
+    value: 'canonical template unavailable',
+    detail: context.templateError,
+  }),
+  TEMPLATE_MISSING_MARKER: (): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'WARN',
+    value: 'canonical template not evaluated',
+    detail: 'The shipped workflow template does not carry the generated workflow marker.',
+  }),
+  GENERATED_WORKFLOWS_FRESH: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'PASS',
+    value: `${context.generatedWorkflowPaths.length} generated workflow(s) fresh`,
+    detail: [
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+    ].join('\n') || undefined,
+  }),
+  GENERATED_WORKFLOWS_STALE: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'WARN',
+    value: `${context.staleWorkflowPaths.length} generated workflow(s) stale`,
+    detail: [
+      'Generated workflow file(s) differ from the shipped release workflow template:',
+      ...context.staleWorkflowPaths.map((path) => `- ${path}`),
+      'Run release-it-preset init --with-workflows in a scratch directory and merge the generated workflow updates.',
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+    ].join('\n'),
+  }),
+} satisfies Record<
+  PublishWorkflowFreshnessState,
+  (context: PublishWorkflowFreshnessContext) => CheckResult | null
+>
+
+export function validatePublishWorkflowFreshness(deps: DoctorDeps): CheckResult | null {
+  const scan = listWorkflowFiles(deps)
+  const generatedWorkflowPaths = scan.files
+    .filter((file) => hasGeneratedWorkflowMarker(file.content))
+    .map((file) => file.path)
+  const staleWorkflowPaths: string[] = []
+  let templateError: string | undefined
+  let templateMissingMarker = false
+
+  if (generatedWorkflowPaths.length > 0) {
+    try {
+      const template = readWorkflowTemplate(deps).content
+      if (!hasGeneratedWorkflowMarker(template)) {
+        templateMissingMarker = true
+      } else {
+        const normalizedTemplate = normalizeWorkflowContent(template)
+        for (const file of scan.files) {
+          if (
+            hasGeneratedWorkflowMarker(file.content) &&
+            normalizeWorkflowContent(file.content) !== normalizedTemplate
+          ) {
+            staleWorkflowPaths.push(file.path)
+          }
+        }
+      }
+    } catch (error) {
+      templateError = error instanceof Error ? error.message : 'canonical workflow template unavailable'
+    }
+  }
+
+  const context: PublishWorkflowFreshnessContext = {
+    scan,
+    generatedWorkflowPaths,
+    staleWorkflowPaths,
+    templateError,
+    templateMissingMarker,
+  }
+  const state = classifyPublishWorkflowFreshness(context)
+  return PUBLISH_WORKFLOW_FRESHNESS_DECISIONS[state](context)
+}
+
+function stripYamlComment(line: string): string {
+  const commentIndex = line.indexOf('#')
+  return (commentIndex >= 0 ? line.slice(0, commentIndex) : line).trimEnd()
+}
+
+function countIndent(line: string): number {
+  return line.match(/^\s*/)?.[0].length ?? 0
+}
+
+interface YamlLine {
+  index: number
+  text: string
+  trimmed: string
+  indent: number
+}
+
+interface YamlMapping {
+  key: string
+  value: string
+}
+
+interface WorkflowJobBlock {
+  id: string
+  content: string
+  indent: number
+}
+
+type WorkflowJobsParseResult =
+  | {
+      ok: true
+      jobs: WorkflowJobBlock[]
+    }
+  | {
+      ok: false
+      reason: string
+    }
+
+type PermissionEvaluation = 'GRANTED' | 'MISSING' | 'NOT_EVALUATED'
+type JobPermissionEvaluation = PermissionEvaluation | 'INHERIT'
+
+interface WorkflowNpmProvenanceEvaluation {
+  publishJobIds: string[]
+  idTokenJobIds: string[]
+  missingJobIds: string[]
+  notEvaluatedReason?: string
+}
+
+function toYamlLines(content: string): { rawLines: string[]; lines: YamlLine[] } {
+  const rawLines = content.split(/\r?\n/)
+  return {
+    rawLines,
+    lines: rawLines
+      .map((rawLine, index) => {
+        const text = stripYamlComment(rawLine)
+        return {
+          index,
+          text,
+          trimmed: text.trim(),
+          indent: countIndent(text),
+        }
+      })
+      .filter((line) => line.trimmed !== ''),
+  }
+}
+
+function parseYamlMapping(trimmed: string): YamlMapping | null {
+  if (trimmed.startsWith('- ')) {
+    return null
+  }
+
+  const match = trimmed.match(/^("[^"]+"|'[^']+'|[A-Za-z0-9_-]+)\s*:\s*(.*)$/)
+  if (!match) {
+    return null
+  }
+
+  const rawKey = match[1]
+  const key =
+    (rawKey.startsWith('"') && rawKey.endsWith('"')) ||
+    (rawKey.startsWith("'") && rawKey.endsWith("'"))
+      ? rawKey.slice(1, -1)
+      : rawKey
+
+  return {
+    key,
+    value: match[2].trim(),
+  }
+}
+
+function parseWorkflowJobs(content: string): WorkflowJobsParseResult {
+  const { rawLines, lines } = toYamlLines(content)
+  const jobsLines = lines.filter((line) => {
+    const mapping = parseYamlMapping(line.trimmed)
+    return line.indent === 0 && mapping?.key === 'jobs'
+  })
+
+  if (jobsLines.length === 0) {
+    return { ok: false, reason: 'top-level jobs block not detected' }
+  }
+  if (jobsLines.length > 1) {
+    return { ok: false, reason: 'multiple top-level jobs blocks detected' }
+  }
+
+  const jobsLine = jobsLines[0]
+  const jobsMapping = parseYamlMapping(jobsLine.trimmed)
+  if (!jobsMapping || jobsMapping.value !== '') {
+    return { ok: false, reason: 'top-level jobs block uses an inline or dynamic value' }
+  }
+
+  const firstAfterJobs = lines.findIndex((line) => line.index > jobsLine.index)
+  const jobsBlockEnd =
+    firstAfterJobs === -1
+      ? rawLines.length
+      : (lines.slice(firstAfterJobs).find((line) => line.indent <= jobsLine.indent)?.index ??
+        rawLines.length)
+
+  const jobLines = lines.filter((line) => line.index > jobsLine.index && line.index < jobsBlockEnd)
+  if (jobLines.length === 0) {
+    return { ok: false, reason: 'jobs block is empty' }
+  }
+
+  const jobIndent = jobLines[0].indent
+  if (jobIndent <= jobsLine.indent) {
+    return { ok: false, reason: 'jobs block has no nested job definitions' }
+  }
+
+  const jobStarts: Array<{ id: string; index: number }> = []
+  for (const line of jobLines) {
+    if (line.indent !== jobIndent) {
+      continue
+    }
+
+    const mapping = parseYamlMapping(line.trimmed)
+    if (!mapping) {
+      return { ok: false, reason: 'jobs block contains an unsupported child entry' }
+    }
+    if (mapping.value !== '') {
+      return { ok: false, reason: `job "${mapping.key}" uses an inline or dynamic value` }
+    }
+
+    jobStarts.push({ id: mapping.key, index: line.index })
+  }
+
+  if (jobStarts.length === 0) {
+    return { ok: false, reason: 'jobs block has no supported job definitions' }
+  }
+
+  const jobs = jobStarts.map((job, index): WorkflowJobBlock => {
+    const nextJob = jobStarts[index + 1]
+    const endIndex = nextJob?.index ?? jobsBlockEnd
+    return {
+      id: job.id,
+      content: rawLines.slice(job.index, endIndex).join('\n'),
+      indent: jobIndent,
+    }
+  })
+
+  return { ok: true, jobs }
+}
+
+function stripYamlQuotes(value: string): string {
+  const trimmed = value.trim()
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
+
+function inlinePermissionsMapHasIdTokenWrite(value: string): boolean | null {
+  const trimmed = value.trim()
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+    return null
+  }
+
+  return /(?:^|,)\s*['"]?id-token['"]?\s*:\s*['"]?write['"]?\s*(?:,|$)/.test(
+    trimmed.slice(1, -1),
+  )
+}
+
+function scalarPermissionsValueHasIdTokenWrite(value: string): PermissionEvaluation | null {
+  const scalar = stripYamlQuotes(value)
+  if (scalar === 'write-all') {
+    return 'GRANTED'
+  }
+  if (scalar === 'read-all') {
+    return 'MISSING'
+  }
+  return null
+}
+
+function isDynamicYamlValue(value: string): boolean {
+  return (
+    value.startsWith('*') ||
+    value.startsWith('&') ||
+    value.startsWith('[') ||
+    value.includes('${{')
+  )
+}
+
+function evaluatePermissionsValue(value: string): PermissionEvaluation {
+  const scalarResult = scalarPermissionsValueHasIdTokenWrite(value)
+  if (scalarResult !== null) {
+    return scalarResult
+  }
+
+  const inlineResult = inlinePermissionsMapHasIdTokenWrite(value)
+  if (inlineResult !== null) {
+    return inlineResult ? 'GRANTED' : 'MISSING'
+  }
+
+  return isDynamicYamlValue(value) ? 'NOT_EVALUATED' : 'MISSING'
+}
+
+function evaluatePermissionsLine(lines: YamlLine[], permissionsLine: YamlLine): PermissionEvaluation {
+  const permissions = parseYamlMapping(permissionsLine.trimmed)
+  if (!permissions) {
+    return 'NOT_EVALUATED'
+  }
+
+  if (permissions.value !== '') {
+    return evaluatePermissionsValue(permissions.value)
+  }
+
+  const permissionChildLines = lines.filter((line) => line.index > permissionsLine.index)
+  const permissionBlockLines: YamlLine[] = []
+  for (const line of permissionChildLines) {
+    if (line.indent <= permissionsLine.indent) {
+      break
+    }
+    permissionBlockLines.push(line)
+  }
+
+  if (permissionBlockLines.length === 0) {
+    return 'MISSING'
+  }
+
+  const permissionChildIndent = permissionBlockLines[0].indent
+  for (const line of permissionBlockLines) {
+    if (line.indent !== permissionChildIndent) {
+      continue
+    }
+
+    const mapping = parseYamlMapping(line.trimmed)
+    if (!mapping || mapping.key === '<<' || isDynamicYamlValue(mapping.value)) {
+      return 'NOT_EVALUATED'
+    }
+    if (mapping.key === 'id-token' && stripYamlQuotes(mapping.value) === 'write') {
+      return 'GRANTED'
+    }
+  }
+
+  return 'MISSING'
+}
+
+function evaluateWorkflowIdTokenWritePermission(content: string): PermissionEvaluation {
+  const { lines } = toYamlLines(content)
+  const permissionsLines = lines.filter((line) => {
+    const mapping = parseYamlMapping(line.trimmed)
+    return line.indent === 0 && mapping?.key === 'permissions'
+  })
+
+  if (permissionsLines.length === 0) {
+    return 'MISSING'
+  }
+  if (permissionsLines.length > 1) {
+    return 'NOT_EVALUATED'
+  }
+
+  return evaluatePermissionsLine(lines, permissionsLines[0])
+}
+
+function evaluateJobIdTokenWritePermission(job: WorkflowJobBlock): JobPermissionEvaluation {
+  const { lines } = toYamlLines(job.content)
+  const childLines = lines.filter((line) => line.index > 0 && line.indent > job.indent)
+  if (childLines.length === 0) {
+    return 'INHERIT'
+  }
+
+  const childIndent = childLines[0].indent
+  const permissionsLines = childLines.filter((line) => {
+    const mapping = parseYamlMapping(line.trimmed)
+    return line.indent === childIndent && mapping?.key === 'permissions'
+  })
+
+  if (permissionsLines.length === 0) {
+    return 'INHERIT'
+  }
+  if (permissionsLines.length > 1) {
+    return 'NOT_EVALUATED'
+  }
+
+  return evaluatePermissionsLine(childLines, permissionsLines[0])
+}
+
+function resolveJobIdTokenWritePermission(
+  job: WorkflowJobBlock,
+  workflowPermission: PermissionEvaluation,
+): PermissionEvaluation {
+  const jobPermission = evaluateJobIdTokenWritePermission(job)
+  return jobPermission === 'INHERIT' ? workflowPermission : jobPermission
+}
+
+export function workflowHasIdTokenWritePermission(content: string): boolean {
+  const parsed = parseWorkflowJobs(content)
+  if (!parsed.ok) {
+    return false
+  }
+
+  const workflowPermission = evaluateWorkflowIdTokenWritePermission(content)
+  return parsed.jobs.some(
+    (job) => resolveJobIdTokenWritePermission(job, workflowPermission) === 'GRANTED',
+  )
+}
+
+function contentWithoutYamlComments(content: string): string {
+  return content
+    .split(/\r?\n/)
+    .map((line) => stripYamlComment(line))
+    .join('\n')
+}
+
+function workflowHasNpmPublishIntent(content: string): boolean {
+  const body = contentWithoutYamlComments(content)
+  return (
+    /\bNPM_PUBLISH\s*:\s*(?:['"]?true['"]?|\$\{\{)/.test(body) ||
+    /\bretry-publish(?![-\w])/.test(body) ||
+    /\bnpm\s+publish\b/.test(body)
+  )
+}
+
+function evaluateWorkflowNpmProvenance(content: string): WorkflowNpmProvenanceEvaluation {
+  if (!workflowHasNpmPublishIntent(content)) {
+    return {
+      publishJobIds: [],
+      idTokenJobIds: [],
+      missingJobIds: [],
+    }
+  }
+
+  const parsed = parseWorkflowJobs(content)
+  if (!parsed.ok) {
+    return {
+      publishJobIds: [],
+      idTokenJobIds: [],
+      missingJobIds: [],
+      notEvaluatedReason: parsed.reason,
+    }
+  }
+
+  const publishJobs = parsed.jobs.filter((job) => workflowHasNpmPublishIntent(job.content))
+  if (publishJobs.length === 0) {
+    return {
+      publishJobIds: [],
+      idTokenJobIds: [],
+      missingJobIds: [],
+      notEvaluatedReason:
+        'npm-publish signal is present, but no concrete publishing job could be identified',
+    }
+  }
+
+  const idTokenJobIds: string[] = []
+  const missingJobIds: string[] = []
+  const notEvaluatedJobIds: string[] = []
+  const workflowPermission = evaluateWorkflowIdTokenWritePermission(content)
+
+  for (const job of publishJobs) {
+    const permission = resolveJobIdTokenWritePermission(job, workflowPermission)
+    if (permission === 'GRANTED') {
+      idTokenJobIds.push(job.id)
+    } else if (permission === 'MISSING') {
+      missingJobIds.push(job.id)
+    } else {
+      notEvaluatedJobIds.push(job.id)
+    }
+  }
+
+  return {
+    publishJobIds: publishJobs.map((job) => job.id),
+    idTokenJobIds,
+    missingJobIds,
+    notEvaluatedReason:
+      notEvaluatedJobIds.length > 0
+        ? `resolved permissions not evaluated for: ${notEvaluatedJobIds.join(', ')}`
+        : undefined,
+  }
+}
+
+type NpmProvenanceReadinessState =
+  | 'NPM_PUBLISH_DISABLED'
+  | 'WORKFLOW_DIR_UNREADABLE'
+  | 'WORKFLOW_FILES_UNREADABLE'
+  | 'WORKFLOW_FILES_SKIPPED'
+  | 'NO_WORKFLOW_FILES'
+  | 'NO_NPM_PUBLISH_WORKFLOW'
+  | 'PUBLISHING_JOB_NOT_EVALUATED'
+  | 'ID_TOKEN_WRITE_FOUND'
+  | 'ID_TOKEN_WRITE_MISSING'
+
+interface NpmProvenanceReadinessContext {
+  scan: WorkflowScan
+  publishJobRefs: string[]
+  idTokenJobRefs: string[]
+  missingJobRefs: string[]
+  notEvaluatedWorkflowDetails: string[]
+  npmPublish: string | undefined
+}
+
+function classifyNpmProvenanceReadiness(
+  context: NpmProvenanceReadinessContext,
+): NpmProvenanceReadinessState {
+  if (context.npmPublish !== 'true') return 'NPM_PUBLISH_DISABLED'
+  if (context.scan.error) return 'WORKFLOW_DIR_UNREADABLE'
+  if (context.scan.files.length === 0 && context.scan.unreadableFilePaths.length === 0) {
+    return 'NO_WORKFLOW_FILES'
+  }
+  if (context.scan.unreadableFilePaths.length > 0) return 'WORKFLOW_FILES_UNREADABLE'
+  if (context.notEvaluatedWorkflowDetails.length > 0) return 'PUBLISHING_JOB_NOT_EVALUATED'
+  if (context.publishJobRefs.length === 0) return 'NO_NPM_PUBLISH_WORKFLOW'
+  if (context.missingJobRefs.length > 0) return 'ID_TOKEN_WRITE_MISSING'
+  // A skipped file (name outside the supported pattern) could contain an
+  // ungated publishing job — a clean PASS must never hide unscanned files.
+  if (context.scan.skippedFileNames.length > 0) return 'WORKFLOW_FILES_SKIPPED'
+  return 'ID_TOKEN_WRITE_FOUND'
+}
+
+function npmProvenanceMissingDetail(context: NpmProvenanceReadinessContext): string {
+  return [
+    'NPM_PUBLISH=true is set, but no evaluated publishing job declares permissions: id-token: write.',
+    'Add id-token: write under top-level permissions or jobs.<publishing-job>.permissions; job-level permissions override workflow-level permissions.',
+    ...context.missingJobRefs.map((ref) => `- missing on ${ref}`),
+    ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+    ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+  ].join('\n')
+}
+
+const NPM_PROVENANCE_READINESS_DECISIONS = {
+  // Omitted, not PASS: matches the not-applicable convention of the
+  // workspace ranges check and the documented "when NPM_PUBLISH=true" gate.
+  NPM_PUBLISH_DISABLED: (): null => null,
+  WORKFLOW_DIR_UNREADABLE: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'workflow directory not evaluated',
+    detail: context.scan.error,
+  }),
+  WORKFLOW_FILES_UNREADABLE: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'workflow files not evaluated',
+    detail: [
+      'One or more workflow files could not be read, so npm provenance readiness was not fully evaluated.',
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+    ].join('\n'),
+  }),
+  NO_WORKFLOW_FILES: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'id-token: write not detected',
+    detail: npmProvenanceMissingDetail(context),
+  }),
+  NO_NPM_PUBLISH_WORKFLOW: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'npm publish workflow not detected',
+    detail: [
+      'NPM_PUBLISH=true is set, but no allowlisted workflow file contains a supported npm-publish signal.',
+      'Supported signals: NPM_PUBLISH, retry-publish, or npm publish.',
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+    ].join('\n'),
+  }),
+  WORKFLOW_FILES_SKIPPED: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'workflow files partially evaluated',
+    detail: [
+      'Evaluated publishing jobs all resolve to id-token: write, but some workflow files were skipped because their name is outside the supported pattern, so they may contain an unverified publishing job.',
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+      'Rename the skipped file(s) to a simple name (letters, digits, dot, underscore, dash) or review their permissions manually.',
+    ].join('\n'),
+  }),
+  PUBLISHING_JOB_NOT_EVALUATED: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'publishing job permissions not evaluated',
+    detail: [
+      'NPM_PUBLISH=true is set, but one or more npm-publish workflow structures or permissions could not be evaluated.',
+      'Doctor passes this check when the publishing job resolves to permissions: id-token: write, either directly or by inheriting workflow-level permissions.',
+      'Not evaluated:',
+      ...context.notEvaluatedWorkflowDetails.map((detail) => `- ${detail}`),
+      ...context.missingJobRefs.map((ref) => `- missing on ${ref}`),
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+    ].join('\n'),
+  }),
+  ID_TOKEN_WRITE_FOUND: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'PASS',
+    value: `id-token: write detected on ${context.idTokenJobRefs.length} publishing job(s)`,
+    detail: context.idTokenJobRefs.map((ref) => `- ${ref}`).join('\n'),
+  }),
+  ID_TOKEN_WRITE_MISSING: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'id-token: write not detected',
+    detail: npmProvenanceMissingDetail(context),
+  }),
+} satisfies Record<
+  NpmProvenanceReadinessState,
+  (context: NpmProvenanceReadinessContext) => CheckResult | null
+>
+
+export function validateNpmProvenanceReadiness(deps: DoctorDeps): CheckResult | null {
+  const scan = listWorkflowFiles(deps)
+  const publishJobRefs: string[] = []
+  const idTokenJobRefs: string[] = []
+  const missingJobRefs: string[] = []
+  const notEvaluatedWorkflowDetails: string[] = []
+
+  for (const file of scan.files) {
+    const evaluation = evaluateWorkflowNpmProvenance(file.content)
+    publishJobRefs.push(...evaluation.publishJobIds.map((jobId) => `${file.path}#${jobId}`))
+    idTokenJobRefs.push(...evaluation.idTokenJobIds.map((jobId) => `${file.path}#${jobId}`))
+    missingJobRefs.push(...evaluation.missingJobIds.map((jobId) => `${file.path}#${jobId}`))
+    if (evaluation.notEvaluatedReason) {
+      notEvaluatedWorkflowDetails.push(`${file.path}: ${evaluation.notEvaluatedReason}`)
+    }
+  }
+
+  const context: NpmProvenanceReadinessContext = {
+    scan,
+    publishJobRefs,
+    idTokenJobRefs,
+    missingJobRefs,
+    notEvaluatedWorkflowDetails,
+    npmPublish: deps.getEnv('NPM_PUBLISH'),
+  }
+  const state = classifyNpmProvenanceReadiness(context)
+  return NPM_PROVENANCE_READINESS_DECISIONS[state](context)
 }
 
 type DependencyField = 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies'
@@ -838,6 +1622,15 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
   const workspaceDependencyRanges = validateWorkspaceDependencyRanges(deps)
   if (workspaceDependencyRanges) {
     checks.push(workspaceDependencyRanges)
+  }
+
+  const publishWorkflowFreshness = validatePublishWorkflowFreshness(deps)
+  if (publishWorkflowFreshness) {
+    checks.push(publishWorkflowFreshness)
+  }
+  const npmProvenanceReadiness = validateNpmProvenanceReadiness(deps)
+  if (npmProvenanceReadiness) {
+    checks.push(npmProvenanceReadiness)
   }
 
   for (const result of validateReleaseItPeer(deps)) {
