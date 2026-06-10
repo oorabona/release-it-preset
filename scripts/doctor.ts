@@ -467,7 +467,11 @@ function classifyPublishWorkflowFreshness(
   if (context.templateError) return 'TEMPLATE_UNAVAILABLE'
   if (context.templateMissingMarker) return 'TEMPLATE_MISSING_MARKER'
   if (context.staleWorkflowPaths.length > 0) return 'GENERATED_WORKFLOWS_STALE'
-  if (context.scan.unreadableFilePaths.length > 0) return 'WORKFLOW_FILES_UNREADABLE'
+  // Skipped files (name outside the supported pattern) could hold a stale
+  // generated workflow — a clean PASS must never hide unscanned files.
+  if (context.scan.unreadableFilePaths.length > 0 || context.scan.skippedFileNames.length > 0) {
+    return 'WORKFLOW_FILES_UNREADABLE'
+  }
   return 'GENERATED_WORKFLOWS_FRESH'
 }
 
@@ -974,6 +978,7 @@ type NpmProvenanceReadinessState =
   | 'NPM_PUBLISH_DISABLED'
   | 'WORKFLOW_DIR_UNREADABLE'
   | 'WORKFLOW_FILES_UNREADABLE'
+  | 'WORKFLOW_FILES_SKIPPED'
   | 'NO_WORKFLOW_FILES'
   | 'NO_NPM_PUBLISH_WORKFLOW'
   | 'PUBLISHING_JOB_NOT_EVALUATED'
@@ -1000,8 +1005,11 @@ function classifyNpmProvenanceReadiness(
   if (context.scan.unreadableFilePaths.length > 0) return 'WORKFLOW_FILES_UNREADABLE'
   if (context.notEvaluatedWorkflowDetails.length > 0) return 'PUBLISHING_JOB_NOT_EVALUATED'
   if (context.publishJobRefs.length === 0) return 'NO_NPM_PUBLISH_WORKFLOW'
-  if (context.missingJobRefs.length === 0) return 'ID_TOKEN_WRITE_FOUND'
-  return 'ID_TOKEN_WRITE_MISSING'
+  if (context.missingJobRefs.length > 0) return 'ID_TOKEN_WRITE_MISSING'
+  // A skipped file (name outside the supported pattern) could contain an
+  // ungated publishing job — a clean PASS must never hide unscanned files.
+  if (context.scan.skippedFileNames.length > 0) return 'WORKFLOW_FILES_SKIPPED'
+  return 'ID_TOKEN_WRITE_FOUND'
 }
 
 function npmProvenanceMissingDetail(context: NpmProvenanceReadinessContext): string {
@@ -1049,6 +1057,16 @@ const NPM_PROVENANCE_READINESS_DECISIONS = {
       'Supported signals: NPM_PUBLISH, retry-publish, or npm publish.',
       ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
       ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+    ].join('\n'),
+  }),
+  WORKFLOW_FILES_SKIPPED: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'workflow files partially evaluated',
+    detail: [
+      'Evaluated publishing jobs all resolve to id-token: write, but some workflow files were skipped because their name is outside the supported pattern, so they may contain an unverified publishing job.',
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+      'Rename the skipped file(s) to a simple name (letters, digits, dot, underscore, dash) or review their permissions manually.',
     ].join('\n'),
   }),
   PUBLISHING_JOB_NOT_EVALUATED: (context: NpmProvenanceReadinessContext): CheckResult => ({

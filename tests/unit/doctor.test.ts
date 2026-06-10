@@ -759,6 +759,24 @@ describe('publish workflow freshness check', () => {
     expect(check.value).toBe('workflow files partially evaluated')
     expect(check.detail).toContain(join(workflowDir, 'release.yml'))
   })
+
+  it('WARN when a skipped workflow file could hide a stale generated workflow', () => {
+    // Mutation lock: a fresh verdict used to ignore skipped file names, so a
+    // generated workflow renamed outside the supported pattern vanished from
+    // the comparison while the check still reported PASS.
+    const deps = makeWorkflowDeps({
+      [join('.github', 'workflows', 'release.yml')]: GENERATED_WORKFLOW,
+    })
+    ;(deps.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue([
+      'release.yml',
+      'release publish.yml',
+    ])
+
+    const check = validatePublishWorkflowFreshness(deps)
+
+    expect(check?.status).toBe('WARN')
+    expect(check?.detail).toContain('release publish.yml')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -772,6 +790,27 @@ describe('npm provenance readiness check', () => {
     const check = validateNpmProvenanceReadiness(makeDeps())
 
     expect(check).toBeNull()
+  })
+
+  it('WARN when a skipped workflow file could hide an unverified publishing job', () => {
+    // Mutation lock: classifying skipped files after the granted check used
+    // to return a clean PASS while "release publish.yml" was never scanned.
+    const deps = makeWorkflowDeps(
+      {
+        [join('.github', 'workflows', 'release.yml')]: GENERATED_WORKFLOW,
+      },
+      { NPM_PUBLISH: 'true' },
+    )
+    ;(deps.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue([
+      'release.yml',
+      'release publish.yml',
+    ])
+
+    const check = validateNpmProvenanceReadiness(deps)
+
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toBe('workflow files partially evaluated')
+    expect(check?.detail).toContain('release publish.yml')
   })
 
   it('PASS when NPM_PUBLISH=true and the publishing job grants id-token: write', () => {
