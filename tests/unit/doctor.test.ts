@@ -696,6 +696,25 @@ describe('Workspace dependency ranges check', () => {
     expect(check?.detail).toContain('unsupported range syntax')
   })
 
+  it('WARN when pnpm-workspace.yaml cannot be parsed', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'pnpm-workspace.yaml'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'pnpm-workspace.yaml') {
+          return "packages: ['packages/*']\n"
+        }
+        return ''
+      }),
+    })
+
+    const check = validateWorkspaceDependencyRanges(deps)
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toBe('workspace configuration not evaluated')
+    expect(check?.detail).toContain('not be parsed')
+    expect(check?.detail).toContain('not verified')
+    expect(check?.detail).toContain('flow-style')
+  })
+
   it('includes the check in JSON output for workspace projects', () => {
     const deps = makeWorkspaceDeps(
       {

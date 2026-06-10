@@ -64,4 +64,14 @@ describe('semver-utils', () => {
     expect(rangeIncludesVersion('latest', '1.2.3')).toBeNull()
     expect(rangeIncludesVersion('latest || ^2.0.0', '1.2.3')).toBeNull()
   })
+
+  it('returns null when the workspace version carries prerelease or build metadata', () => {
+    expect(rangeIncludesVersion('^1.0.0', '1.0.0-beta.1')).toBeNull()
+    expect(rangeIncludesVersion('>=1.0.0', '1.0.0-beta.1')).toBeNull()
+    expect(rangeIncludesVersion('^1.0.0', '1.0.0+build.5')).toBeNull()
+  })
+
+  it('returns null when a range operand carries prerelease metadata', () => {
+    expect(rangeIncludesVersion('^1.0.0-rc.1', '1.2.0')).toBeNull()
+  })
 })

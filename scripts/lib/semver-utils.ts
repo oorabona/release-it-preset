@@ -11,6 +11,11 @@ interface ParsedVersion {
   normalized: string
 }
 
+function hasPrereleaseOrBuildMetadata(version: string): boolean {
+  const normalized = version.replace(/^v/, '')
+  return normalized.includes('-') || normalized.includes('+')
+}
+
 function parseVersion(version: string): ParsedVersion | null {
   if (!isValidSemver(version)) {
     return null
@@ -48,6 +53,13 @@ function includesTildeRange(version: ParsedVersion, base: ParsedVersion): boolea
 function evaluateRangePart(range: string, version: ParsedVersion): RangeEvaluation {
   const trimmed = range.trim()
   if (!trimmed) {
+    return null
+  }
+
+  const semverOperand = trimmed
+    .replace(/^workspace:/, '')
+    .replace(/^(?:=|\^|~|>=)\s*/, '')
+  if (isValidSemver(semverOperand) && hasPrereleaseOrBuildMetadata(semverOperand)) {
     return null
   }
 
@@ -122,6 +134,9 @@ export function validateAndNormalizeSemver(version: string): string {
 export function rangeIncludesVersion(range: string, version: string): RangeEvaluation {
   const parsedVersion = parseVersion(version)
   if (!parsedVersion) {
+    return null
+  }
+  if (hasPrereleaseOrBuildMetadata(version)) {
     return null
   }
 

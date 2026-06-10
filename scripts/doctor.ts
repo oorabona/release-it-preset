@@ -384,13 +384,20 @@ function collectDependencyRanges(pkg: Record<string, unknown>): WorkspacePackage
   return dependencies
 }
 
-function readWorkspacePatterns(deps: DoctorDeps): string[] | null {
+function readWorkspacePatterns(deps: DoctorDeps): { patterns: string[]; error?: string } | null {
   if (deps.existsSync('pnpm-workspace.yaml')) {
     try {
       const content = deps.readFileSync('pnpm-workspace.yaml', 'utf8') as string
-      return parsePnpmWorkspaceYaml(content)
-    } catch {
-      return []
+      return { patterns: parsePnpmWorkspaceYaml(content) }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'unknown parser error'
+      return {
+        patterns: [],
+        error: [
+          'pnpm-workspace.yaml could not be parsed; internal dependency ranges were not verified.',
+          reason,
+        ].join('\n'),
+      }
     }
   }
 
@@ -401,9 +408,15 @@ function readWorkspacePatterns(deps: DoctorDeps): string[] | null {
   try {
     const content = deps.readFileSync('package.json', 'utf8') as string
     const patterns = parseWorkspacesFromPackageJson(content)
-    return patterns.length > 0 ? patterns : null
-  } catch {
-    return null
+    return patterns.length > 0 ? { patterns } : null
+  } catch (error) {
+    return {
+      patterns: [],
+      error: [
+        'package.json workspaces field could not be read; internal dependency ranges were not verified.',
+        error instanceof Error ? error.message : 'unknown parser error',
+      ].join('\n'),
+    }
   }
 }
 
@@ -432,11 +445,21 @@ function readWorkspacePackages(packageDirs: string[], deps: DoctorDeps): Workspa
 }
 
 export function validateWorkspaceDependencyRanges(deps: DoctorDeps): CheckResult | null {
-  const patterns = readWorkspacePatterns(deps)
-  if (patterns === null) {
+  const workspacePatterns = readWorkspacePatterns(deps)
+  if (workspacePatterns === null) {
     return null
   }
 
+  if (workspacePatterns.error) {
+    return {
+      name: 'Workspace dependency ranges',
+      status: 'WARN',
+      value: 'workspace configuration not evaluated',
+      detail: workspacePatterns.error,
+    }
+  }
+
+  const { patterns } = workspacePatterns
   if (patterns.length === 0) {
     return {
       name: 'Workspace dependency ranges',
