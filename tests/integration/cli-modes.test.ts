@@ -64,7 +64,6 @@ function execCLI(
   })
 }
 
-
 /**
  * Helper to execute CLI with a mock `release-it` binary injected into PATH.
  * The mock prints all received arguments to stderr as "MOCK_ARGS: <json>".
@@ -139,7 +138,6 @@ function execCLIWithArgCapture(
     }, 10_000)
   })
 }
-
 
 /**
  * Helper to create a test directory structure
@@ -490,7 +488,10 @@ describe('CLI Modes - Config Validation and Security', () => {
     expect(result.stderr).toContain('"--config"')
     const mockArgsMatch = result.stderr.match(/MOCK_ARGS: (\[.*?\])/)
     expect(mockArgsMatch).not.toBeNull()
-    const spawnArgs: string[] = JSON.parse(mockArgsMatch![1])
+    if (!mockArgsMatch) {
+      throw new Error('MOCK_ARGS marker missing from stderr')
+    }
+    const spawnArgs: string[] = JSON.parse(mockArgsMatch[1])
     const configFlagIdx = spawnArgs.indexOf('--config')
     expect(configFlagIdx).toBeGreaterThanOrEqual(0)
     expect(spawnArgs[configFlagIdx + 1]).toMatch(/retry-publish\.js$/)

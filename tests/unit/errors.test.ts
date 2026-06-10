@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  ChangelogError,
-  GitError,
-  ScriptError,
-  ValidationError,
-} from '../../scripts/lib/errors'
+import { ChangelogError, GitError, ScriptError, ValidationError } from '../../scripts/lib/errors'
 
 describe('ScriptError', () => {
   it('has a default exitCode of 1', () => {

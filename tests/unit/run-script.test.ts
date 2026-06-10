@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ScriptError, ValidationError } from '../../scripts/lib/errors'
-import { runScript, type RunScriptDeps } from '../../scripts/lib/run-script'
+import { type RunScriptDeps, runScript } from '../../scripts/lib/run-script'
 
 describe('runScript', () => {
   let deps: RunScriptDeps

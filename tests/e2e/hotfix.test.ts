@@ -116,7 +116,9 @@ describe('E2E: hotfix / populate-unreleased-changelog', () => {
     // The helper sets remote origin = https://github.com/example/demo-e2e.git
     // The script strips .git and generates links in the form:
     //   ([<sha>](https://github.com/example/demo-e2e/commit/<sha>))
-    expect(changelog).toMatch(/\(\[[\da-f]{7}\]\(https:\/\/github\.com\/example\/demo-e2e\/commit\/[\da-f]{7}\)\)/)
+    expect(changelog).toMatch(
+      /\(\[[\da-f]{7}\]\(https:\/\/github\.com\/example\/demo-e2e\/commit\/[\da-f]{7}\)\)/,
+    )
     expect(changelog).toContain('linked feature')
   })
 })

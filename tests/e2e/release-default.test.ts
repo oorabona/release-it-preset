@@ -68,7 +68,10 @@ describe('E2E: release-default workflow', () => {
 
     // 5. Commit the updated changelog so working dir is clean for validate
     execFileSync('git', ['add', 'CHANGELOG.md'], { cwd: repo.cwd, stdio: 'pipe' })
-    execFileSync('git', ['commit', '-m', 'docs: update changelog'], { cwd: repo.cwd, stdio: 'pipe' })
+    execFileSync('git', ['commit', '-m', 'docs: update changelog'], {
+      cwd: repo.cwd,
+      stdio: 'pipe',
+    })
 
     // 6. validate should now pass (changelog has content, clean working dir)
     const validateResult = repo.runCli(['validate'])

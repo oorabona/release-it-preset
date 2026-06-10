@@ -10,10 +10,14 @@
  *   NPM_TOKEN=dummy-e2e-token (bypasses `npm whoami` via the CI auth-token path)
  */
 
-import { execFileSync, spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process'
+import {
+  execFileSync,
+  type SpawnSyncOptionsWithStringEncoding,
+  spawnSync,
+} from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /** Path to the CLI entry point, resolved relative to this helper file. */
@@ -57,7 +61,9 @@ const openDirs = new Set<string>()
 let exitHandlerRegistered = false
 
 function registerExitHandler() {
-  if (exitHandlerRegistered) return
+  if (exitHandlerRegistered) {
+    return
+  }
   exitHandlerRegistered = true
   process.on('exit', () => {
     for (const dir of openDirs) {
