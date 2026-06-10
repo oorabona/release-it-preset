@@ -23,10 +23,21 @@ describe('semver-utils', () => {
     )
   })
 
-  it('treats workspace protocol ranges as including the workspace version', () => {
+  it('treats workspace protocol passthrough ranges as including the workspace version', () => {
     expect(rangeIncludesVersion('workspace:*', '1.2.3')).toBe(true)
     expect(rangeIncludesVersion('workspace:^', '1.2.3')).toBe(true)
-    expect(rangeIncludesVersion('workspace:~1.0.0', '1.2.3')).toBe(true)
+    expect(rangeIncludesVersion('workspace:~', '1.2.3')).toBe(true)
+  })
+
+  it('evaluates explicit workspace protocol ranges after stripping the prefix', () => {
+    expect(rangeIncludesVersion('workspace:1.2.3', '1.2.3')).toBe(true)
+    expect(rangeIncludesVersion('workspace:1.2.4', '1.2.3')).toBe(false)
+    expect(rangeIncludesVersion('workspace:^1.2.0', '1.3.0')).toBe(true)
+    expect(rangeIncludesVersion('workspace:^1.2.0', '2.0.0')).toBe(false)
+    expect(rangeIncludesVersion('workspace:~1.2.0', '1.2.9')).toBe(true)
+    expect(rangeIncludesVersion('workspace:~1.2.0', '1.3.0')).toBe(false)
+    expect(rangeIncludesVersion('workspace:>=1.2.0', '1.5.0')).toBe(true)
+    expect(rangeIncludesVersion('workspace:>=1.2.0', '1.1.9')).toBe(false)
   })
 
   it('evaluates exact ranges', () => {
@@ -63,6 +74,9 @@ describe('semver-utils', () => {
     expect(rangeIncludesVersion('>=1.0.0 <2.0.0', '1.2.3')).toBeNull()
     expect(rangeIncludesVersion('latest', '1.2.3')).toBeNull()
     expect(rangeIncludesVersion('latest || ^2.0.0', '1.2.3')).toBeNull()
+    expect(rangeIncludesVersion('workspace:', '1.2.3')).toBeNull()
+    expect(rangeIncludesVersion('workspace:latest', '1.2.3')).toBeNull()
+    expect(rangeIncludesVersion('workspace:>=1.0.0 <2.0.0', '1.2.3')).toBeNull()
   })
 
   it('returns null when the workspace version carries prerelease or build metadata', () => {

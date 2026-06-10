@@ -635,6 +635,23 @@ describe('Workspace dependency ranges check', () => {
     expect(check?.value).toContain('1/1 internal range(s) coherent')
   })
 
+  it('WARN when an explicit workspace protocol range excludes the current workspace version', () => {
+    const deps = makeWorkspaceDeps({
+      a: {
+        name: '@scope/a',
+        version: '1.0.0',
+        dependencies: { '@scope/b': 'workspace:^1.0.0' },
+      },
+      b: { name: '@scope/b', version: '2.0.0' },
+    })
+
+    const check = validateWorkspaceDependencyRanges(deps)
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toBe('1 stale internal range(s)')
+    expect(check?.detail).toContain('@scope/a dependencies.@scope/b="workspace:^1.0.0"')
+    expect(check?.detail).toContain('does not include 2.0.0')
+  })
+
   it('PASS when an internal semver range includes the current workspace version', () => {
     const deps = makeWorkspaceDeps({
       a: {
@@ -695,6 +712,23 @@ describe('Workspace dependency ranges check', () => {
     expect(check?.status).toBe('PASS')
     expect(check?.value).toContain('1 skipped')
     expect(check?.detail).toContain('unsupported range syntax')
+  })
+
+  it('skips unrecognized workspace protocol ranges without marking them coherent', () => {
+    const deps = makeWorkspaceDeps({
+      a: {
+        name: '@scope/a',
+        version: '1.0.0',
+        dependencies: { '@scope/b': 'workspace:latest' },
+      },
+      b: { name: '@scope/b', version: '2.1.0' },
+    })
+
+    const check = validateWorkspaceDependencyRanges(deps)
+    expect(check?.status).toBe('PASS')
+    expect(check?.value).toContain('1 skipped')
+    expect(check?.value).not.toContain('1/1 internal range(s) coherent')
+    expect(check?.detail).toContain('@scope/a dependencies.@scope/b="workspace:latest"')
   })
 
   it('WARN when pnpm-workspace.yaml cannot be parsed', () => {

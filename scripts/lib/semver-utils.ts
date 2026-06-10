@@ -4,6 +4,13 @@
 
 type RangeEvaluation = boolean | null
 
+const SEMVER_PATTERN = String.raw`v?\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?`
+const exactRangeRegex = new RegExp(String.raw`^=?${SEMVER_PATTERN}$`)
+const caretRangeRegex = new RegExp(String.raw`^\^\s*(${SEMVER_PATTERN})$`)
+const tildeRangeRegex = new RegExp(String.raw`^~\s*(${SEMVER_PATTERN})$`)
+const greaterThanOrEqualRangeRegex = new RegExp(String.raw`^>=\s*(${SEMVER_PATTERN})$`)
+const workspaceProtocolPassthroughRanges = new Set(['*', '^', '~'])
+
 interface ParsedVersion {
   major: number
   minor: number
@@ -50,42 +57,66 @@ function includesTildeRange(version: ParsedVersion, base: ParsedVersion): boolea
   return compareVersions(version, base) >= 0 && version.major === base.major && version.minor === base.minor
 }
 
+function normalizeWorkspaceProtocolRange(trimmed: string): string | null {
+  if (!trimmed.startsWith('workspace:')) {
+    return trimmed
+  }
+
+  const workspaceRange = trimmed.slice('workspace:'.length).trim()
+  if (workspaceProtocolPassthroughRanges.has(workspaceRange)) {
+    return '*'
+  }
+
+  if (
+    exactRangeRegex.test(workspaceRange) ||
+    caretRangeRegex.test(workspaceRange) ||
+    tildeRangeRegex.test(workspaceRange) ||
+    greaterThanOrEqualRangeRegex.test(workspaceRange)
+  ) {
+    return workspaceRange
+  }
+
+  return null
+}
+
 function evaluateRangePart(range: string, version: ParsedVersion): RangeEvaluation {
   const trimmed = range.trim()
   if (!trimmed) {
     return null
   }
 
-  const semverOperand = trimmed
-    .replace(/^workspace:/, '')
-    .replace(/^(?:=|\^|~|>=)\s*/, '')
+  const normalizedRange = normalizeWorkspaceProtocolRange(trimmed)
+  if (normalizedRange === null) {
+    return null
+  }
+  if (normalizedRange === '*') {
+    return true
+  }
+
+  const semverOperand = normalizedRange.replace(/^(?:=|\^|~|>=)\s*/, '')
   if (isValidSemver(semverOperand) && hasPrereleaseOrBuildMetadata(semverOperand)) {
     return null
   }
 
-  if (trimmed.startsWith('workspace:')) {
-    return true
-  }
-
-  const exactMatch = trimmed.match(/^=?v?\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/)
+  const exactMatch = normalizedRange.match(exactRangeRegex)
   if (exactMatch) {
-    const exact = parseVersion(trimmed.replace(/^=/, ''))
+    const exact = parseVersion(normalizedRange.replace(/^=/, ''))
     return exact ? exact.normalized === version.normalized : null
   }
 
-  const caretMatch = trimmed.match(/^\^\s*(v?\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)$/)
+  const caretMatch = normalizedRange.match(caretRangeRegex)
   if (caretMatch) {
     const base = parseVersion(caretMatch[1])
     return base ? includesCaretRange(version, base) : null
   }
 
-  const tildeMatch = trimmed.match(/^~\s*(v?\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)$/)
+  const tildeMatch = normalizedRange.match(tildeRangeRegex)
   if (tildeMatch) {
     const base = parseVersion(tildeMatch[1])
     return base ? includesTildeRange(version, base) : null
   }
 
-  const greaterThanOrEqualMatch = trimmed.match(/^>=\s*(v?\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)$/)
+  const greaterThanOrEqualMatch = normalizedRange.match(greaterThanOrEqualRangeRegex)
   if (greaterThanOrEqualMatch) {
     const base = parseVersion(greaterThanOrEqualMatch[1])
     return base ? compareVersions(version, base) >= 0 : null
