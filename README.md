@@ -67,7 +67,7 @@ Most release workflows fall into one of three traps: too much manual work (plain
 
 - **One-command init** — `init --with-workflows` scaffolds `.release-it.json`, `CHANGELOG.md`, `package.json` scripts, and a GitHub Actions publish workflow.
 - **Seven release configs** — `default`, `hotfix`, `manual-changelog`, `no-changelog`, `changelog-only`, `republish`, `retry-publish` — each tuned for a specific scenario. → [docs/USAGE.md#configurations](docs/USAGE.md#available-configurations)
-- **Doctor command** — pre-release diagnostics: branch state, npm auth, peer-dep range, CHANGELOG validity, readiness score. → [docs/USAGE.md#doctor](docs/USAGE.md#doctor---release-readiness-diagnostic)
+- **Doctor command** — pre-release diagnostics: branch state, publish workflow freshness, npm provenance readiness, peer-dep range, CHANGELOG validity, readiness score. → [docs/USAGE.md#doctor](docs/USAGE.md#doctor---release-readiness-diagnostic)
 - **OIDC trusted publishing** — zero-config npm provenance via GitHub Actions OIDC; no `NPM_TOKEN` secret needed when using the reusable `publish.yml` workflow.
 - **Monorepo support** — `init` auto-detects workspace manifests; `GIT_CHANGELOG_PATH` scopes changelog generation per package.
 - **Recovery flows** — `republish` / `retry-publish` for the inevitable "first publish failed at npm step" moment.

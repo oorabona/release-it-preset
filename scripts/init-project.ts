@@ -16,8 +16,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { runScript } from './lib/run-script.js';
 import {
   parsePnpmWorkspaceYaml,
@@ -25,6 +24,7 @@ import {
   resolvePackagePaths,
 } from './lib/workspace-detect.js';
 import { ValidationError } from './lib/errors.js';
+import { readWorkflowTemplate } from './lib/workflow-template.js';
 
 
 
@@ -226,23 +226,14 @@ export async function writeWorkflow(options: Options, deps: InitProjectDeps): Pr
     return false;
   }
 
-  // Resolve template path: try compiled position first, fall back to source position.
-  //   compiled: dist/scripts/init-project.js → ../../scripts/templates/... (2 hops up)
-  //   source:   scripts/init-project.ts     → ./templates/...             (sibling dir)
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  const compiledPath = join(__dirname, '..', '..', 'scripts', 'templates', 'workflows', 'release.yml.template');
-  const sourcePath = join(__dirname, 'templates', 'workflows', 'release.yml.template');
-  const templatePath = deps.existsSync(compiledPath) ? compiledPath : sourcePath;
-
   let templateContent: string;
   try {
-    templateContent = deps.readFileSync(templatePath, 'utf8') as string;
+    templateContent = readWorkflowTemplate(deps).content;
   } catch (error) {
     throw new ValidationError(
-      `Failed to read workflow template at "${templatePath}".\n` +
-      `The template ships in scripts/templates/ — if it is missing, reinstall the package.\n` +
-      `Original error: ${error}`
+      error instanceof Error
+        ? error.message
+        : 'Failed to read workflow template. The template ships in scripts/templates/.'
     );
   }
 

@@ -23,6 +23,11 @@ import {
   parseWorkspacesFromPackageJson,
   resolvePackagePaths,
 } from './lib/workspace-detect.js'
+import {
+  hasGeneratedWorkflowMarker,
+  normalizeWorkflowContent,
+  readWorkflowTemplate,
+} from './lib/workflow-template.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -342,6 +347,379 @@ function detectWorkspaceIntegration(deps: DoctorDeps): CheckResult {
       'Skip if you only need per-package CHANGELOG (use GIT_CHANGELOG_PATH).',
     ].join('\n'),
   }
+}
+
+const WORKFLOW_DIR = join('.github', 'workflows')
+const WORKFLOW_FILE_NAME_REGEX = /^[A-Za-z0-9._-]+\.ya?ml$/
+
+interface WorkflowFile {
+  path: string
+  content: string
+}
+
+interface WorkflowScan {
+  files: WorkflowFile[]
+  skippedFileNames: string[]
+  unreadableFilePaths: string[]
+  error?: string
+}
+
+function listWorkflowFiles(deps: DoctorDeps): WorkflowScan {
+  if (!deps.existsSync(WORKFLOW_DIR)) {
+    return { files: [], skippedFileNames: [], unreadableFilePaths: [] }
+  }
+
+  let entries: unknown
+  try {
+    entries = deps.readdirSync(WORKFLOW_DIR)
+  } catch (error) {
+    return {
+      files: [],
+      skippedFileNames: [],
+      unreadableFilePaths: [],
+      error: error instanceof Error ? error.message : 'workflow directory could not be read',
+    }
+  }
+
+  if (!Array.isArray(entries)) {
+    return {
+      files: [],
+      skippedFileNames: [],
+      unreadableFilePaths: [],
+      error: 'workflow directory listing did not return file names',
+    }
+  }
+
+  const files: WorkflowFile[] = []
+  const skippedFileNames: string[] = []
+  const unreadableFilePaths: string[] = []
+
+  for (const entry of entries) {
+    if (typeof entry !== 'string' || !WORKFLOW_FILE_NAME_REGEX.test(entry)) {
+      skippedFileNames.push(String(entry))
+      continue
+    }
+
+    const path = join(WORKFLOW_DIR, entry)
+    try {
+      files.push({
+        path,
+        content: deps.readFileSync(path, 'utf8') as string,
+      })
+    } catch {
+      unreadableFilePaths.push(path)
+    }
+  }
+
+  return { files, skippedFileNames, unreadableFilePaths }
+}
+
+function formatSkippedWorkflowFiles(skippedFileNames: string[]): string[] {
+  if (skippedFileNames.length === 0) {
+    return []
+  }
+
+  return [
+    'Skipped workflow file name(s) outside the generated-template allowlist:',
+    ...skippedFileNames.map((name) => `- ${name}`),
+  ]
+}
+
+function formatUnreadableWorkflowFiles(unreadableFilePaths: string[]): string[] {
+  if (unreadableFilePaths.length === 0) {
+    return []
+  }
+
+  return [
+    'Unreadable workflow file(s) were not evaluated:',
+    ...unreadableFilePaths.map((path) => `- ${path}`),
+  ]
+}
+
+type PublishWorkflowFreshnessState =
+  | 'WORKFLOW_DIR_UNREADABLE'
+  | 'WORKFLOW_FILES_UNREADABLE'
+  | 'NO_WORKFLOW_FILES'
+  | 'NO_GENERATED_WORKFLOW'
+  | 'TEMPLATE_UNAVAILABLE'
+  | 'TEMPLATE_MISSING_MARKER'
+  | 'GENERATED_WORKFLOWS_FRESH'
+  | 'GENERATED_WORKFLOWS_STALE'
+
+interface PublishWorkflowFreshnessContext {
+  scan: WorkflowScan
+  generatedWorkflowPaths: string[]
+  staleWorkflowPaths: string[]
+  templateError?: string
+  templateMissingMarker: boolean
+}
+
+function classifyPublishWorkflowFreshness(
+  context: PublishWorkflowFreshnessContext,
+): PublishWorkflowFreshnessState {
+  if (context.scan.error) return 'WORKFLOW_DIR_UNREADABLE'
+  if (context.scan.files.length === 0) {
+    return context.scan.unreadableFilePaths.length > 0 ? 'WORKFLOW_FILES_UNREADABLE' : 'NO_WORKFLOW_FILES'
+  }
+  if (context.generatedWorkflowPaths.length === 0) {
+    return context.scan.unreadableFilePaths.length > 0 ? 'WORKFLOW_FILES_UNREADABLE' : 'NO_GENERATED_WORKFLOW'
+  }
+  if (context.templateError) return 'TEMPLATE_UNAVAILABLE'
+  if (context.templateMissingMarker) return 'TEMPLATE_MISSING_MARKER'
+  if (context.staleWorkflowPaths.length > 0) return 'GENERATED_WORKFLOWS_STALE'
+  if (context.scan.unreadableFilePaths.length > 0) return 'WORKFLOW_FILES_UNREADABLE'
+  return 'GENERATED_WORKFLOWS_FRESH'
+}
+
+const PUBLISH_WORKFLOW_FRESHNESS_DECISIONS = {
+  WORKFLOW_DIR_UNREADABLE: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'WARN',
+    value: 'workflow directory not evaluated',
+    detail: context.scan.error,
+  }),
+  WORKFLOW_FILES_UNREADABLE: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'WARN',
+    value: 'workflow files partially evaluated',
+    detail: [
+      'One or more workflow files could not be read, so generated workflow freshness was not fully evaluated.',
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+    ].join('\n'),
+  }),
+  // Omitted, not PASS: no workflow files at all means the domain is absent
+  // (same not-applicable convention as the workspace ranges check).
+  NO_WORKFLOW_FILES: (): null => null,
+  NO_GENERATED_WORKFLOW: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'PASS',
+    value: 'custom workflow(s) not evaluated',
+    detail: [
+      'No workflow generated by release-it-preset init --with-workflows was detected.',
+      'Only files carrying the generated workflow marker are compared to the shipped template.',
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+    ].join('\n'),
+  }),
+  TEMPLATE_UNAVAILABLE: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'WARN',
+    value: 'canonical template unavailable',
+    detail: context.templateError,
+  }),
+  TEMPLATE_MISSING_MARKER: (): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'WARN',
+    value: 'canonical template not evaluated',
+    detail: 'The shipped workflow template does not carry the generated workflow marker.',
+  }),
+  GENERATED_WORKFLOWS_FRESH: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'PASS',
+    value: `${context.generatedWorkflowPaths.length} generated workflow(s) fresh`,
+    detail: [
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+    ].join('\n') || undefined,
+  }),
+  GENERATED_WORKFLOWS_STALE: (context: PublishWorkflowFreshnessContext): CheckResult => ({
+    name: 'publish workflow freshness',
+    status: 'WARN',
+    value: `${context.staleWorkflowPaths.length} generated workflow(s) stale`,
+    detail: [
+      'Generated workflow file(s) differ from the shipped release workflow template:',
+      ...context.staleWorkflowPaths.map((path) => `- ${path}`),
+      'Run release-it-preset init --with-workflows in a scratch directory and merge the generated workflow updates.',
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+    ].join('\n'),
+  }),
+} satisfies Record<
+  PublishWorkflowFreshnessState,
+  (context: PublishWorkflowFreshnessContext) => CheckResult | null
+>
+
+export function validatePublishWorkflowFreshness(deps: DoctorDeps): CheckResult | null {
+  const scan = listWorkflowFiles(deps)
+  const generatedWorkflowPaths = scan.files
+    .filter((file) => hasGeneratedWorkflowMarker(file.content))
+    .map((file) => file.path)
+  const staleWorkflowPaths: string[] = []
+  let templateError: string | undefined
+  let templateMissingMarker = false
+
+  if (generatedWorkflowPaths.length > 0) {
+    try {
+      const template = readWorkflowTemplate(deps).content
+      if (!hasGeneratedWorkflowMarker(template)) {
+        templateMissingMarker = true
+      } else {
+        const normalizedTemplate = normalizeWorkflowContent(template)
+        for (const file of scan.files) {
+          if (
+            hasGeneratedWorkflowMarker(file.content) &&
+            normalizeWorkflowContent(file.content) !== normalizedTemplate
+          ) {
+            staleWorkflowPaths.push(file.path)
+          }
+        }
+      }
+    } catch (error) {
+      templateError = error instanceof Error ? error.message : 'canonical workflow template unavailable'
+    }
+  }
+
+  const context: PublishWorkflowFreshnessContext = {
+    scan,
+    generatedWorkflowPaths,
+    staleWorkflowPaths,
+    templateError,
+    templateMissingMarker,
+  }
+  const state = classifyPublishWorkflowFreshness(context)
+  return PUBLISH_WORKFLOW_FRESHNESS_DECISIONS[state](context)
+}
+
+function stripYamlComment(line: string): string {
+  const commentIndex = line.indexOf('#')
+  return (commentIndex >= 0 ? line.slice(0, commentIndex) : line).trimEnd()
+}
+
+function countIndent(line: string): number {
+  return line.match(/^\s*/)?.[0].length ?? 0
+}
+
+export function workflowHasIdTokenWritePermission(content: string): boolean {
+  let permissionsIndent: number | null = null
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = stripYamlComment(rawLine)
+    if (line.trim() === '') {
+      continue
+    }
+
+    if (/^\s*permissions\s*:\s*\{[^}]*\bid-token\s*:\s*['"]?write['"]?[^}]*\}\s*$/.test(line)) {
+      return true
+    }
+
+    const indent = countIndent(line)
+    if (permissionsIndent !== null && indent <= permissionsIndent) {
+      permissionsIndent = null
+    }
+
+    const permissionsMatch = line.match(/^(\s*)permissions\s*:\s*$/)
+    if (permissionsMatch) {
+      permissionsIndent = permissionsMatch[1].length
+      continue
+    }
+
+    if (permissionsIndent !== null && indent > permissionsIndent) {
+      if (/^id-token\s*:\s*['"]?write['"]?\s*$/.test(line.trim())) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+function workflowHasNpmPublishIntent(content: string): boolean {
+  return /\bNPM_PUBLISH\s*:/.test(content) || /\bretry-publish\b/.test(content) || /\bnpm publish\b/.test(content)
+}
+
+type NpmProvenanceReadinessState =
+  | 'NPM_PUBLISH_DISABLED'
+  | 'WORKFLOW_DIR_UNREADABLE'
+  | 'NO_WORKFLOW_FILES'
+  | 'NO_NPM_PUBLISH_WORKFLOW'
+  | 'ID_TOKEN_WRITE_FOUND'
+  | 'ID_TOKEN_WRITE_MISSING'
+
+interface NpmProvenanceReadinessContext {
+  scan: WorkflowScan
+  publishWorkflowPaths: string[]
+  idTokenWorkflowPaths: string[]
+  npmPublish: string | undefined
+}
+
+function classifyNpmProvenanceReadiness(
+  context: NpmProvenanceReadinessContext,
+): NpmProvenanceReadinessState {
+  if (context.npmPublish !== 'true') return 'NPM_PUBLISH_DISABLED'
+  if (context.scan.error) return 'WORKFLOW_DIR_UNREADABLE'
+  if (context.scan.files.length === 0) return 'NO_WORKFLOW_FILES'
+  if (context.publishWorkflowPaths.length === 0) return 'NO_NPM_PUBLISH_WORKFLOW'
+  if (context.idTokenWorkflowPaths.length > 0) return 'ID_TOKEN_WRITE_FOUND'
+  return 'ID_TOKEN_WRITE_MISSING'
+}
+
+function npmProvenanceMissingDetail(context: NpmProvenanceReadinessContext): string {
+  return [
+    'NPM_PUBLISH=true is set, but no allowlisted npm-publish workflow declares permissions: id-token: write.',
+    'Add id-token: write to the workflow that runs npm publish, or scaffold the generated workflow with release-it-preset init --with-workflows.',
+    ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+    ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+  ].join('\n')
+}
+
+const NPM_PROVENANCE_READINESS_DECISIONS = {
+  // Omitted, not PASS: matches the not-applicable convention of the
+  // workspace ranges check and the documented "when NPM_PUBLISH=true" gate.
+  NPM_PUBLISH_DISABLED: (): null => null,
+  WORKFLOW_DIR_UNREADABLE: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'workflow directory not evaluated',
+    detail: context.scan.error,
+  }),
+  NO_WORKFLOW_FILES: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'id-token: write not detected',
+    detail: npmProvenanceMissingDetail(context),
+  }),
+  NO_NPM_PUBLISH_WORKFLOW: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'npm publish workflow not detected',
+    detail: [
+      'NPM_PUBLISH=true is set, but no allowlisted workflow file contains a supported npm-publish signal.',
+      'Supported signals: NPM_PUBLISH, retry-publish, or npm publish.',
+      ...formatSkippedWorkflowFiles(context.scan.skippedFileNames),
+      ...formatUnreadableWorkflowFiles(context.scan.unreadableFilePaths),
+    ].join('\n'),
+  }),
+  ID_TOKEN_WRITE_FOUND: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'PASS',
+    value: `id-token: write detected in ${context.idTokenWorkflowPaths.length} workflow(s)`,
+    detail: context.idTokenWorkflowPaths.map((path) => `- ${path}`).join('\n'),
+  }),
+  ID_TOKEN_WRITE_MISSING: (context: NpmProvenanceReadinessContext): CheckResult => ({
+    name: 'npm provenance readiness',
+    status: 'WARN',
+    value: 'id-token: write not detected',
+    detail: npmProvenanceMissingDetail(context),
+  }),
+} satisfies Record<
+  NpmProvenanceReadinessState,
+  (context: NpmProvenanceReadinessContext) => CheckResult | null
+>
+
+export function validateNpmProvenanceReadiness(deps: DoctorDeps): CheckResult | null {
+  const scan = listWorkflowFiles(deps)
+  const publishWorkflowFiles = scan.files.filter((file) => workflowHasNpmPublishIntent(file.content))
+  const context: NpmProvenanceReadinessContext = {
+    scan,
+    publishWorkflowPaths: publishWorkflowFiles.map((file) => file.path),
+    idTokenWorkflowPaths: publishWorkflowFiles
+      .filter((file) => workflowHasIdTokenWritePermission(file.content))
+      .map((file) => file.path),
+    npmPublish: deps.getEnv('NPM_PUBLISH'),
+  }
+  const state = classifyNpmProvenanceReadiness(context)
+  return NPM_PROVENANCE_READINESS_DECISIONS[state](context)
 }
 
 type DependencyField = 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies'
@@ -838,6 +1216,15 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
   const workspaceDependencyRanges = validateWorkspaceDependencyRanges(deps)
   if (workspaceDependencyRanges) {
     checks.push(workspaceDependencyRanges)
+  }
+
+  const publishWorkflowFreshness = validatePublishWorkflowFreshness(deps)
+  if (publishWorkflowFreshness) {
+    checks.push(publishWorkflowFreshness)
+  }
+  const npmProvenanceReadiness = validateNpmProvenanceReadiness(deps)
+  if (npmProvenanceReadiness) {
+    checks.push(npmProvenanceReadiness)
   }
 
   for (const result of validateReleaseItPeer(deps)) {
