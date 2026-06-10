@@ -52,11 +52,12 @@ const VALID_RELEASE_IT_JSON = JSON.stringify({
 function makeWorkspaceDeps(
   packages: Record<string, Record<string, unknown>>,
   rootPackage: Record<string, unknown> = { name: 'root', version: '1.0.0' },
+  workspaceYaml = "packages:\n  - 'packages/*'\n",
 ): DoctorDeps {
   const root = '/repo'
   const packageNames = Object.keys(packages)
   const files = new Map<string, string>([
-    ['pnpm-workspace.yaml', "packages:\n  - 'packages/*'\n"],
+    ['pnpm-workspace.yaml', workspaceYaml],
     ['package.json', JSON.stringify(rootPackage)],
   ])
 
@@ -713,6 +714,97 @@ describe('Workspace dependency ranges check', () => {
     expect(check?.detail).toContain('not be parsed')
     expect(check?.detail).toContain('not verified')
     expect(check?.detail).toContain('flow-style')
+  })
+
+  it('WARN when a nested glob pattern is unsupported by the check', () => {
+    const deps = makeWorkspaceDeps(
+      {},
+      { name: 'root', version: '1.0.0' },
+      "packages:\n  - 'packages/**'\n",
+    )
+
+    const check = validateWorkspaceDependencyRanges(deps)
+
+    // Mutation lock: reverting to the old fall-through reports PASS with no dependencies.
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toBe('workspace ranges partially evaluated')
+    expect(check?.detail).toContain('packages/**')
+    expect(check?.detail).toMatch(/not supported/i)
+    expect(check?.detail).toMatch(/not evaluated/i)
+  })
+
+  it('WARN when supported workspace patterns resolve to zero package dirs', () => {
+    const deps = makeWorkspaceDeps({})
+
+    const check = validateWorkspaceDependencyRanges(deps)
+
+    // Mutation lock: restoring silent zero-dir resolution reports PASS with no dependencies.
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toMatch(/not resolved/i)
+    expect(check?.detail).toContain('packages/*')
+  })
+
+  it('WARN with stale range detail and unsupported pattern detail together', () => {
+    const deps = makeWorkspaceDeps(
+      {
+        a: {
+          name: '@scope/a',
+          version: '1.0.0',
+          dependencies: { '@scope/b': '^1.0.0' },
+        },
+        b: { name: '@scope/b', version: '2.0.0' },
+      },
+      { name: 'root', version: '1.0.0' },
+      "packages:\n  - 'packages/*'\n  - 'apps/**'\n",
+    )
+
+    const check = validateWorkspaceDependencyRanges(deps)
+    const detail = check?.detail ?? ''
+
+    // Mutation lock: dropping stale or unsupported aggregation removes half of the warning.
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toBe('1 stale internal range(s)')
+    expect(detail).toContain('@scope/a dependencies.@scope/b="^1.0.0"')
+    expect(detail).toContain('workspace: protocol')
+    expect(detail).toContain('apps/**')
+    expect(detail).toMatch(/not supported/i)
+    expect(detail.indexOf('@scope/a dependencies.@scope/b')).toBeLessThan(detail.indexOf('apps/**'))
+  })
+
+  it('WARN when the only resolved workspace manifest is invalid JSON', () => {
+    const deps = makeDeps({
+      cwd: vi.fn(() => '/repo'),
+      existsSync: vi.fn((p: string) => {
+        if (p === 'pnpm-workspace.yaml' || p === 'package.json') {
+          return true
+        }
+        if (p === join('/repo', 'packages')) {
+          return true
+        }
+        return p === join('/repo', 'packages', 'a', 'package.json')
+      }),
+      readdirSync: vi.fn((p: string) => (p === join('/repo', 'packages') ? ['a'] : [])),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'pnpm-workspace.yaml') {
+          return "packages:\n  - 'packages/*'\n"
+        }
+        if (p === 'package.json') {
+          return JSON.stringify({ name: 'root', version: '1.0.0' })
+        }
+        if (p === join('/repo', 'packages', 'a', 'package.json')) {
+          return '{ invalid json'
+        }
+        return ''
+      }),
+    })
+
+    const check = validateWorkspaceDependencyRanges(deps)
+
+    // Mutation lock: keeping manifest parse errors as silent skips reports PASS.
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toMatch(/manifests unreadable/i)
+    expect(check?.detail).toMatch(/unreadable/i)
+    expect(check?.detail).toMatch(/not evaluated/i)
   })
 
   it('includes the check in JSON output for workspace projects', () => {
