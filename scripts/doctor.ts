@@ -385,10 +385,6 @@ function collectDependencyRanges(pkg: Record<string, unknown>): WorkspacePackage
 }
 
 function isSupportedWorkspacePattern(pattern: string): boolean {
-  if (pattern.startsWith('!')) {
-    return false
-  }
-
   if (/[?{}[\]]/.test(pattern)) {
     return false
   }
@@ -404,19 +400,23 @@ function isSupportedWorkspacePattern(pattern: string): boolean {
 function classifyWorkspacePatterns(patterns: string[]): {
   supportedPatterns: string[]
   unsupportedPatterns: string[]
+  negatedPatterns: string[]
 } {
   const supportedPatterns: string[] = []
   const unsupportedPatterns: string[] = []
+  const negatedPatterns: string[] = []
 
   for (const pattern of patterns) {
-    if (isSupportedWorkspacePattern(pattern)) {
+    if (pattern.startsWith('!')) {
+      negatedPatterns.push(pattern)
+    } else if (isSupportedWorkspacePattern(pattern)) {
       supportedPatterns.push(pattern)
     } else {
       unsupportedPatterns.push(pattern)
     }
   }
 
-  return { supportedPatterns, unsupportedPatterns }
+  return { supportedPatterns, unsupportedPatterns, negatedPatterns }
 }
 
 function formatUnsupportedPatternDetails(patterns: string[]): string[] {
@@ -428,6 +428,14 @@ function formatUnsupportedPatternDetails(patterns: string[]): string[] {
     'Unsupported workspace pattern(s) were not evaluated:',
     ...patterns.map((pattern) => `- ${pattern}: pattern not supported by this check`),
   ]
+}
+
+function formatNegatedPatternDetails(patterns: string[]): string {
+  return [
+    'Negated workspace pattern(s) are not supported by this check; internal dependency ranges were not evaluated.',
+    ...patterns.map((pattern) => `- ${pattern}: exclusion pattern not supported`),
+    'Remove negated workspace patterns or verify internal dependency ranges manually.',
+  ].join('\n')
 }
 
 function formatUnreadableManifestDetail(unreadableManifestCount: number): string | undefined {
@@ -534,7 +542,16 @@ export function validateWorkspaceDependencyRanges(deps: DoctorDeps): CheckResult
     }
   }
 
-  const { supportedPatterns, unsupportedPatterns } = classifyWorkspacePatterns(patterns)
+  const { supportedPatterns, unsupportedPatterns, negatedPatterns } = classifyWorkspacePatterns(patterns)
+  if (negatedPatterns.length > 0) {
+    return {
+      name: 'Workspace dependency ranges',
+      status: 'WARN',
+      value: 'not evaluated',
+      detail: formatNegatedPatternDetails(negatedPatterns),
+    }
+  }
+
   let packageDirs: string[]
   try {
     packageDirs =

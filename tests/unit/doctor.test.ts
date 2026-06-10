@@ -733,6 +733,58 @@ describe('Workspace dependency ranges check', () => {
     expect(check?.detail).toMatch(/not evaluated/i)
   })
 
+  it('WARN not evaluated when workspace patterns include negation', () => {
+    const deps = makeWorkspaceDeps(
+      {
+        a: {
+          name: '@scope/a',
+          version: '1.0.0',
+          dependencies: { '@scope/b': '^1.0.0' },
+        },
+        b: { name: '@scope/b', version: '2.0.0' },
+      },
+      { name: 'root', version: '1.0.0' },
+      "packages:\n  - 'packages/*'\n  - '!packages/private'\n",
+    )
+
+    const check = validateWorkspaceDependencyRanges(deps)
+    const detail = check?.detail ?? ''
+
+    // Mutation lock: negation exclusions must not fall through to partial evaluation.
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toBe('not evaluated')
+    expect(detail).toContain('!packages/private')
+    expect(detail).toMatch(/negated/i)
+    expect(detail).toMatch(/not evaluated/i)
+    expect(detail).not.toContain('@scope/a dependencies.@scope/b')
+    expect(deps.readdirSync).not.toHaveBeenCalled()
+  })
+
+  it('WARN partial coverage when additive unsupported globs accompany supported patterns', () => {
+    const deps = makeWorkspaceDeps(
+      {
+        a: {
+          name: '@scope/a',
+          version: '1.0.0',
+          dependencies: { '@scope/b': '^2.0.0' },
+        },
+        b: { name: '@scope/b', version: '2.1.0' },
+      },
+      { name: 'root', version: '1.0.0' },
+      "packages:\n  - 'packages/*'\n  - 'apps/**'\n",
+    )
+
+    const check = validateWorkspaceDependencyRanges(deps)
+    const detail = check?.detail ?? ''
+
+    // Mutation lock: additive unsupported globs should not suppress supported coverage.
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toBe('workspace ranges partially evaluated')
+    expect(detail).toContain('1/1 internal range(s) coherent')
+    expect(detail).toContain('apps/**')
+    expect(detail).toMatch(/not supported/i)
+  })
+
   it('WARN when supported workspace patterns resolve to zero package dirs', () => {
     const deps = makeWorkspaceDeps({})
 
