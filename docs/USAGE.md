@@ -390,6 +390,26 @@ pnpm release-it-preset update
 - Generates commit links to repository
 - Uses only the conventional commit subject; edit CHANGELOG.md afterwards if you want to add detail from the commit body
 
+#### `annotate` - Enrich Changelog Entries from PR Notes
+
+Regenerates resolvable `[Unreleased]` entries from typed changelog blocks in merged pull request bodies:
+
+```bash
+pnpm release-it-preset annotate
+```
+
+Pull request bodies can provide one or more typed blocks:
+
+```md
+<!-- changelog:fixed -->
+Describe the user-visible fix.
+<!-- /changelog -->
+```
+
+Supported block types are `added`, `changed`, `deprecated`, `removed`, `fixed`, and `security`. The command keeps unresolved bullets untouched, removes all bullets for a PR when at least one valid block is found, and regenerates those bullets under the matching Keep a Changelog section with `(#PR)` and commit links.
+
+SHA-to-PR mapping uses GitHub's commit association endpoint. Squash merges are reliable; rebases, cherry-picks, or unusual merge flows may not map back to a merged PR, in which case the bullet is left unchanged. The GitHub CLI must be installed and authenticated (`gh auth status`) before running `annotate`; any `gh` failure stops the command before writing.
+
 #### `validate` - Validate Release Readiness
 
 Checks if project is ready for release:
