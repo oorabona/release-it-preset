@@ -14,6 +14,7 @@
 import type { ExecSyncOptions } from 'node:child_process'
 import { execSync } from 'node:child_process'
 import { appendFileSync, readFileSync } from 'node:fs'
+import { extractStructuredChangelogNotes } from './annotate-changelog.js'
 import { STRICT_CONVENTIONAL_COMMIT_REGEX } from './lib/commit-parser.js'
 import { runScript } from './lib/run-script.js'
 
@@ -40,8 +41,6 @@ export interface PrCheckDeps {
 }
 
 const SKIP_CHANGELOG_REGEX = /\[skip-changelog]/i
-const CHANGELOG_BLOCK_REGEX =
-  /<!--\s*changelog\s*:\s*(added|changed|deprecated|removed|fixed|security)\s*-->[\s\S]*?<!--\s*\/changelog\s*-->/i
 
 export function safeExec(command: string, deps: PrCheckDeps): string | null {
   try {
@@ -142,7 +141,10 @@ export function evaluateChangelogBlockStatus(deps: PrCheckDeps): ChangelogBlockS
       return 'unknown'
     }
 
-    return CHANGELOG_BLOCK_REGEX.test(body) ? 'present' : 'absent'
+    // Same parser as annotate (typed markers, fence masking): a fenced
+    // documentation example must not count as present here while annotate
+    // would ignore it.
+    return extractStructuredChangelogNotes(body).length > 0 ? 'present' : 'absent'
   } catch {
     return 'unknown'
   }

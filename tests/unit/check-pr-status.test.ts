@@ -91,6 +91,25 @@ describe('check-pr-status utilities', () => {
     }
   })
 
+  it('reports changelog block absent when the only block is a fenced example', () => {
+    // Mutation lock: the previous raw regex counted a documentation example
+    // inside a code fence as present while annotate ignores it (#66) —
+    // check-pr and annotate must share the same parser.
+    const event = writeTempEvent(
+      JSON.stringify({
+        pull_request: {
+          body: 'Example:\n\n```html\n<!-- changelog:fixed -->\nDescribe the fix.\n<!-- /changelog -->\n```\n',
+        },
+      }),
+    )
+
+    try {
+      expect(evaluateChangelogBlockStatus(createBlockDeps(event.path))).toBe('absent')
+    } finally {
+      rmSync(event.dir, { recursive: true, force: true })
+    }
+  })
+
   it('reports changelog block absent when the PR body has no typed block', () => {
     const event = writeTempEvent(JSON.stringify({ pull_request: { body: 'Plain PR body' } }))
 
