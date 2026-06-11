@@ -1128,6 +1128,140 @@ export function validateNpmProvenanceReadiness(deps: DoctorDeps): CheckResult | 
   return NPM_PROVENANCE_READINESS_DECISIONS[state](context)
 }
 
+interface GitHubRepositoryRef {
+  owner: string
+  repo: string
+}
+
+function isSafeGitHubPathPart(value: string): boolean {
+  return /^[A-Za-z0-9._-]+$/.test(value)
+}
+
+function parseGitHubRepositoryRef(repositoryUrl: unknown): GitHubRepositoryRef | null {
+  if (typeof repositoryUrl !== 'string') {
+    return null
+  }
+
+  try {
+    const url = new URL(repositoryUrl.replace(/^git\+/, ''))
+    if (url.hostname.toLowerCase() !== 'github.com') {
+      return null
+    }
+
+    const pathParts = url.pathname.split('/').filter(Boolean)
+    if (pathParts.length !== 2) {
+      return null
+    }
+
+    const [owner, rawRepo] = pathParts
+    const repo = rawRepo.replace(/\.git$/, '')
+    if (!isSafeGitHubPathPart(owner) || !isSafeGitHubPathPart(repo)) {
+      return null
+    }
+
+    return { owner, repo }
+  } catch {
+    return null
+  }
+}
+
+function npmPackBasename(packageName: string, version: string): string {
+  return `${packageName.replace(/^@/, '').replace(/\//g, '-')}-${version}.tgz`
+}
+
+export function validateSlsaAttestationAvailability(deps: DoctorDeps): CheckResult | null {
+  const presetPackageJsonPath = join(
+    deps.cwd(),
+    'node_modules',
+    '@oorabona',
+    'release-it-preset',
+    'package.json',
+  )
+
+  if (!deps.existsSync(presetPackageJsonPath)) {
+    return null
+  }
+
+  let packageName: string | undefined
+  let version: string | undefined
+  let repositoryUrl: unknown
+  try {
+    const raw = deps.readFileSync(presetPackageJsonPath, 'utf8') as string
+    const pkg = JSON.parse(raw) as Record<string, unknown>
+    packageName = typeof pkg.name === 'string' ? pkg.name : undefined
+    version = typeof pkg.version === 'string' ? pkg.version : undefined
+    repositoryUrl =
+      typeof pkg.repository === 'object' && pkg.repository !== null
+        ? (pkg.repository as { url?: unknown }).url
+        : undefined
+  } catch {
+    return null
+  }
+
+  // v-prefixed and +build-metadata versions pass here; release 404s yield null from the network probe.
+  if (!packageName || !version || !isValidSemver(version)) {
+    return null
+  }
+
+  const repository = parseGitHubRepositoryRef(repositoryUrl)
+  if (!repository) {
+    return null
+  }
+
+  const releaseJson = safeExec(
+    `curl -fsSL --max-time 5 https://api.github.com/repos/${repository.owner}/${repository.repo}/releases/tags/v${version}`,
+    deps,
+  )
+  if (!releaseJson) {
+    return null
+  }
+
+  try {
+    const release = JSON.parse(releaseJson) as { assets?: unknown }
+    if (!Array.isArray(release.assets)) {
+      return null
+    }
+
+    const assetNames = release.assets
+      .map((asset) =>
+        typeof asset === 'object' && asset !== null
+          ? (asset as { name?: unknown }).name
+          : undefined,
+      )
+      .filter((name): name is string => typeof name === 'string')
+    const assetNameSet = new Set(assetNames)
+    const basename = npmPackBasename(packageName, version)
+    const expectedIntotoAssetName = `${basename}.intoto.jsonl`
+    const expectedSigstoreAssetName = `${basename}.sigstore.json`
+    const verifyDocUrl = `https://github.com/${repository.owner}/${repository.repo}/blob/v${version}/docs/VERIFY.md`
+    const hasIntotoStatement = assetNameSet.has(expectedIntotoAssetName)
+    const hasSigstoreBundle = assetNameSet.has(expectedSigstoreAssetName)
+
+    if (!hasIntotoStatement || !hasSigstoreBundle) {
+      const missingAssetNames = [
+        hasIntotoStatement ? null : expectedIntotoAssetName,
+        hasSigstoreBundle ? null : expectedSigstoreAssetName,
+      ].filter((name): name is string => name !== null)
+
+      return {
+        name: 'SLSA attestation availability',
+        status: 'WARN',
+        value: version,
+        detail: `Release v${version} is missing ${missingAssetNames.join(' and ')}; verify: ${verifyDocUrl}`,
+      }
+    }
+
+    return {
+      name: 'SLSA attestation availability',
+      status: 'PASS',
+      value: version,
+      detail: `Release v${version} ships ${expectedIntotoAssetName} and ${expectedSigstoreAssetName}; verify: ${verifyDocUrl}`,
+    }
+  } catch {
+    return null
+  }
+}
+
 type DependencyField = 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies'
 
 interface WorkspacePackage {
@@ -1643,6 +1777,10 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
   const npmProvenanceReadiness = validateNpmProvenanceReadiness(deps)
   if (npmProvenanceReadiness) {
     checks.push(npmProvenanceReadiness)
+  }
+  const slsaAttestationAvailability = validateSlsaAttestationAvailability(deps)
+  if (slsaAttestationAvailability) {
+    checks.push(slsaAttestationAvailability)
   }
 
   for (const result of validateReleaseItPeer(deps)) {
