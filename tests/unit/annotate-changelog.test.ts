@@ -3,6 +3,7 @@ import {
   type AnnotateChangelogDeps,
   annotateChangelog,
   choosePrimarySha,
+  extractCommitShas,
   extractStructuredChangelogNotes,
   groupEntriesForLookup,
   parseUnreleasedEntries,
@@ -59,6 +60,45 @@ Do not guess where this belongs.
     expect(notes).toEqual([])
     expect(deps.warn).toHaveBeenCalledWith(expect.stringContaining('PR #49'))
     expect(deps.warn).toHaveBeenCalledWith(expect.stringContaining('unknown changelog type'))
+  })
+
+  it('ignores hex-looking prose words, keeps generated commit references', () => {
+    // Mutation lock: matching any bare 7-40 hex word used to send ticket ids
+    // and words like "deadbeef" to the commits/<sha>/pulls endpoint.
+    expect(extractCommitShas('bump build 1234567 cache key for deadbeef')).toEqual([])
+    expect(extractCommitShas('add feature (1a2b3c4)')).toEqual(['1a2b3c4'])
+    expect(
+      extractCommitShas('add feature ([1a2b3c4](https://github.com/o/r/commit/1a2b3c4))'),
+    ).toEqual(['1a2b3c4'])
+  })
+
+  it('never regenerates entries from an unmerged pull request body', () => {
+    // Mutation lock: gh pr view answers for open PRs too — without the
+    // mergedAt filter an unreviewed open-PR body could rewrite the changelog.
+    vi.mocked(deps.readFileSync).mockReturnValue(`# Changelog
+
+## [Unreleased]
+
+### Changed
+- prepare the next migration (#321)
+`)
+    vi.mocked(deps.execSync).mockImplementation(command => {
+      if (command === 'git config --get remote.origin.url') {
+        return 'https://github.com/owner/repo.git'
+      }
+      if (command === 'gh pr view 321 --repo owner/repo --json number,body,mergedAt') {
+        return JSON.stringify({
+          number: 321,
+          mergedAt: null,
+          body: '<!-- changelog:changed -->\nUnreviewed text\n<!-- /changelog -->',
+        })
+      }
+      return ''
+    })
+
+    annotateChangelog(deps)
+
+    expect(deps.writeFileSync).not.toHaveBeenCalled()
   })
 
   it('chooses the first primary sha in document order', () => {
@@ -252,7 +292,7 @@ Add the annotate command.
       if (command === 'git config --get remote.origin.url') {
         return 'https://github.com/owner/repo.git'
       }
-      if (command === 'gh pr view 123 --json number,body') {
+      if (command === 'gh pr view 123 --repo owner/repo --json number,body,mergedAt') {
         throw new Error('GraphQL: Could not resolve to a PullRequest with the number of 123.')
       }
       return ''

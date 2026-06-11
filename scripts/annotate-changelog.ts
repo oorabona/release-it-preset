@@ -139,8 +139,12 @@ export function extractCommitShas(value: string): string[] {
     shas.add(match[1].toLowerCase())
   }
 
-  for (const match of value.matchAll(/\b([0-9a-f]{7,40})\b/gi)) {
-    shas.add(match[1].toLowerCase())
+  // Bare shas only count in the generated no-repo-url reference shape — a
+  // trailing parenthesized hex word like "(1a2b3c4)". Any hex-looking word
+  // in prose ("deadbeef", a ticket id) is the author's text, not a commit.
+  const bareReference = value.match(/\(([0-9a-f]{7,40})\)\s*$/i)
+  if (bareReference) {
+    shas.add(bareReference[1].toLowerCase())
   }
 
   return [...shas]
@@ -346,12 +350,22 @@ function validatePrInfo(value: unknown, command: string): PullRequestInfo {
 
 export function fetchPullRequestByNumber(
   prNumber: number,
+  ownerRepo: string,
   deps: AnnotateChangelogDeps,
 ): PullRequestInfo | null {
-  const command = `gh pr view ${prNumber} --json number,body`
+  // --repo pins the lookup to the remote-derived repository: without it gh
+  // infers the repo from cwd/GH_REPO and forks or CI checkouts can answer
+  // for the wrong repository.
+  const command = `gh pr view ${prNumber} --repo ${ownerRepo} --json number,body,mergedAt`
   try {
     const output = deps.execSync(command, GH_JSON_OPTIONS) as string
-    return validatePrInfo(parseGhJson(command, output), command)
+    const parsed = parseGhJson(command, output) as { mergedAt?: unknown }
+    // An open or closed-unmerged PR is not part of release history — its
+    // body must never regenerate changelog entries.
+    if (typeof parsed?.mergedAt !== 'string') {
+      return null
+    }
+    return validatePrInfo(parsed, command)
   } catch (error) {
     if (error instanceof ChangelogError) {
       throw error
@@ -372,7 +386,18 @@ export function fetchPullRequestBySha(
   deps: AnnotateChangelogDeps,
 ): PullRequestInfo | null {
   const command = `gh api repos/${ownerRepo}/commits/${sha}/pulls --jq '[.[] | {number: .number, body: .body, merged_at: .merged_at}]'`
-  const parsed = execGhJson(command, deps)
+  let parsed: unknown
+  try {
+    parsed = execGhJson(command, deps)
+  } catch (error) {
+    // A sha that GitHub does not know (rebased away, or a hex-looking word
+    // that slipped through extraction) is the author's text, not annotate's
+    // business — benign passthrough. Auth/network failures stay fatal.
+    if (/not found|HTTP 404/i.test(errorText(error))) {
+      return null
+    }
+    throw error
+  }
 
   if (!Array.isArray(parsed)) {
     throw new ChangelogError(`GitHub CLI command returned an invalid pulls response: ${command}`)
@@ -420,7 +445,7 @@ export function resolvePullRequestGroups(
   for (const group of groups) {
     const pr =
       group.kind === 'pr'
-        ? fetchPullRequestByNumber(Number.parseInt(group.ref, 10), deps)
+        ? fetchPullRequestByNumber(Number.parseInt(group.ref, 10), ownerRepo, deps)
         : fetchPullRequestBySha(group.ref, ownerRepo, deps)
 
     if (!pr) {
