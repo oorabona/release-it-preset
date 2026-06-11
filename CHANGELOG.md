@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-06-11
+
 ### Fixed
 - The attestation chain's registry-tarball artifact upload uses `actions/upload-artifact@v7` (the `@v8` pin only exists for `download-artifact`, so the v1.4.0 release run could not produce its SLSA/cosign assets); v1.4.1 is therefore the first release carrying attestation assets
 
@@ -529,7 +531,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.4.1...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -586,3 +588,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [1.3.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.3.0
 [v1.4.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.4.0
 [1.4.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.4.0
+[v1.4.1]: https://github.com/oorabona/release-it-preset/releases/tag/v1.4.1
+[1.4.1]: https://github.com/oorabona/release-it-preset/releases/tag/v1.4.1
