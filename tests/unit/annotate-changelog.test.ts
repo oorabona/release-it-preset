@@ -119,6 +119,31 @@ The real entry.
     expect(deps.warn).not.toHaveBeenCalled()
   })
 
+  it('ignores markers inside fences nested under list items', () => {
+    // Mutation lock: capping fence detection at CommonMark's top-level
+    // 3-space indent left list-nested fences (4+ spaces, a common GitHub
+    // pattern) unmasked, importing their example markers as real entries.
+    const notes = extractStructuredChangelogNotes(
+      `
+- An example nested in a list:
+
+    \`\`\`
+    <!-- changelog:fixed -->
+    Inert example under a list item.
+    <!-- /changelog -->
+    \`\`\`
+
+<!-- changelog:added -->
+The real entry.
+<!-- /changelog -->
+`,
+      { prNumber: 66, warn: deps.warn },
+    )
+
+    expect(notes).toEqual([{ section: '### Added', text: 'The real entry.' }])
+    expect(deps.warn).not.toHaveBeenCalled()
+  })
+
   it('warns and ignores unknown typed blocks', () => {
     const notes = extractStructuredChangelogNotes(
       `

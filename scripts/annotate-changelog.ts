@@ -504,7 +504,10 @@ function maskFencedRegions(value: string): string {
   return value
     .split('\n')
     .map(line => {
-      const delimiter = line.match(/^\s{0,3}(`{3,}|~{3,})/)
+      // Any indentation is accepted on purpose: fences nested under list
+      // items are indented beyond CommonMark's top-level 3-space cap, and a
+      // safety mask must over-mask rather than import a fenced example.
+      const delimiter = line.match(/^\s*(`{3,}|~{3,})/)
       if (openFence === null) {
         if (delimiter) {
           openFence = { char: delimiter[1][0], length: delimiter[1].length }
@@ -519,7 +522,7 @@ function maskFencedRegions(value: string): string {
         delimiter &&
         delimiter[1][0] === openFence.char &&
         delimiter[1].length >= openFence.length &&
-        /^\s{0,3}(`{3,}|~{3,})\s*$/.test(line)
+        /^\s*(`{3,}|~{3,})\s*$/.test(line)
       ) {
         openFence = null
       }
