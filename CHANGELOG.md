@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-06-11
+
+### Added
+- SLSA Build L3 provenance and cosign keyless signature attached to every GitHub release; see docs/VERIFY.md for copy-pasteable verification commands ([#50](https://github.com/oorabona/release-it-preset/issues/50)) (#69) ([dd5eb82](https://github.com/oorabona/release-it-preset/commit/dd5eb82))
+
+### Changed
+- Canonical manual replay of publish.yml is now `gh workflow run publish.yml --ref vX.Y.Z` (tag ref), keeping SLSA and cosign identities tag-canonical (#69) ([dd5eb82](https://github.com/oorabona/release-it-preset/commit/dd5eb82))
+
+### Fixed
+- `annotate` now ignores changelog markers inside fenced code blocks (CommonMark fence semantics, any indentation) and reports an accurate applied-PR count; `check-pr` shares the same parser, so a fenced example no longer counts as a changelog block (#67) ([f850b6f](https://github.com/oorabona/release-it-preset/commit/f850b6f))
+
 ## [1.3.0] - 2026-06-11
 
 ### Added
@@ -515,7 +526,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.4.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -570,3 +581,5 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [1.2.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.2.0
 [v1.3.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.3.0
 [1.3.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.3.0
+[v1.4.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.4.0
+[1.4.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.4.0
