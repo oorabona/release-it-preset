@@ -410,6 +410,8 @@ Supported block types are `added`, `changed`, `deprecated`, `removed`, `fixed`, 
 
 SHA-to-PR mapping uses GitHub's commit association endpoint. Squash merges are reliable; rebases, cherry-picks, or unusual merge flows may not map back to a merged PR, in which case the bullet is left unchanged. The GitHub CLI must be installed and authenticated (`gh auth status`) before running `annotate`; any `gh` failure stops the command before writing.
 
+**Trust model:** PR bodies are mutable after merge, so imported block text is exactly as trustworthy as the PR body is *right now*. `annotate` is a local command: it only edits your working tree, logs every source PR it applied (`- PR #N: ...`), and never commits — review the resulting `git diff` like any other change before releasing. Wrapped (multi-line) bullets and manually curated notes between entries are preserved in place; only the bullets belonging to an annotated PR are replaced.
+
 #### `validate` - Validate Release Readiness
 
 Checks if project is ready for release:

@@ -165,6 +165,56 @@ Fix the crash reported in issue (#123)
     )
   })
 
+  it('preserves wrapped bullets and curated notes in their original section', () => {
+    // Mutation lock: the previous renderer hoisted non-bullet lines above all
+    // sections and dropped bullet continuation lines, so annotating one PR
+    // corrupted unrelated, manually curated content.
+    vi.mocked(deps.readFileSync).mockReturnValue(`# Changelog
+
+## [Unreleased]
+
+### Added
+- add annotate command ([aaaaaaa](https://github.com/owner/repo/commit/aaaaaaa))
+
+### Fixed
+- a manually written fix that wraps
+  onto a second indented line
+> curator note kept under Fixed
+`)
+
+    vi.mocked(deps.execSync).mockImplementation(command => {
+      if (command === 'git config --get remote.origin.url') {
+        return 'https://github.com/owner/repo.git'
+      }
+      if (
+        command ===
+        "gh api repos/owner/repo/commits/aaaaaaa/pulls --jq '[.[] | {number: .number, body: .body, merged_at: .merged_at}]'"
+      ) {
+        return JSON.stringify([
+          {
+            number: 72,
+            merged_at: '2026-01-01T00:00:00Z',
+            body: `<!-- changelog:added -->
+Add the annotate command.
+<!-- /changelog -->`,
+          },
+        ])
+      }
+      return ''
+    })
+
+    annotateChangelog(deps)
+
+    const written = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+    expect(written).toContain('- a manually written fix that wraps\n  onto a second indented line')
+    const fixedIndex = written.indexOf('### Fixed')
+    expect(fixedIndex).toBeGreaterThan(-1)
+    expect(written.indexOf('> curator note kept under Fixed')).toBeGreaterThan(fixedIndex)
+    expect(written).toContain(
+      '- Add the annotate command. (#72) ([aaaaaaa](https://github.com/owner/repo/commit/aaaaaaa))',
+    )
+  })
+
   it('treats a mid-text issue reference without a commit link as plain text', () => {
     // Mutation lock: the unanchored (#N) regex used to send issue references
     // to gh pr view; prose entries without a PR marker must not trigger any

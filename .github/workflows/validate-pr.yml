@@ -41,11 +41,16 @@ jobs:
               ? JSON.parse(Buffer.from(commitsEncoded, 'base64').toString('utf8'))
               : [];
             const body = context.payload.pull_request?.body;
-            const changelogBlock = changelogBlockOutput || (
-              typeof body === 'string'
-                ? (/<!--\s*changelog\s*:\s*(added|changed|deprecated|removed|fixed|security)\s*-->[\s\S]*?<!--\s*\/changelog\s*-->/i.test(body) ? 'present' : 'absent')
-                : 'unknown'
-            );
+            // Only present/absent are authoritative; '' or 'unknown' (event
+            // payload unreadable in the reusable workflow) falls back to the
+            // live PR body so the advisory is not silently suppressed.
+            const changelogBlock = ['present', 'absent'].includes(changelogBlockOutput)
+              ? changelogBlockOutput
+              : (
+                typeof body === 'string'
+                  ? (/<!--\s*changelog\s*:\s*(added|changed|deprecated|removed|fixed|security)\s*-->[\s\S]*?<!--\s*\/changelog\s*-->/i.test(body) ? 'present' : 'absent')
+                  : 'unknown'
+              );
 
             let summary = '## 📋 PR Validation Summary\n\n';
 

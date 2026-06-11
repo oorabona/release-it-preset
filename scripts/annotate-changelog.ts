@@ -45,9 +45,17 @@ interface UnreleasedBlock {
   suffix: string
 }
 
+type SectionItem = { kind: 'note'; line: string } | { kind: 'entry'; entry: ChangelogEntry }
+
+interface ParsedSection {
+  // null = preamble lines before the first ### heading
+  heading: string | null
+  items: SectionItem[]
+}
+
 interface ParsedUnreleased {
   entries: ChangelogEntry[]
-  nonEntryLines: string[]
+  sections: ParsedSection[]
 }
 
 interface CandidateGroup {
@@ -174,39 +182,55 @@ export function choosePrimarySha(values: Array<string | null | undefined>): stri
 
 export function parseUnreleasedEntries(body: string): ParsedUnreleased {
   const entries: ChangelogEntry[] = []
-  const nonEntryLines: string[] = []
-  let currentSection = DEFAULT_SECTION
+  const sections: ParsedSection[] = [{ heading: null, items: [] }]
   let order = 0
+
+  const currentSection = (): ParsedSection => sections[sections.length - 1]
+  const sectionHeadingOf = (section: ParsedSection): string =>
+    section.heading ?? DEFAULT_SECTION
 
   for (const line of body.split(/\r?\n/)) {
     const headingMatch = line.match(/^###\s+(.+?)\s*$/)
     if (headingMatch) {
-      currentSection = normalizeSectionHeading(line)
+      sections.push({ heading: normalizeSectionHeading(line), items: [] })
       continue
     }
 
-    const bulletMatch = line.match(/^\s*-\s+(.+?)\s*$/)
-    if (!bulletMatch) {
-      if (line.trim() && line.trim() !== 'No changes yet.') {
-        nonEntryLines.push(line)
+    const bulletMatch = line.match(/^-\s+(.+?)\s*$/)
+    if (bulletMatch) {
+      const text = bulletMatch[1].trim()
+      const entry: ChangelogEntry = {
+        section: sectionHeadingOf(currentSection()),
+        text,
+        rawLine: line.replace(/\s+$/, ''),
+        shaList: extractCommitShas(text),
+        prNumber: extractPrNumber(text),
+        order,
       }
+      entries.push(entry)
+      currentSection().items.push({ kind: 'entry', entry })
+      order += 1
       continue
     }
 
-    const text = bulletMatch[1].trim()
-    const shaList = extractCommitShas(text)
-    entries.push({
-      section: currentSection,
-      text,
-      rawLine: `- ${text}`,
-      shaList,
-      prNumber: extractPrNumber(text),
-      order,
-    })
-    order += 1
+    // Indented continuation of a wrapped bullet: it belongs to that bullet
+    // and must travel with it (or stay with it) — never hoisted as a note.
+    const items = currentSection().items
+    const lastItem = items[items.length - 1]
+    if (/^\s+\S/.test(line) && lastItem?.kind === 'entry') {
+      lastItem.entry.rawLine += `\n${line.replace(/\s+$/, '')}`
+      lastItem.entry.text += ` ${line.trim()}`
+      lastItem.entry.shaList = extractCommitShas(lastItem.entry.text)
+      lastItem.entry.prNumber = extractPrNumber(lastItem.entry.text)
+      continue
+    }
+
+    if (line.trim() && line.trim() !== 'No changes yet.') {
+      currentSection().items.push({ kind: 'note', line: line.replace(/\s+$/, '') })
+    }
   }
 
-  return { entries, nonEntryLines }
+  return { entries, sections }
 }
 
 export function groupEntriesForLookup(entries: ChangelogEntry[]): {
@@ -530,67 +554,81 @@ function notesForResolvedGroup(group: ResolvedGroup, deps: AnnotateChangelogDeps
 export function renderAnnotatedBody(
   parsed: ParsedUnreleased,
   resolvedGroups: ResolvedGroup[],
-  unresolvedEntries: ChangelogEntry[],
   repoUrl: string,
   deps: AnnotateChangelogDeps,
 ): string | null {
-  const renderedEntries: ChangelogEntry[] = [...unresolvedEntries]
+  const removedEntries = new Set<ChangelogEntry>()
+  const additionsBySection = new Map<string, ChangelogEntry[]>()
   let annotatedGroups = 0
 
   for (const group of resolvedGroups) {
     const notes = notesForResolvedGroup(group, deps)
     if (notes.length === 0) {
-      renderedEntries.push(...group.entries)
       continue
     }
 
     annotatedGroups += 1
+    // The PR body is mutable post-merge: name every source PR so the
+    // maintainer knows exactly what to review in the resulting diff.
+    deps.log(`- PR #${group.pr.number}: ${notes.length} changelog block(s) applied`)
+    for (const entry of group.entries) {
+      removedEntries.add(entry)
+    }
     const primarySha = choosePrimarySha([group.primarySha, ...group.entries.flatMap(entry => entry.shaList)])
     for (const note of notes) {
-      renderedEntries.push(formatNote(note, primarySha, repoUrl, group.pr.number))
+      const formatted = formatNote(note, primarySha, repoUrl, group.pr.number)
+      const list = additionsBySection.get(formatted.section) ?? []
+      list.push(formatted)
+      additionsBySection.set(formatted.section, list)
     }
   }
 
   // Nothing was annotated: re-rendering would only restructure the existing
-  // body (hoisting non-entry lines, reordering sections) without adding any
-  // information — the caller must leave the file untouched.
+  // body without adding any information — the caller must leave the file
+  // untouched.
   if (annotatedGroups === 0) {
     return null
   }
 
-  if (renderedEntries.length === 0 && parsed.nonEntryLines.length === 0) {
-    return '\nNo changes yet.\n\n'
-  }
-
-  const bySection = new Map<string, ChangelogEntry[]>()
-  for (const entry of renderedEntries) {
-    const list = bySection.get(entry.section) ?? []
-    list.push(entry)
-    bySection.set(entry.section, list)
-  }
-
-  const customSections = [...bySection.keys()].filter(section => !STANDARD_SECTION_ORDER.includes(section))
-  const sections = [...STANDARD_SECTION_ORDER, ...customSections]
+  // Everything that is not replaced is preserved in place: sections keep
+  // their original order and internal layout (notes, wrapped bullets);
+  // replacement bullets append at the end of their target section; sections
+  // that only exist in the additions are appended in canonical order.
   const lines: string[] = []
+  const emittedHeadings = new Set<string>()
 
-  for (const line of parsed.nonEntryLines) {
-    lines.push(line)
-  }
-  if (parsed.nonEntryLines.length > 0 && bySection.size > 0) {
-    lines.push('')
-  }
-
-  for (const section of sections) {
-    const entries = bySection.get(section)
-    if (!entries?.length) {
-      continue
+  const emitSection = (heading: string | null, items: SectionItem[], additions: ChangelogEntry[]): void => {
+    const keptItems = items.filter(item => item.kind === 'note' || !removedEntries.has(item.entry))
+    if (keptItems.length === 0 && additions.length === 0) {
+      return
     }
-
-    lines.push(section)
-    for (const entry of entries) {
-      lines.push(entry.rawLine)
+    if (heading !== null) {
+      lines.push(heading)
+    }
+    for (const item of keptItems) {
+      lines.push(item.kind === 'note' ? item.line : item.entry.rawLine)
+    }
+    for (const added of additions) {
+      lines.push(added.rawLine)
     }
     lines.push('')
+  }
+
+  for (const section of parsed.sections) {
+    const additions = section.heading !== null ? (additionsBySection.get(section.heading) ?? []) : []
+    if (section.heading !== null) {
+      emittedHeadings.add(section.heading)
+    }
+    emitSection(section.heading, section.items, additions)
+  }
+
+  const pendingHeadings = [...additionsBySection.keys()].filter(heading => !emittedHeadings.has(heading))
+  const orderedPending = [
+    ...STANDARD_SECTION_ORDER.filter(heading => pendingHeadings.includes(heading)),
+    ...pendingHeadings.filter(heading => !STANDARD_SECTION_ORDER.includes(heading)),
+  ]
+  for (const heading of orderedPending) {
+    emitSection(heading, [], additionsBySection.get(heading) ?? [])
   }
 
   return `\n${lines.join('\n').trim()}\n\n`
@@ -617,7 +655,7 @@ export function annotateChangelog(deps: AnnotateChangelogDeps): void {
     return
   }
 
-  const { groups, passthrough } = groupEntriesForLookup(parsed.entries)
+  const { groups } = groupEntriesForLookup(parsed.entries)
   if (groups.length === 0) {
     deps.log('No PR or commit references found in [Unreleased]')
     return
@@ -625,7 +663,7 @@ export function annotateChangelog(deps: AnnotateChangelogDeps): void {
 
   const { repoUrl, ownerRepo } = getRequiredGitHubContext(deps)
   const resolved = resolvePullRequestGroups(groups, ownerRepo, deps)
-  const nextBody = renderAnnotatedBody(parsed, resolved.resolved, [...passthrough, ...resolved.unresolved], repoUrl, deps)
+  const nextBody = renderAnnotatedBody(parsed, resolved.resolved, repoUrl, deps)
   if (nextBody === null) {
     deps.log('No changelog blocks found in the resolved pull requests — nothing to annotate')
     return
