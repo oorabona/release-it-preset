@@ -91,6 +91,33 @@ Another inert example.
     expect(deps.warn).not.toHaveBeenCalled()
   })
 
+  it('keeps long fences open across shorter inner fence examples', () => {
+    // Mutation lock: tracking only the fence character let an inner three-
+    // backtick example close a four-backtick outer fence, re-exposing the
+    // markers that followed it inside the same code block.
+    const notes = extractStructuredChangelogNotes(
+      `
+\`\`\`\`md
+Example of a fenced example:
+\`\`\`
+some code
+\`\`\`
+<!-- changelog:fixed -->
+Still inside the four-backtick fence — must stay inert.
+<!-- /changelog -->
+\`\`\`\`
+
+<!-- changelog:added -->
+The real entry.
+<!-- /changelog -->
+`,
+      { prNumber: 66, warn: deps.warn },
+    )
+
+    expect(notes).toEqual([{ section: '### Added', text: 'The real entry.' }])
+    expect(deps.warn).not.toHaveBeenCalled()
+  })
+
   it('warns and ignores unknown typed blocks', () => {
     const notes = extractStructuredChangelogNotes(
       `

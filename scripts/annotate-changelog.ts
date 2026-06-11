@@ -500,20 +500,28 @@ function normalizeBlockText(value: string): string {
 // marker scanning never sees them while every index still maps back to the
 // original text. Grammar examples in PR bodies stay inert this way.
 function maskFencedRegions(value: string): string {
-  let fenceChar: string | null = null
+  let openFence: { char: string; length: number } | null = null
   return value
     .split('\n')
     .map(line => {
       const delimiter = line.match(/^\s{0,3}(`{3,}|~{3,})/)
-      if (fenceChar === null) {
+      if (openFence === null) {
         if (delimiter) {
-          fenceChar = delimiter[1][0]
+          openFence = { char: delimiter[1][0], length: delimiter[1].length }
           return ' '.repeat(line.length)
         }
         return line
       }
-      if (delimiter && delimiter[1][0] === fenceChar && /^\s{0,3}(`{3,}|~{3,})\s*$/.test(line)) {
-        fenceChar = null
+      // CommonMark: the closing fence must use the same character and be at
+      // least as long as the opener — a ```` fence is NOT closed by an inner
+      // ``` example, which is precisely how docs show fenced code.
+      if (
+        delimiter &&
+        delimiter[1][0] === openFence.char &&
+        delimiter[1].length >= openFence.length &&
+        /^\s{0,3}(`{3,}|~{3,})\s*$/.test(line)
+      ) {
+        openFence = null
       }
       return ' '.repeat(line.length)
     })
