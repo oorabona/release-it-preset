@@ -59,6 +59,38 @@ across reruns.
     expect(deps.warn).toHaveBeenCalledWith(expect.stringContaining('nested changelog marker'))
   })
 
+  it('ignores changelog markers inside fenced code regions', () => {
+    // Mutation lock: without fence masking the documentation EXAMPLE block in
+    // a PR body was imported as a real entry during the v1.3.0 dogfood (#66).
+    const notes = extractStructuredChangelogNotes(
+      `
+Real entry below.
+
+<!-- changelog:added -->
+The real entry.
+<!-- /changelog -->
+
+Example for the docs:
+
+\`\`\`html
+<!-- changelog:fixed -->
+Describe the user-visible fix.
+<!-- /changelog -->
+\`\`\`
+
+~~~
+<!-- changelog:security -->
+Another inert example.
+<!-- /changelog -->
+~~~
+`,
+      { prNumber: 66, warn: deps.warn },
+    )
+
+    expect(notes).toEqual([{ section: '### Added', text: 'The real entry.' }])
+    expect(deps.warn).not.toHaveBeenCalled()
+  })
+
   it('warns and ignores unknown typed blocks', () => {
     const notes = extractStructuredChangelogNotes(
       `
@@ -273,6 +305,44 @@ Add the annotate command.
     expect(written).toContain(
       '- Add the annotate command. (#72) ([aaaaaaa](https://github.com/owner/repo/commit/aaaaaaa))',
     )
+  })
+
+  it('reports the number of PRs actually applied, not merely resolved', () => {
+    // Mutation lock: the summary used to count every resolved PR — the
+    // v1.3.0 dogfood printed "Annotated 8" while only 4 had blocks (#66).
+    vi.mocked(deps.readFileSync).mockReturnValue(`# Changelog
+
+## [Unreleased]
+
+### Added
+- with a block ([aaaaaaa](https://github.com/owner/repo/commit/aaaaaaa))
+- without a block ([dddddDD](https://github.com/owner/repo/commit/ddddddd))
+`)
+    vi.mocked(deps.execSync).mockImplementation(command => {
+      if (command === 'git config --get remote.origin.url') {
+        return 'https://github.com/owner/repo.git'
+      }
+      if (String(command).includes('commits/aaaaaaa/pulls')) {
+        return JSON.stringify([
+          {
+            number: 90,
+            merged_at: '2026-01-01T00:00:00Z',
+            body: '<!-- changelog:added -->\nWith a block.\n<!-- /changelog -->',
+          },
+        ])
+      }
+      if (String(command).includes('commits/ddddddd/pulls')) {
+        return JSON.stringify([
+          { number: 91, merged_at: '2026-01-01T00:00:00Z', body: 'no block here' },
+        ])
+      }
+      return ''
+    })
+
+    annotateChangelog(deps)
+
+    const logs = vi.mocked(deps.log).mock.calls.flat().join('\n')
+    expect(logs).toContain('Annotated 1 pull request(s)')
   })
 
   it('keeps attribution to the source PR when imported text embeds other references', () => {
