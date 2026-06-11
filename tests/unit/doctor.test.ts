@@ -16,6 +16,7 @@ import {
   validateNpmProvenanceReadiness,
   validatePublishWorkflowFreshness,
   validateReleaseItPeer,
+  validateSlsaAttestationAvailability,
   validateWorkspaceDependencyRanges,
   workflowHasIdTokenWritePermission,
 } from '../../scripts/doctor'
@@ -1133,6 +1134,207 @@ describe('npm provenance readiness check', () => {
     expect(
       workflowHasIdTokenWritePermission('# id-token: write\npermissions:\n  id-token: read\n'),
     ).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// SLSA attestation availability
+// ---------------------------------------------------------------------------
+
+describe('SLSA attestation availability check', () => {
+  const presetPackageJsonPath = join(
+    '/repo',
+    'node_modules',
+    '@oorabona',
+    'release-it-preset',
+    'package.json',
+  )
+  const installedPresetPackageJson = JSON.stringify({
+    name: '@oorabona/release-it-preset',
+    version: '1.4.1',
+    repository: { url: 'https://github.com/oorabona/release-it-preset' },
+  })
+  const releaseWithSlsaAssets = JSON.stringify({
+    assets: [
+      { name: 'oorabona-release-it-preset-1.4.1.tgz.intoto.jsonl' },
+      { name: 'oorabona-release-it-preset-1.4.1.tgz.sigstore.json' },
+    ],
+  })
+  const verifyDocUrl = 'https://github.com/oorabona/release-it-preset/blob/v1.4.1/docs/VERIFY.md'
+
+  function makeSlsaDeps(
+    packageJson = installedPresetPackageJson,
+    releaseJson = releaseWithSlsaAssets,
+  ): DoctorDeps {
+    return makeDeps({
+      existsSync: vi.fn((p: string) => p === presetPackageJsonPath),
+      readFileSync: vi.fn((p: string) => {
+        if (p === presetPackageJsonPath) {
+          return packageJson
+        }
+        throw new Error(`unexpected file read: ${p}`)
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.startsWith('curl -fsSL --max-time 5 ')) {
+          return releaseJson
+        }
+        throw new Error(`unexpected command: ${cmd}`)
+      }),
+    })
+  }
+
+  it('returns PASS when the installed preset release has both SLSA asset types', () => {
+    const check = validateSlsaAttestationAvailability(makeSlsaDeps())
+
+    expect(check).toEqual({
+      name: 'SLSA attestation availability',
+      status: 'PASS',
+      value: '1.4.1',
+      detail:
+        'Release v1.4.1 ships oorabona-release-it-preset-1.4.1.tgz.intoto.jsonl and oorabona-release-it-preset-1.4.1.tgz.sigstore.json; verify: https://github.com/oorabona/release-it-preset/blob/v1.4.1/docs/VERIFY.md',
+    })
+  })
+
+  it('returns WARN when the release lacks a sigstore bundle asset', () => {
+    const deps = makeSlsaDeps(
+      installedPresetPackageJson,
+      JSON.stringify({
+        assets: [{ name: 'oorabona-release-it-preset-1.4.1.tgz.intoto.jsonl' }],
+      }),
+    )
+
+    expect(validateSlsaAttestationAvailability(deps)).toEqual({
+      name: 'SLSA attestation availability',
+      status: 'WARN',
+      value: '1.4.1',
+      detail: `Release v1.4.1 is missing oorabona-release-it-preset-1.4.1.tgz.sigstore.json; verify: ${verifyDocUrl}`,
+    })
+  })
+
+  it('returns WARN when the release lacks both SLSA asset types', () => {
+    const deps = makeSlsaDeps(
+      installedPresetPackageJson,
+      JSON.stringify({
+        assets: [],
+      }),
+    )
+
+    expect(validateSlsaAttestationAvailability(deps)).toEqual({
+      name: 'SLSA attestation availability',
+      status: 'WARN',
+      value: '1.4.1',
+      detail: `Release v1.4.1 is missing oorabona-release-it-preset-1.4.1.tgz.intoto.jsonl and oorabona-release-it-preset-1.4.1.tgz.sigstore.json; verify: ${verifyDocUrl}`,
+    })
+  })
+
+  it('returns WARN when the release only has SLSA assets for a different version', () => {
+    const deps = makeSlsaDeps(
+      installedPresetPackageJson,
+      JSON.stringify({
+        assets: [
+          { name: 'oorabona-release-it-preset-1.3.0.tgz.intoto.jsonl' },
+          { name: 'oorabona-release-it-preset-1.3.0.tgz.sigstore.json' },
+        ],
+      }),
+    )
+
+    expect(validateSlsaAttestationAvailability(deps)).toEqual({
+      name: 'SLSA attestation availability',
+      status: 'WARN',
+      value: '1.4.1',
+      detail: `Release v1.4.1 is missing oorabona-release-it-preset-1.4.1.tgz.intoto.jsonl and oorabona-release-it-preset-1.4.1.tgz.sigstore.json; verify: ${verifyDocUrl}`,
+    })
+  })
+
+  it('returns null when the curl probe fails', () => {
+    const deps = makeSlsaDeps()
+    deps.execSync = vi.fn(() => {
+      throw new Error('curl unavailable')
+    })
+
+    expect(validateSlsaAttestationAvailability(deps)).toBeNull()
+  })
+
+  it('returns null when the preset is not installed under node_modules', () => {
+    const deps = makeDeps()
+
+    expect(validateSlsaAttestationAvailability(deps)).toBeNull()
+    expect(deps.readFileSync).not.toHaveBeenCalled()
+    expect(deps.execSync).not.toHaveBeenCalled()
+  })
+
+  it('returns null when the GitHub release response is malformed JSON', () => {
+    const deps = makeSlsaDeps(installedPresetPackageJson, '{ invalid json')
+
+    expect(validateSlsaAttestationAvailability(deps)).toBeNull()
+  })
+
+  it('returns null when the release response has no assets array', () => {
+    const deps = makeSlsaDeps(installedPresetPackageJson, JSON.stringify({ tag_name: 'v1.4.1' }))
+
+    expect(validateSlsaAttestationAvailability(deps)).toBeNull()
+  })
+
+  it('returns null when the installed preset package.json is malformed', () => {
+    const deps = makeSlsaDeps('{ invalid json')
+
+    expect(validateSlsaAttestationAvailability(deps)).toBeNull()
+    expect(deps.execSync).not.toHaveBeenCalled()
+  })
+
+  it('returns null for non-GitHub repository URLs before probing releases', () => {
+    const deps = makeSlsaDeps(
+      JSON.stringify({
+        name: '@oorabona/release-it-preset',
+        version: '1.4.1',
+        repository: { url: 'https://gitlab.com/o/r' },
+      }),
+    )
+
+    expect(validateSlsaAttestationAvailability(deps)).toBeNull()
+    expect(deps.execSync).not.toHaveBeenCalled()
+  })
+
+  it('returns null for npm string repository shorthand before probing releases', () => {
+    const deps = makeSlsaDeps(
+      JSON.stringify({
+        name: '@oorabona/release-it-preset',
+        version: '1.4.1',
+        repository: 'github:oorabona/release-it-preset',
+      }),
+    )
+
+    expect(validateSlsaAttestationAvailability(deps)).toBeNull()
+    expect(deps.execSync).not.toHaveBeenCalled()
+  })
+
+  it('returns null for invalid semver versions before probing releases', () => {
+    const deps = makeSlsaDeps(
+      JSON.stringify({
+        name: '@oorabona/release-it-preset',
+        version: 'not-semver',
+        repository: { url: 'https://github.com/oorabona/release-it-preset' },
+      }),
+    )
+
+    expect(validateSlsaAttestationAvailability(deps)).toBeNull()
+    expect(deps.execSync).not.toHaveBeenCalled()
+  })
+
+  it('parses git+https GitHub repository URLs before probing the release tag', () => {
+    const deps = makeSlsaDeps(
+      JSON.stringify({
+        name: '@oorabona/release-it-preset',
+        version: '1.4.1',
+        repository: { url: 'git+https://github.com/oorabona/release-it-preset.git' },
+      }),
+    )
+
+    expect(validateSlsaAttestationAvailability(deps)?.status).toBe('PASS')
+    expect(deps.execSync).toHaveBeenCalledWith(
+      'curl -fsSL --max-time 5 https://api.github.com/repos/oorabona/release-it-preset/releases/tags/v1.4.1',
+      expect.any(Object),
+    )
   })
 })
 
