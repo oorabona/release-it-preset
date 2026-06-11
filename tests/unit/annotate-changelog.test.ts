@@ -47,6 +47,18 @@ across reruns.
     ])
   })
 
+  it('rejects overlapping blocks and keeps only the well-formed inner one', () => {
+    // Mutation lock: without the nested-marker guard the outer block leaked
+    // the raw inner marker into the changelog and duplicated the inner text.
+    const notes = extractStructuredChangelogNotes(
+      '<!-- changelog:added -->A<!-- changelog:fixed -->B<!-- /changelog -->',
+      { prNumber: 49, warn: deps.warn },
+    )
+
+    expect(notes).toEqual([{ section: '### Fixed', text: 'B' }])
+    expect(deps.warn).toHaveBeenCalledWith(expect.stringContaining('nested changelog marker'))
+  })
+
   it('warns and ignores unknown typed blocks', () => {
     const notes = extractStructuredChangelogNotes(
       `

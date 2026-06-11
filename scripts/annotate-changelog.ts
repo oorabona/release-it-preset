@@ -525,7 +525,17 @@ export function extractStructuredChangelogNotes(
       continue
     }
 
-    const text = normalizeBlockText(rest.slice(0, closeMatch.index))
+    const rawContent = rest.slice(0, closeMatch.index)
+    // A second open marker before the close means overlapping blocks: the
+    // outer region is malformed and must never leak a raw marker (or
+    // duplicated text) into the changelog. The inner block, if well-formed,
+    // is still picked up by its own matchAll iteration.
+    if (/<!--\s*changelog\s*:/i.test(rawContent)) {
+      warnForPr(prNumber, options, `nested changelog marker inside ${type} block`)
+      continue
+    }
+
+    const text = normalizeBlockText(rawContent)
     if (!text) {
       warnForPr(prNumber, options, `empty ${type} block`)
       continue
