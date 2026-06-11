@@ -31,12 +31,15 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
-            const releaseValidation = '${{ needs.validate.outputs.release_validation }}';
-            const changelogStatus = '${{ needs.validate.outputs.changelog_status }}';
-            const changelogBlockOutput = '${{ needs.validate.outputs.changelog_block }}';
-            const skipChangelog = '${{ needs.validate.outputs.skip_changelog }}' === 'true';
-            const conventionalCommits = '${{ needs.validate.outputs.conventional_commits }}' === 'true';
-            const commitsEncoded = '${{ needs.validate.outputs.commit_messages }}';
+            // toJSON: these outputs are produced by code checked out from the
+            // PR branch — quoted string interpolation would let a crafted
+            // output break out of the JS string in this privileged job.
+            const releaseValidation = ${{ toJSON(needs.validate.outputs.release_validation) }};
+            const changelogStatus = ${{ toJSON(needs.validate.outputs.changelog_status) }};
+            const changelogBlockOutput = ${{ toJSON(needs.validate.outputs.changelog_block) }};
+            const skipChangelog = ${{ toJSON(needs.validate.outputs.skip_changelog) }} === 'true';
+            const conventionalCommits = ${{ toJSON(needs.validate.outputs.conventional_commits) }} === 'true';
+            const commitsEncoded = ${{ toJSON(needs.validate.outputs.commit_messages) }};
             const commits = commitsEncoded
               ? JSON.parse(Buffer.from(commitsEncoded, 'base64').toString('utf8'))
               : [];
