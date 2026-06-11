@@ -34,6 +34,9 @@ on:
       changelog_status:
         description: "Changelog status (updated/skipped/missing)"
         value: ${{ jobs.verify.outputs.changelog_status }}
+      changelog_block:
+        description: "Structured changelog block in the PR body (present/absent/unknown)"
+        value: ${{ jobs.verify.outputs.changelog_block }}
       skip_changelog:
         description: "'true' when [skip-changelog] detected"
         value: ${{ jobs.verify.outputs.skip_changelog }}
@@ -55,6 +58,7 @@ jobs:
     outputs:
       release_validation: ${{ steps.release_validation.outputs.passed }}
       changelog_status: ${{ steps.pr_check.outputs.changelog_status }}
+      changelog_block: ${{ steps.pr_check.outputs.changelog_block }}
       skip_changelog: ${{ steps.pr_check.outputs.skip_changelog }}
       conventional_commits: ${{ steps.pr_check.outputs.conventional_commits }}
       commit_messages: ${{ steps.pr_check.outputs.commit_messages }}

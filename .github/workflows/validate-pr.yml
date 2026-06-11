@@ -31,14 +31,29 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
-            const releaseValidation = '${{ needs.validate.outputs.release_validation }}';
-            const changelogStatus = '${{ needs.validate.outputs.changelog_status }}';
-            const skipChangelog = '${{ needs.validate.outputs.skip_changelog }}' === 'true';
-            const conventionalCommits = '${{ needs.validate.outputs.conventional_commits }}' === 'true';
-            const commitsEncoded = '${{ needs.validate.outputs.commit_messages }}';
+            // toJSON: these outputs are produced by code checked out from the
+            // PR branch — quoted string interpolation would let a crafted
+            // output break out of the JS string in this privileged job.
+            const releaseValidation = ${{ toJSON(needs.validate.outputs.release_validation) }};
+            const changelogStatus = ${{ toJSON(needs.validate.outputs.changelog_status) }};
+            const changelogBlockOutput = ${{ toJSON(needs.validate.outputs.changelog_block) }};
+            const skipChangelog = ${{ toJSON(needs.validate.outputs.skip_changelog) }} === 'true';
+            const conventionalCommits = ${{ toJSON(needs.validate.outputs.conventional_commits) }} === 'true';
+            const commitsEncoded = ${{ toJSON(needs.validate.outputs.commit_messages) }};
             const commits = commitsEncoded
               ? JSON.parse(Buffer.from(commitsEncoded, 'base64').toString('utf8'))
               : [];
+            const body = context.payload.pull_request?.body;
+            // Only present/absent are authoritative; '' or 'unknown' (event
+            // payload unreadable in the reusable workflow) falls back to the
+            // live PR body so the advisory is not silently suppressed.
+            const changelogBlock = ['present', 'absent'].includes(changelogBlockOutput)
+              ? changelogBlockOutput
+              : (
+                typeof body === 'string'
+                  ? (/<!--\s*changelog\s*:\s*(added|changed|deprecated|removed|fixed|security)\s*-->[\s\S]*?<!--\s*\/changelog\s*-->/i.test(body) ? 'present' : 'absent')
+                  : 'unknown'
+              );
 
             let summary = '## 📋 PR Validation Summary\n\n';
 
@@ -62,6 +77,10 @@ jobs:
             } else {
               summary += 'ℹ️  **Conventional commits**: Not detected\n';
               summary += '   - Recommended format: `type(scope): description` (e.g., `feat: add new feature`)\n';
+            }
+
+            if (changelogBlock === 'absent') {
+              summary += 'ℹ️  **PR changelog block**: Optional for `annotate`; example: `<!-- changelog:fixed -->\\nDescribe the user-visible fix.\\n<!-- /changelog -->`\n';
             }
 
             if (commits.length) {

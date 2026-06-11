@@ -13,11 +13,12 @@
 
 import type { ExecSyncOptions } from 'node:child_process'
 import { execSync } from 'node:child_process'
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, readFileSync } from 'node:fs'
 import { STRICT_CONVENTIONAL_COMMIT_REGEX } from './lib/commit-parser.js'
 import { runScript } from './lib/run-script.js'
 
 export type ChangelogStatus = 'updated' | 'skipped' | 'missing'
+export type ChangelogBlockStatus = 'present' | 'absent' | 'unknown'
 
 export interface PrCheckResult {
   baseRef: string | null
@@ -25,6 +26,7 @@ export interface PrCheckResult {
   changedFiles: string[]
   commits: string[]
   changelogStatus: ChangelogStatus
+  changelogBlock: ChangelogBlockStatus
   skipChangelogMarker: boolean
   hasConventionalCommits: boolean
 }
@@ -38,6 +40,8 @@ export interface PrCheckDeps {
 }
 
 const SKIP_CHANGELOG_REGEX = /\[skip-changelog]/i
+const CHANGELOG_BLOCK_REGEX =
+  /<!--\s*changelog\s*:\s*(added|changed|deprecated|removed|fixed|security)\s*-->[\s\S]*?<!--\s*\/changelog\s*-->/i
 
 export function safeExec(command: string, deps: PrCheckDeps): string | null {
   try {
@@ -116,6 +120,34 @@ export function evaluateChangelogStatus(
   return { status: 'missing', skipMarker }
 }
 
+export function evaluateChangelogBlockStatus(deps: PrCheckDeps): ChangelogBlockStatus {
+  const eventPath = deps.getEnv('GITHUB_EVENT_PATH')
+  if (!eventPath) {
+    return 'unknown'
+  }
+
+  try {
+    const event = JSON.parse(readFileSync(eventPath, 'utf8')) as unknown
+    if (!event || typeof event !== 'object') {
+      return 'unknown'
+    }
+
+    const pullRequest = (event as { pull_request?: unknown }).pull_request
+    if (!pullRequest || typeof pullRequest !== 'object') {
+      return 'unknown'
+    }
+
+    const body = (pullRequest as { body?: unknown }).body
+    if (typeof body !== 'string') {
+      return 'unknown'
+    }
+
+    return CHANGELOG_BLOCK_REGEX.test(body) ? 'present' : 'absent'
+  } catch {
+    return 'unknown'
+  }
+}
+
 export function getDiffRange(baseRef: string | null, headRef: string): string {
   if (!baseRef) {
     return headRef
@@ -145,6 +177,7 @@ export function runPrCheck(args: { base?: string | null; head?: string | null },
 
   const changelogPath = deps.getEnv('CHANGELOG_FILE') ?? 'CHANGELOG.md'
   const changelogEvaluation = evaluateChangelogStatus(changedFiles, changelogPath, commits)
+  const changelogBlock = evaluateChangelogBlockStatus(deps)
   const conventional = hasConventionalCommits(commits)
 
   return {
@@ -153,6 +186,7 @@ export function runPrCheck(args: { base?: string | null; head?: string | null },
     changedFiles,
     commits,
     changelogStatus: changelogEvaluation.status,
+    changelogBlock,
     skipChangelogMarker: changelogEvaluation.skipMarker,
     hasConventionalCommits: conventional,
   }
@@ -179,6 +213,7 @@ export function writeOutputs(result: PrCheckResult, deps: PrCheckDeps) {
   const filesEncoded = Buffer.from(JSON.stringify(result.changedFiles), 'utf8').toString('base64')
 
   deps.writeOutput('changelog_status', result.changelogStatus)
+  deps.writeOutput('changelog_block', result.changelogBlock)
   deps.writeOutput('skip_changelog', result.skipChangelogMarker ? 'true' : 'false')
   deps.writeOutput('conventional_commits', result.hasConventionalCommits ? 'true' : 'false')
   deps.writeOutput('commit_messages', commitsEncoded)

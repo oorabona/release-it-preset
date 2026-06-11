@@ -1,9 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createDefaultDeps,
+  evaluateChangelogBlockStatus,
   evaluateChangelogStatus,
   hasConventionalCommits,
   hasSkipChangelog,
@@ -16,6 +17,23 @@ import {
   splitList,
   writeOutputs,
 } from '../../scripts/check-pr-status'
+
+function writeTempEvent(content: string): { dir: string; path: string } {
+  const dir = mkdtempSync(join(tmpdir(), 'pr-event-'))
+  const path = join(dir, 'event.json')
+  writeFileSync(path, content)
+  return { dir, path }
+}
+
+function createBlockDeps(eventPath: string | undefined): PrCheckDeps {
+  return {
+    execSync: vi.fn(),
+    getEnv: vi.fn((key: string) => (key === 'GITHUB_EVENT_PATH' ? eventPath : undefined)),
+    writeOutput: vi.fn(),
+    log: vi.fn(),
+    warn: vi.fn(),
+  }
+}
 
 describe('check-pr-status utilities', () => {
   it('normalizes base refs with origin prefix', () => {
@@ -55,6 +73,58 @@ describe('check-pr-status utilities', () => {
 
     const missing = evaluateChangelogStatus([], 'CHANGELOG.md', [])
     expect(missing).toEqual({ status: 'missing', skipMarker: false })
+  })
+
+  it('reports changelog block present from pull request body', () => {
+    const event = writeTempEvent(
+      JSON.stringify({
+        pull_request: {
+          body: '<!-- changelog:fixed -->\nFix the release note.\n<!-- /changelog -->',
+        },
+      }),
+    )
+
+    try {
+      expect(evaluateChangelogBlockStatus(createBlockDeps(event.path))).toBe('present')
+    } finally {
+      rmSync(event.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reports changelog block absent when the PR body has no typed block', () => {
+    const event = writeTempEvent(JSON.stringify({ pull_request: { body: 'Plain PR body' } }))
+
+    try {
+      expect(evaluateChangelogBlockStatus(createBlockDeps(event.path))).toBe('absent')
+    } finally {
+      rmSync(event.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reports changelog block unknown when the event file is missing', () => {
+    const missingPath = join(tmpdir(), `missing-event-${Date.now()}.json`)
+
+    expect(evaluateChangelogBlockStatus(createBlockDeps(missingPath))).toBe('unknown')
+  })
+
+  it('reports changelog block unknown when the event JSON is invalid', () => {
+    const event = writeTempEvent('{bad json')
+
+    try {
+      expect(evaluateChangelogBlockStatus(createBlockDeps(event.path))).toBe('unknown')
+    } finally {
+      rmSync(event.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reports changelog block unknown when the PR body field is absent', () => {
+    const event = writeTempEvent(JSON.stringify({ pull_request: {} }))
+
+    try {
+      expect(evaluateChangelogBlockStatus(createBlockDeps(event.path))).toBe('unknown')
+    } finally {
+      rmSync(event.dir, { recursive: true, force: true })
+    }
   })
 
   it('falls back to default changelog filename when blank', () => {
@@ -123,6 +193,7 @@ describe('check-pr-status utilities', () => {
 
     expect(result.baseRef).toBe('origin/develop')
     expect(result.changelogStatus).toBe('updated')
+    expect(result.changelogBlock).toBe('unknown')
     expect(result.hasConventionalCommits).toBe(true)
     expect(result.commits).toHaveLength(2)
   })
@@ -163,6 +234,7 @@ describe('check-pr-status utilities', () => {
     expect(commands).toContain('git diff --name-only feature-branch')
     expect(commands).toContain('git log feature-branch --pretty=format:%s')
     expect(result.changelogStatus).toBe('missing')
+    expect(result.changelogBlock).toBe('unknown')
     expect(result.hasConventionalCommits).toBe(true)
   })
 
@@ -207,6 +279,7 @@ describe('check-pr-status utilities', () => {
     expect(commands).toContain('git log origin/release..HEAD --pretty=format:%s')
     expect(result.changedFiles).toEqual([])
     expect(result.commits).toEqual([])
+    expect(result.changelogBlock).toBe('unknown')
     expect(warn).toHaveBeenCalledTimes(2)
     expect(warn.mock.calls[0][0]).toContain('diff failed')
     expect(warn.mock.calls[1][0]).toContain('log failed')
@@ -237,6 +310,7 @@ describe('check-pr-status utilities', () => {
 
     expect(result.baseRef).toBeNull()
     expect(result.headRef).toBe('HEAD')
+    expect(result.changelogBlock).toBe('unknown')
     expect(commands).toContain('git diff --name-only HEAD')
     expect(commands).toContain('git log HEAD --pretty=format:%s')
   })
@@ -259,6 +333,7 @@ describe('check-pr-status utilities', () => {
       changedFiles: ['CHANGELOG.md'],
       commits: ['feat: update CHANGELOG'],
       changelogStatus: 'updated' as const,
+      changelogBlock: 'present' as const,
       skipChangelogMarker: false,
       hasConventionalCommits: true,
     }
@@ -266,6 +341,7 @@ describe('check-pr-status utilities', () => {
     writeOutputs(result, deps)
 
     expect(outputs.changelog_status).toBe('updated')
+    expect(outputs.changelog_block).toBe('present')
     expect(outputs.skip_changelog).toBe('false')
     expect(outputs.conventional_commits).toBe('true')
 
@@ -296,6 +372,7 @@ describe('check-pr-status utilities', () => {
       changedFiles: [],
       commits: [],
       changelogStatus: 'missing' as const,
+      changelogBlock: 'unknown' as const,
       skipChangelogMarker: false,
       hasConventionalCommits: false,
     }
@@ -324,6 +401,7 @@ describe('check-pr-status utilities', () => {
       changedFiles: [],
       commits: ['chore: something [skip-changelog]'],
       changelogStatus: 'skipped' as const,
+      changelogBlock: 'absent' as const,
       skipChangelogMarker: true,
       hasConventionalCommits: false,
     }
@@ -352,6 +430,7 @@ describe('check-pr-status utilities', () => {
         changedFiles: [],
         commits: ['feat: add feature'],
         changelogStatus: 'updated',
+        changelogBlock: 'present',
         skipChangelogMarker: false,
         hasConventionalCommits: true,
       },
@@ -365,6 +444,7 @@ describe('check-pr-status utilities', () => {
         changedFiles: [],
         commits: ['chore: maintenance'],
         changelogStatus: 'skipped',
+        changelogBlock: 'absent',
         skipChangelogMarker: true,
         hasConventionalCommits: false,
       },
@@ -378,6 +458,7 @@ describe('check-pr-status utilities', () => {
         changedFiles: [],
         commits: [],
         changelogStatus: 'missing',
+        changelogBlock: 'unknown',
         skipChangelogMarker: false,
         hasConventionalCommits: false,
       },
