@@ -133,24 +133,36 @@ export function normalizeSectionHeading(rawHeading: string): string {
 }
 
 export function extractCommitShas(value: string): string[] {
-  const shas = new Set<string>()
-
-  for (const match of value.matchAll(/\/commit\/([0-9a-f]{7,40})/gi)) {
-    shas.add(match[1].toLowerCase())
+  // Only the generated TRAILING reference identifies the bullet's commit.
+  // Annotated bullets import author text verbatim, so a /commit/ URL or a
+  // hex word inside the prose must never re-key the bullet to another
+  // commit (and through it, another PR) on the next run.
+  const trailingLink = value.match(
+    /\(\[([0-9a-f]{7,40})\]\([^)]*\/commit\/[0-9a-f]{7,40}\)\)\s*$/i,
+  )
+  if (trailingLink) {
+    return [trailingLink[1].toLowerCase()]
   }
 
-  // Bare shas only count in the generated no-repo-url reference shape — a
-  // trailing parenthesized hex word like "(1a2b3c4)". Any hex-looking word
-  // in prose ("deadbeef", a ticket id) is the author's text, not a commit.
   const bareReference = value.match(/\(([0-9a-f]{7,40})\)\s*$/i)
   if (bareReference) {
-    shas.add(bareReference[1].toLowerCase())
+    return [bareReference[1].toLowerCase()]
   }
 
-  return [...shas]
+  return []
 }
 
 export function extractPrNumber(value: string): number | null {
+  // The generated trailing reference always wins: annotated bullets carry
+  // author text verbatim, and an embedded "PR #72" or /pull/72 in that prose
+  // must not out-rank the (#N) suffix appended by annotate itself.
+  const squashSuffix = value.match(
+    /\(#(\d{1,10})\)(?:\s+\(\[[0-9a-f]{7,40}\]\([^)]*\)\))?\s*$/i,
+  )
+  if (squashSuffix) {
+    return Number.parseInt(squashSuffix[1], 10)
+  }
+
   const explicitPr = value.match(/\bPR\s+#(\d{1,10})\b/i)
   if (explicitPr) {
     return Number.parseInt(explicitPr[1], 10)
@@ -159,16 +171,6 @@ export function extractPrNumber(value: string): number | null {
   const pullUrl = value.match(/\/pull\/(\d{1,10})\b/i)
   if (pullUrl) {
     return Number.parseInt(pullUrl[1], 10)
-  }
-
-  // Bare (#N) only counts in squash-suffix position (end of the descriptive
-  // text, optionally followed by the generated commit link) — a mid-text
-  // (#N) is an issue reference in the author's prose, not a PR marker.
-  const squashSuffix = value.match(
-    /\(#(\d{1,10})\)(?:\s+\(\[[0-9a-f]{7,40}\]\([^)]*\)\))?\s*$/i,
-  )
-  if (squashSuffix) {
-    return Number.parseInt(squashSuffix[1], 10)
   }
 
   return null

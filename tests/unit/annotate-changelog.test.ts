@@ -82,6 +82,14 @@ Do not guess where this belongs.
     expect(
       extractCommitShas('add feature ([1a2b3c4](https://github.com/o/r/commit/1a2b3c4))'),
     ).toEqual(['1a2b3c4'])
+    // Imported author prose may embed commit URLs and PR references — only
+    // the generated trailing forms identify the bullet.
+    expect(extractCommitShas('see https://github.com/o/r/commit/bbbbbbb for context')).toEqual([])
+    expect(
+      extractCommitShas(
+        'see https://github.com/o/r/commit/bbbbbbb (#80) ([ccccccc](https://github.com/o/r/commit/ccccccc))',
+      ),
+    ).toEqual(['ccccccc'])
   })
 
   it('never regenerates entries from an unmerged pull request body', () => {
@@ -264,6 +272,44 @@ Add the annotate command.
     expect(written.indexOf('> curator note kept under Fixed')).toBeGreaterThan(fixedIndex)
     expect(written).toContain(
       '- Add the annotate command. (#72) ([aaaaaaa](https://github.com/owner/repo/commit/aaaaaaa))',
+    )
+  })
+
+  it('keeps attribution to the source PR when imported text embeds other references', () => {
+    // Mutation lock: prose-embedded "PR #72" and commit URLs used to out-rank
+    // the generated trailing reference, re-keying the bullet to the wrong PR
+    // on the next run.
+    vi.mocked(deps.readFileSync).mockReturnValue(`# Changelog
+
+## [Unreleased]
+
+### Fixed
+- See PR #72 and https://github.com/owner/repo/commit/bbbbbbb for context (#80) ([ccccccc](https://github.com/owner/repo/commit/ccccccc))
+`)
+    vi.mocked(deps.execSync).mockImplementation(command => {
+      if (command === 'git config --get remote.origin.url') {
+        return 'https://github.com/owner/repo.git'
+      }
+      if (
+        command ===
+        "gh api repos/owner/repo/commits/ccccccc/pulls --jq '[.[] | {number: .number, body: .body, merged_at: .merged_at}]'"
+      ) {
+        return JSON.stringify([
+          {
+            number: 80,
+            merged_at: '2026-01-01T00:00:00Z',
+            body: '<!-- changelog:fixed -->\nSee PR #72 and https://github.com/owner/repo/commit/bbbbbbb for context\n<!-- /changelog -->',
+          },
+        ])
+      }
+      throw new Error(`unexpected command: ${command}`)
+    })
+
+    annotateChangelog(deps)
+
+    const written = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+    expect(written).toContain(
+      'See PR #72 and https://github.com/owner/repo/commit/bbbbbbb for context (#80) ([ccccccc](https://github.com/owner/repo/commit/ccccccc))',
     )
   })
 
