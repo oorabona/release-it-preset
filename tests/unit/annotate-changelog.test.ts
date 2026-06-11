@@ -97,13 +97,19 @@ Do not guess where this belongs.
       if (command === 'git config --get remote.origin.url') {
         return 'https://github.com/owner/repo.git'
       }
-      if (command === 'gh pr view 49 --json number,body') {
-        return JSON.stringify({
-          number: 49,
-          body: `<!-- changelog:fixed -->
+      if (
+        command ===
+        "gh api repos/owner/repo/commits/aaaaaaa/pulls --jq '[.[] | {number: .number, body: .body, merged_at: .merged_at}]'"
+      ) {
+        return JSON.stringify([
+          {
+            number: 49,
+            merged_at: '2026-01-01T00:00:00Z',
+            body: `<!-- changelog:fixed -->
 Ship the annotate workflow.
 <!-- /changelog -->`,
-        })
+          },
+        ])
       }
       return ''
     })
@@ -134,13 +140,19 @@ Ship the annotate workflow.
       if (command === 'git config --get remote.origin.url') {
         return 'https://github.com/owner/repo.git'
       }
-      if (command === 'gh pr view 49 --json number,body') {
-        return JSON.stringify({
-          number: 49,
-          body: `<!-- changelog:fixed -->
+      if (
+        command ===
+        "gh api repos/owner/repo/commits/aaaaaaa/pulls --jq '[.[] | {number: .number, body: .body, merged_at: .merged_at}]'"
+      ) {
+        return JSON.stringify([
+          {
+            number: 49,
+            merged_at: '2026-01-01T00:00:00Z',
+            body: `<!-- changelog:fixed -->
 Fix the crash reported in issue (#123)
 <!-- /changelog -->`,
-        })
+          },
+        ])
       }
       return ''
     })
@@ -151,6 +163,54 @@ Fix the crash reported in issue (#123)
     expect(written).toContain(
       '- Fix the crash reported in issue (#123) (#49) ([aaaaaaa](https://github.com/owner/repo/commit/aaaaaaa))',
     )
+  })
+
+  it('treats a mid-text issue reference without a commit link as plain text', () => {
+    // Mutation lock: the unanchored (#N) regex used to send issue references
+    // to gh pr view; prose entries without a PR marker must not trigger any
+    // lookup at all.
+    vi.mocked(deps.readFileSync).mockReturnValue(`# Changelog
+
+## [Unreleased]
+
+### Fixed
+- fix crash reported in issue (#123) by retrying
+`)
+    vi.mocked(deps.execSync).mockImplementation(command => {
+      if (command === 'git config --get remote.origin.url') {
+        return 'https://github.com/owner/repo.git'
+      }
+      throw new Error(`unexpected command: ${command}`)
+    })
+
+    annotateChangelog(deps)
+
+    expect(deps.writeFileSync).not.toHaveBeenCalled()
+  })
+
+  it('leaves a bullet untouched when its trailing reference is an issue, not a PR', () => {
+    // Mutation lock: a thrown "Could not resolve to a PullRequest" used to be
+    // fatal; an issue number in squash position must be benign passthrough.
+    vi.mocked(deps.readFileSync).mockReturnValue(`# Changelog
+
+## [Unreleased]
+
+### Changed
+- documented the recovery flow in the handbook (#123)
+`)
+    vi.mocked(deps.execSync).mockImplementation(command => {
+      if (command === 'git config --get remote.origin.url') {
+        return 'https://github.com/owner/repo.git'
+      }
+      if (command === 'gh pr view 123 --json number,body') {
+        throw new Error('GraphQL: Could not resolve to a PullRequest with the number of 123.')
+      }
+      return ''
+    })
+
+    annotateChangelog(deps)
+
+    expect(deps.writeFileSync).not.toHaveBeenCalled()
   })
 
   it('resolves commit shas through the commits pulls endpoint and regroups by PR', () => {
@@ -271,13 +331,19 @@ Ship the annotate workflow.
       if (command === 'git config --get remote.origin.url') {
         return 'https://github.com/owner/repo.git'
       }
-      if (command === 'gh pr view 49 --json number,body') {
-        return JSON.stringify({
-          number: 49,
-          body: `<!-- changelog:changed -->
+      if (
+        command ===
+        "gh api repos/owner/repo/commits/aaaaaaa/pulls --jq '[.[] | {number: .number, body: .body, merged_at: .merged_at}]'"
+      ) {
+        return JSON.stringify([
+          {
+            number: 49,
+            merged_at: '2026-01-01T00:00:00Z',
+            body: `<!-- changelog:changed -->
 ship the annotate workflow
 <!-- /changelog -->`,
-        })
+          },
+        ])
       }
       return ''
     })
@@ -308,13 +374,15 @@ ship the annotate workflow
       if (command === 'git config --get remote.origin.url') {
         return 'https://github.com/owner/repo.git'
       }
-      if (command === 'gh pr view 49 --json number,body') {
+      if (command.startsWith('gh api repos/owner/repo/commits/aaaaaaa/pulls')) {
         throw new Error('not logged in to any GitHub hosts')
       }
       return ''
     })
 
-    expect(() => annotateChangelog(deps)).toThrow(/gh pr view 49 --json number,body/)
+    expect(() => annotateChangelog(deps)).toThrow(
+      /gh api repos\/owner\/repo\/commits\/aaaaaaa\/pulls/,
+    )
     expect(deps.writeFileSync).not.toHaveBeenCalled()
   })
 

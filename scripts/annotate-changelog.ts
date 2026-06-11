@@ -149,7 +149,12 @@ export function extractPrNumber(value: string): number | null {
     return Number.parseInt(pullUrl[1], 10)
   }
 
-  const squashSuffix = value.match(/\(#(\d{1,10})\)/)
+  // Bare (#N) only counts in squash-suffix position (end of the descriptive
+  // text, optionally followed by the generated commit link) — a mid-text
+  // (#N) is an issue reference in the author's prose, not a PR marker.
+  const squashSuffix = value.match(
+    /\(#(\d{1,10})\)(?:\s+\(\[[0-9a-f]{7,40}\]\([^)]*\)\))?\s*$/i,
+  )
   if (squashSuffix) {
     return Number.parseInt(squashSuffix[1], 10)
   }
@@ -217,7 +222,10 @@ export function groupEntriesForLookup(entries: ChangelogEntry[]): {
       continue
     }
 
-    if (entry.prNumber !== null) {
+    // The commit sha is the authoritative key: the commits/<sha>/pulls
+    // endpoint returns the true merged PR, while a textual (#N) may be an
+    // issue reference. Only sha-less entries fall back to the PR number.
+    if (entry.prNumber !== null && entry.shaList.length === 0) {
       const key = `pr:${entry.prNumber}`
       const existing = byKey.get(key)
       if (existing) {
@@ -312,9 +320,26 @@ function validatePrInfo(value: unknown, command: string): PullRequestInfo {
   }
 }
 
-export function fetchPullRequestByNumber(prNumber: number, deps: AnnotateChangelogDeps): PullRequestInfo {
+export function fetchPullRequestByNumber(
+  prNumber: number,
+  deps: AnnotateChangelogDeps,
+): PullRequestInfo | null {
   const command = `gh pr view ${prNumber} --json number,body`
-  return validatePrInfo(execGhJson(command, deps), command)
+  try {
+    const output = deps.execSync(command, GH_JSON_OPTIONS) as string
+    return validatePrInfo(parseGhJson(command, output), command)
+  } catch (error) {
+    if (error instanceof ChangelogError) {
+      throw error
+    }
+    // A (#NNN) reference in bullet text may point at an issue, not a PR —
+    // that is the author's text, not an annotation candidate. Only this
+    // not-a-PR shape is benign; auth/network/API failures stay fatal.
+    if (/could not resolve to a PullRequest|no pull requests? found|not found/i.test(errorText(error))) {
+      return null
+    }
+    throw new ChangelogError(`GitHub CLI command failed: ${command}\n${errorText(error)}`)
+  }
 }
 
 export function fetchPullRequestBySha(
