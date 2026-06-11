@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The attestation chain's registry-tarball artifact upload uses `actions/upload-artifact@v7` (the `@v8` pin only exists for `download-artifact`, so the v1.4.0 release run could not produce its SLSA/cosign assets); v1.4.1 is therefore the first release carrying attestation assets
+
 ## [1.4.0] - 2026-06-11
 
 ### Added

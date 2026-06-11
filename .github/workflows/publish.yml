@@ -282,7 +282,7 @@ jobs:
 
       - name: Upload registry tarball artifact
         if: steps.pack.outputs.should_attest == 'true'
-        uses: actions/upload-artifact@v8
+        uses: actions/upload-artifact@v7
         with:
           name: registry-tarball
           path: ${{ runner.temp }}/npm-pack-subject/${{ steps.pack.outputs.tgz }}

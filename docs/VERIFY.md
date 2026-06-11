@@ -2,7 +2,7 @@
 
 This guide verifies a release of `@oorabona/release-it-preset`. Replace
 `X.Y.Z` with the version and `vX.Y.Z` with the matching tag. For the first
-release containing this chain, use `1.4.0` and `v1.4.0`.
+release containing this chain, use `1.4.1` and `v1.4.1`.
 
 Set the expected tarball name:
 
@@ -87,8 +87,11 @@ commit, so attestations are never produced for bytes built from another ref.
   Branch replays with `-f tag=vX.Y.Z` from another ref can republish npm and
   GitHub release content, but they never (re)write attestation assets, so
   existing canonical assets cannot be downgraded.
-- Releases before `v1.4.0` have npm provenance only. They do not carry the SLSA
-  L3 provenance or cosign release assets described here.
+- Releases up to and including `v1.4.0` have npm provenance only. They do not
+  carry the SLSA L3 provenance or cosign release assets described here
+  (v1.4.0 shipped the chain but its own release run predated a one-line
+  workflow fix, and attestations are deliberately impossible to backfill —
+  see the two caveats above).
 
 ## 7. Pinned Tool Versions
 
