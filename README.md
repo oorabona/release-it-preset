@@ -7,6 +7,7 @@ Shareable [release-it](https://github.com/release-it/release-it) configuration a
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node](https://img.shields.io/node/v/@oorabona/release-it-preset.svg)](https://nodejs.org/)
 [![OIDC trusted publishing](https://img.shields.io/badge/npm-OIDC%20trusted%20publishing-green.svg)](https://docs.npmjs.com/trusted-publishers)
+[![SLSA Level 3](https://slsa.dev/images/gh-badge-level3.svg)](docs/VERIFY.md)
 [![CI](https://github.com/oorabona/release-it-preset/actions/workflows/ci.yml/badge.svg)](https://github.com/oorabona/release-it-preset/actions/workflows/ci.yml)
 [![Audit](https://github.com/oorabona/release-it-preset/actions/workflows/audit.yml/badge.svg)](https://github.com/oorabona/release-it-preset/actions/workflows/audit.yml)
 [![codecov](https://codecov.io/github/oorabona/release-it-preset/graph/badge.svg?token=6RMN34Z7TX)](https://codecov.io/github/oorabona/release-it-preset)
@@ -36,6 +37,13 @@ pnpm release:minor                 # bump + commit + tag + push (CI publishes)
 **One-off (no install):** `pnpm dlx @oorabona/release-it-preset init --with-workflows`
 
 → Full reference: [docs/USAGE.md](docs/USAGE.md) · [Migration v0→v1](docs/MIGRATION.md) · [Public API](docs/PUBLIC_API.md)
+
+## Supply chain verification
+
+Releases use npm OIDC provenance and, starting with v1.4.0, attach the npm
+registry tarball, SLSA L3 provenance, and a cosign keyless bundle to the GitHub
+release. See [docs/VERIFY.md](docs/VERIFY.md) for copy-paste verification
+commands.
 
 ## Why this preset?
 
