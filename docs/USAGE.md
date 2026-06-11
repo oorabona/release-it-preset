@@ -406,7 +406,7 @@ Describe the user-visible fix.
 <!-- /changelog -->
 ```
 
-Supported block types are `added`, `changed`, `deprecated`, `removed`, `fixed`, and `security`. The command keeps unresolved bullets untouched, removes all bullets for a PR when at least one valid block is found, and regenerates those bullets under the matching Keep a Changelog section with `(#PR)` and commit links.
+Supported block types are `added`, `changed`, `deprecated`, `removed`, `fixed`, and `security`. Markers inside fenced code blocks (` ``` ` or `~~~`) are treated as documentation examples and ignored. The command keeps unresolved bullets untouched, removes all bullets for a PR when at least one valid block is found, and regenerates those bullets under the matching Keep a Changelog section with `(#PR)` and commit links.
 
 SHA-to-PR mapping uses GitHub's commit association endpoint. Squash merges are reliable; rebases, cherry-picks, or unusual merge flows may not map back to a merged PR, in which case the bullet is left unchanged. The GitHub CLI must be installed and authenticated (`gh auth status`) before running `annotate`; any `gh` failure stops the command before writing.
 

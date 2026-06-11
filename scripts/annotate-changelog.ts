@@ -496,6 +496,41 @@ function normalizeBlockText(value: string): string {
     .trim()
 }
 
+// Replaces fenced code regions (``` / ~~~) with spaces of identical length so
+// marker scanning never sees them while every index still maps back to the
+// original text. Grammar examples in PR bodies stay inert this way.
+function maskFencedRegions(value: string): string {
+  let openFence: { char: string; length: number } | null = null
+  return value
+    .split('\n')
+    .map(line => {
+      // Any indentation is accepted on purpose: fences nested under list
+      // items are indented beyond CommonMark's top-level 3-space cap, and a
+      // safety mask must over-mask rather than import a fenced example.
+      const delimiter = line.match(/^\s*(`{3,}|~{3,})/)
+      if (openFence === null) {
+        if (delimiter) {
+          openFence = { char: delimiter[1][0], length: delimiter[1].length }
+          return ' '.repeat(line.length)
+        }
+        return line
+      }
+      // CommonMark: the closing fence must use the same character and be at
+      // least as long as the opener — a ```` fence is NOT closed by an inner
+      // ``` example, which is precisely how docs show fenced code.
+      if (
+        delimiter &&
+        delimiter[1][0] === openFence.char &&
+        delimiter[1].length >= openFence.length &&
+        /^\s*(`{3,}|~{3,})\s*$/.test(line)
+      ) {
+        openFence = null
+      }
+      return ' '.repeat(line.length)
+    })
+    .join('\n')
+}
+
 export function extractStructuredChangelogNotes(
   body: string | null | undefined,
   options: { prNumber?: number; warn?: (message: string) => void } = {},
@@ -506,15 +541,18 @@ export function extractStructuredChangelogNotes(
 
   const notes: ChangelogNote[] = []
   const normalizedBody = body.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  // Markers are matched against the masked text (fenced regions blanked, all
+  // indices preserved); the block TEXT is sliced from the real body.
+  const scanBody = maskFencedRegions(normalizedBody)
   const openMarker = /<!--\s*changelog\s*:\s*([a-z]+)\s*-->/gi
   const closeMarker = /<!--\s*\/changelog\s*-->/i
   const prNumber = options.prNumber ?? 0
 
-  for (const match of normalizedBody.matchAll(openMarker)) {
+  for (const match of scanBody.matchAll(openMarker)) {
     const type = match[1].toLowerCase()
     const contentStart = match.index + match[0].length
-    const rest = normalizedBody.slice(contentStart)
-    const closeMatch = closeMarker.exec(rest)
+    const scanRest = scanBody.slice(contentStart)
+    const closeMatch = closeMarker.exec(scanRest)
 
     if (!closeMatch) {
       warnForPr(prNumber, options, 'unclosed marker')
@@ -527,12 +565,13 @@ export function extractStructuredChangelogNotes(
       continue
     }
 
-    const rawContent = rest.slice(0, closeMatch.index)
+    const rawContent = normalizedBody.slice(contentStart, contentStart + closeMatch.index)
     // A second open marker before the close means overlapping blocks: the
     // outer region is malformed and must never leak a raw marker (or
     // duplicated text) into the changelog. The inner block, if well-formed,
-    // is still picked up by its own matchAll iteration.
-    if (/<!--\s*changelog\s*:/i.test(rawContent)) {
+    // is still picked up by its own matchAll iteration. (Checked on the
+    // masked region too, so fenced examples inside a block stay inert.)
+    if (/<!--\s*changelog\s*:/i.test(scanRest.slice(0, closeMatch.index))) {
       warnForPr(prNumber, options, `nested changelog marker inside ${type} block`)
       continue
     }
@@ -593,7 +632,7 @@ export function renderAnnotatedBody(
   resolvedGroups: ResolvedGroup[],
   repoUrl: string,
   deps: AnnotateChangelogDeps,
-): string | null {
+): { body: string; appliedPrCount: number } | null {
   const removedEntries = new Set<ChangelogEntry>()
   const additionsBySection = new Map<string, ChangelogEntry[]>()
   let annotatedGroups = 0
@@ -668,7 +707,7 @@ export function renderAnnotatedBody(
     emitSection(heading, [], additionsBySection.get(heading) ?? [])
   }
 
-  return `\n${lines.join('\n').trim()}\n\n`
+  return { body: `\n${lines.join('\n').trim()}\n\n`, appliedPrCount: annotatedGroups }
 }
 
 function readChangelog(changelogPath: string, deps: AnnotateChangelogDeps): string {
@@ -700,14 +739,14 @@ export function annotateChangelog(deps: AnnotateChangelogDeps): void {
 
   const { repoUrl, ownerRepo } = getRequiredGitHubContext(deps)
   const resolved = resolvePullRequestGroups(groups, ownerRepo, deps)
-  const nextBody = renderAnnotatedBody(parsed, resolved.resolved, repoUrl, deps)
-  if (nextBody === null) {
+  const rendered = renderAnnotatedBody(parsed, resolved.resolved, repoUrl, deps)
+  if (rendered === null) {
     deps.log('No changelog blocks found in the resolved pull requests — nothing to annotate')
     return
   }
-  deps.writeFileSync(changelogPath, `${block.prefix}${nextBody}${block.suffix}`)
+  deps.writeFileSync(changelogPath, `${block.prefix}${rendered.body}${block.suffix}`)
 
-  deps.log(`Annotated ${resolved.resolved.length} pull request(s)`)
+  deps.log(`Annotated ${rendered.appliedPrCount} pull request(s)`)
 }
 
 /* c8 ignore start */
