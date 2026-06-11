@@ -463,11 +463,17 @@ export function extractStructuredChangelogNotes(
   return notes
 }
 
-function stripAnnotationReferences(text: string): string {
+// Only the CURRENT PR's own reference is stripped before re-appending it:
+// a foreign trailing reference like "fixes issue (#123)" is the author's
+// text and must survive verbatim.
+function stripAnnotationReferences(text: string, prNumber: number): string {
+  const ownReference = new RegExp(
+    `\\s+\\(#${prNumber}\\)(?:\\s+\\(\\[[0-9a-f]{7,40}\\]\\([^)]+/commit/[0-9a-f]{7,40}\\)\\))?$`,
+    'i',
+  )
   return text
-    .replace(/\s+\(#\d{1,10}\)(?:\s+\(\[[0-9a-f]{7,40}\]\([^)]+\/commit\/[0-9a-f]{7,40}\)\))?$/i, '')
+    .replace(ownReference, '')
     .replace(/\s+\(\[[0-9a-f]{7,40}\]\([^)]+\/commit\/[0-9a-f]{7,40}\)\)$/i, '')
-    .replace(/\s+\([0-9a-f]{7,40}\)$/i, '')
     .trim()
 }
 
@@ -480,7 +486,7 @@ function formatCommitReference(primarySha: string | null, repoUrl: string): stri
 }
 
 function formatNote(note: ChangelogNote, primarySha: string | null, repoUrl: string, prNumber: number): ChangelogEntry {
-  const text = stripAnnotationReferences(note.text)
+  const text = stripAnnotationReferences(note.text, prNumber)
   const reference = ` (#${prNumber})${formatCommitReference(primarySha, repoUrl)}`
   return {
     section: note.section,
@@ -502,8 +508,9 @@ export function renderAnnotatedBody(
   unresolvedEntries: ChangelogEntry[],
   repoUrl: string,
   deps: AnnotateChangelogDeps,
-): string {
+): string | null {
   const renderedEntries: ChangelogEntry[] = [...unresolvedEntries]
+  let annotatedGroups = 0
 
   for (const group of resolvedGroups) {
     const notes = notesForResolvedGroup(group, deps)
@@ -512,10 +519,18 @@ export function renderAnnotatedBody(
       continue
     }
 
+    annotatedGroups += 1
     const primarySha = choosePrimarySha([group.primarySha, ...group.entries.flatMap(entry => entry.shaList)])
     for (const note of notes) {
       renderedEntries.push(formatNote(note, primarySha, repoUrl, group.pr.number))
     }
+  }
+
+  // Nothing was annotated: re-rendering would only restructure the existing
+  // body (hoisting non-entry lines, reordering sections) without adding any
+  // information — the caller must leave the file untouched.
+  if (annotatedGroups === 0) {
+    return null
   }
 
   if (renderedEntries.length === 0 && parsed.nonEntryLines.length === 0) {
@@ -586,6 +601,10 @@ export function annotateChangelog(deps: AnnotateChangelogDeps): void {
   const { repoUrl, ownerRepo } = getRequiredGitHubContext(deps)
   const resolved = resolvePullRequestGroups(groups, ownerRepo, deps)
   const nextBody = renderAnnotatedBody(parsed, resolved.resolved, [...passthrough, ...resolved.unresolved], repoUrl, deps)
+  if (nextBody === null) {
+    deps.log('No changelog blocks found in the resolved pull requests — nothing to annotate')
+    return
+  }
   deps.writeFileSync(changelogPath, `${block.prefix}${nextBody}${block.suffix}`)
 
   deps.log(`Annotated ${resolved.resolved.length} pull request(s)`)

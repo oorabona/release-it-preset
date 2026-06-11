@@ -119,6 +119,40 @@ Ship the annotate workflow.
     expect(written).toContain('## [1.0.0] - 2026-01-01')
   })
 
+  it('preserves a foreign issue reference at the end of a block text', () => {
+    // Mutation lock: stripping ANY trailing (#NNN) before appending the PR
+    // reference used to corrupt author text like "issue (#123)" into "(#49)".
+    vi.mocked(deps.readFileSync).mockReturnValue(`# Changelog
+
+## [Unreleased]
+
+### Fixed
+- fix crash (#49) ([aaaaaaa](https://github.com/owner/repo/commit/aaaaaaa))
+`)
+
+    vi.mocked(deps.execSync).mockImplementation(command => {
+      if (command === 'git config --get remote.origin.url') {
+        return 'https://github.com/owner/repo.git'
+      }
+      if (command === 'gh pr view 49 --json number,body') {
+        return JSON.stringify({
+          number: 49,
+          body: `<!-- changelog:fixed -->
+Fix the crash reported in issue (#123)
+<!-- /changelog -->`,
+        })
+      }
+      return ''
+    })
+
+    annotateChangelog(deps)
+
+    const written = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+    expect(written).toContain(
+      '- Fix the crash reported in issue (#123) (#49) ([aaaaaaa](https://github.com/owner/repo/commit/aaaaaaa))',
+    )
+  })
+
   it('resolves commit shas through the commits pulls endpoint and regroups by PR', () => {
     vi.mocked(deps.readFileSync).mockReturnValue(`# Changelog
 
@@ -202,10 +236,10 @@ Ship the annotate workflow.
 
     annotateChangelog(deps)
 
-    const written = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
-    expect(written).toContain(
-      '- add annotate command ([aaaaaaa](https://github.com/owner/repo/commit/aaaaaaa))',
-    )
+    // Mutation lock: re-rendering on a no-op run used to rewrite the file and
+    // restructure non-entry lines; nothing annotated must mean nothing written.
+    expect(deps.writeFileSync).not.toHaveBeenCalled()
+    expect(vi.mocked(deps.log).mock.calls.flat().join('\n')).toContain('nothing to annotate')
   })
 
   it('does not touch breaking changes entries', () => {
