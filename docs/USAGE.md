@@ -789,6 +789,7 @@ on:
 permissions:
   contents: write
   id-token: write
+  actions: read  # Required by the nested SLSA generator.
 
 jobs:
   publish:
@@ -840,8 +841,11 @@ Triggered on tag push (`v*`), `workflow_call`, or `workflow_dispatch`. Optional 
 
 **Manual replay:**
 ```bash
-gh workflow run publish.yml --ref main -f tag=vX.Y.Z
+gh workflow run publish.yml --ref vX.Y.Z
 ```
+
+Dispatching on the tag ref keeps SLSA provenance and cosign certificate
+identities tag-canonical (`@refs/tags/vX.Y.Z`).
 
 ---
 

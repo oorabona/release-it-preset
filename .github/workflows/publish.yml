@@ -4,6 +4,8 @@ name: Publish Package
 # (workflow_dispatch). Uses npm OIDC trusted publishing — no NPM_TOKEN needed.
 # Configure the OIDC trusted publisher on npmjs against this workflow path
 # (.github/workflows/publish.yml).
+# Canonical manual replay for attestations: gh workflow run publish.yml --ref vX.Y.Z (tag ref required).
+# workflow_call callers must grant actions: read for the nested SLSA generator.
 
 on:
   push:
@@ -50,6 +52,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: publish-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 env:
   NODE_VERSION: '24'  # npm >= 11.5.1 ships with Node 24, required for OIDC trusted publishing
@@ -197,3 +203,154 @@ jobs:
           else
             echo "**Scope**: npm + GitHub release" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  attest-hash:
+    runs-on: ubuntu-latest
+    needs: publish
+    if: ${{ !inputs.npm_only && needs.publish.result == 'success' && github.ref == format('refs/tags/{0}', inputs.tag || github.ref_name) }}
+    permissions:
+      contents: read
+    outputs:
+      hashes: ${{ steps.pack.outputs.hashes }}
+      tgz: ${{ steps.pack.outputs.tgz }}
+      pkg: ${{ steps.pack.outputs.pkg }}
+      version: ${{ steps.pack.outputs.version }}
+      should_attest: ${{ steps.pack.outputs.should_attest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Download registry tarball and hash subject
+        id: pack
+        env:
+          GITHUB_ONLY: ${{ inputs.github_only }}
+        run: |
+          set -euo pipefail
+
+          PKG="$(jq -r .name package.json)"
+          VER="$(jq -r .version package.json)"
+          VER="${VER#v}"
+
+          if [ "${GITHUB_ONLY}" = "true" ] && ! npm view "${PKG}@${VER}" version >/dev/null 2>&1; then
+            echo "::notice::github_only run and ${PKG}@${VER} is not on npm — skipping attestation; heal with a full replay on the tag ref once npm has the version"
+            echo "should_attest=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          BASENAME="${PKG#@}"
+          BASENAME="${BASENAME//\//-}"
+          TGZ="${BASENAME}-${VER}.tgz"
+          PACK_DIR="${RUNNER_TEMP}/npm-pack-subject"
+
+          rm -rf "${PACK_DIR}"
+          mkdir -p "${PACK_DIR}"
+          cd "${PACK_DIR}"
+
+          for attempt in 1 2 3 4 5; do
+            rm -f "${TGZ}"
+            if npm pack "${PKG}@${VER}" > npm-pack.log 2>&1 && [ -f "${TGZ}" ]; then
+              break
+            fi
+
+            if [ "${attempt}" -eq 5 ]; then
+              echo "::error::npm pack did not produce ${TGZ} after 5 attempts"
+              cat npm-pack.log >&2 || true
+              exit 1
+            fi
+
+            sleep 12
+          done
+
+          cd "${GITHUB_WORKSPACE}"
+          REGISTRY_GITHEAD="$(npm view "${PKG}@${VER}" gitHead 2>/dev/null || true)"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          if [ -z "${REGISTRY_GITHEAD}" ] || [ "${REGISTRY_GITHEAD}" != "${HEAD_SHA}" ]; then
+            echo "::error::Refusing to attest: registry ${PKG}@${VER} gitHead (${REGISTRY_GITHEAD:-absent}) does not match the attested ref commit (${HEAD_SHA}). The published bytes were not built from this tag."
+            exit 1
+          fi
+          cd "${PACK_DIR}"
+
+          {
+            echo "pkg=${PKG}"
+            echo "version=${VER}"
+            echo "tgz=${TGZ}"
+            echo "hashes=$(sha256sum "${TGZ}" | base64 -w0)"
+            echo "should_attest=true"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Upload registry tarball artifact
+        if: steps.pack.outputs.should_attest == 'true'
+        uses: actions/upload-artifact@v8
+        with:
+          name: registry-tarball
+          path: ${{ runner.temp }}/npm-pack-subject/${{ steps.pack.outputs.tgz }}
+          if-no-files-found: error
+
+  provenance:
+    needs: [publish, attest-hash]
+    if: ${{ !inputs.npm_only && needs.publish.result == 'success' && needs.attest-hash.result == 'success' && needs.attest-hash.outputs.should_attest == 'true' && github.ref == format('refs/tags/{0}', inputs.tag || github.ref_name) }}
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: ${{ needs.attest-hash.outputs.hashes }}
+      provenance-name: ${{ needs.attest-hash.outputs.tgz }}.intoto.jsonl
+      upload-assets: false
+
+  attach-attestations:
+    runs-on: ubuntu-latest
+    needs: [publish, attest-hash, provenance]
+    if: ${{ !inputs.npm_only && needs.publish.result == 'success' && needs.attest-hash.result == 'success' && needs.attest-hash.outputs.should_attest == 'true' && needs.provenance.result == 'success' && github.ref == format('refs/tags/{0}', inputs.tag || github.ref_name) }}
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Download registry tarball
+        uses: actions/download-artifact@v8
+        with:
+          name: registry-tarball
+          path: release-assets
+
+      - name: Download provenance artifact
+        uses: actions/download-artifact@v8
+        with:
+          path: provenance
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign and upload release assets
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          TGZ: ${{ needs.attest-hash.outputs.tgz }}
+          GH_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          cd release-assets
+
+          if [ ! -f "${TGZ}" ]; then
+            echo "::error::Expected registry tarball ${TGZ} was not downloaded"
+            exit 1
+          fi
+
+          PROVENANCE="$(find "${GITHUB_WORKSPACE}/provenance" -type f -name "${TGZ}.intoto.jsonl" -print -quit)"
+          if [ -z "${PROVENANCE}" ]; then
+            echo "::error::Expected provenance ${TGZ}.intoto.jsonl was not downloaded"
+            find "${GITHUB_WORKSPACE}/provenance" -type f -print >&2 || true
+            exit 1
+          fi
+          cp "${PROVENANCE}" "${TGZ}.intoto.jsonl"
+
+          if ! gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "::error::GitHub release ${TAG} was not found; refusing to upload attestations"
+            exit 1
+          fi
+
+          cosign sign-blob --yes --bundle "${TGZ}.sigstore.json" "${TGZ}"
+          gh release upload "${TAG}" "${TGZ}" "${TGZ}.intoto.jsonl" "${TGZ}.sigstore.json" --clobber

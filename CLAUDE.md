@@ -347,7 +347,7 @@ Extends mode:
 
 5. **publish.yml** - Unified GitHub Release + npm Publish
    - Triggered on tag push (`v*`), `workflow_call`, or `workflow_dispatch`
-   - Manual replay: `gh workflow run publish.yml --ref main -f tag=vX.Y.Z`
+   - Manual replay: `gh workflow run publish.yml --ref vX.Y.Z`
    - Optional `npm_only` / `github_only` inputs scope a partial replay
    - Uses npm OIDC trusted publishing — no `NPM_TOKEN` secret needed
    - Runs `release-it-preset retry-publish-preflight` then `retry-publish --ci`
