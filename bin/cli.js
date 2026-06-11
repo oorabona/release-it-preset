@@ -46,6 +46,7 @@ const RELEASE_CONFIGS = {
 const UTILITY_COMMANDS = {
   init: 'init-project',
   update: 'populate-unreleased-changelog',
+  annotate: 'annotate-changelog',
   validate: 'validate-release',
   check: 'check-config',
   doctor: 'doctor',
@@ -76,6 +77,7 @@ Release Commands:
 Utility Commands:
   init [--yes]           Initialize project (create CHANGELOG.md, .release-it.json, etc.)
   update                 Update [Unreleased] section from commits
+  annotate               Enrich [Unreleased] entries from merged PR changelog blocks
   validate [--allow-dirty]  Validate project is ready for release
   check                  Display configuration and project status
   doctor                 Run diagnostic checklist and show readiness score
