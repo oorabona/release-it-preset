@@ -92,15 +92,16 @@ Another inert example.
   })
 
   it('keeps long fences open across shorter inner fence examples', () => {
-    // Mutation lock: tracking only the fence character let an inner three-
-    // backtick example close a four-backtick outer fence, re-exposing the
-    // markers that followed it inside the same code block.
+    // Mutation lock: tracking only the fence character (without the
+    // closing-length >= opener rule) lets the SINGLE unbalanced inner
+    // three-backtick line below close the four-backtick fence, re-exposing
+    // the marker that follows it inside the same code block. A paired inner
+    // fence would mask the marker by accident even under the buggy
+    // char-only tracking — the odd count is what makes this lock real.
     const notes = extractStructuredChangelogNotes(
       `
 \`\`\`\`md
-Example of a fenced example:
-\`\`\`
-some code
+How a fence opener looks:
 \`\`\`
 <!-- changelog:fixed -->
 Still inside the four-backtick fence — must stay inert.
