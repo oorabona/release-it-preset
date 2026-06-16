@@ -326,6 +326,7 @@ pnpm add -D @oorabona/release-it-preset @release-it-plugins/workspaces release-i
 // .release-it.json
 {
   "extends": "@oorabona/release-it-preset/config/default",
+  "npm": false,
   "plugins": {
     "@release-it-plugins/workspaces": {
       "publish": false,
@@ -334,6 +335,8 @@ pnpm add -D @oorabona/release-it-preset @release-it-plugins/workspaces release-i
   }
 }
 ```
+
+**Dry-run / version caveat:** the workspaces plugin owns version bumping for the whole monorepo. Without `"npm": false`, this composition can leave the root `package.json` modified after `release-it --dry-run --ci`, producing a dirty dry run. Setting `"npm": false` makes the workspaces plugin the sole version manager and keeps `release:dry` truly read-only. Publishing is unaffected because it is controlled by the workspaces plugin's own `publish` option.
 
 **Publishing caveat:** the workspaces plugin runs its **own npm publish step** per workspace package and does not honor this preset's `NPM_PUBLISH` opt-in — configured as bare `true`, it attempts to publish every package even while the preset's npm publishing stays disabled. It also runs npm registry/auth preflight checks at startup unless `"skipChecks": true` is set, so keep BOTH options as above (this is the exact configuration exercised by this repo's e2e suite) until you deliberately enable workspace publishing — then drop both together, with npm auth in place.
 

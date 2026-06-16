@@ -332,6 +332,42 @@ function detectWorkspaceIntegration(deps: DoctorDeps): CheckResult {
     'node_modules/@release-it-plugins/workspaces/package.json',
   )
   if (pluginInstalled) {
+    if (deps.existsSync('.release-it.json')) {
+      try {
+        const raw = deps.readFileSync('.release-it.json', 'utf8') as string
+        const config = JSON.parse(raw) as Record<string, unknown>
+        if (Object.hasOwn(config, 'npm') && config.npm === false) {
+          return {
+            name: 'Workspace integration',
+            status: 'PASS',
+            value: 'plugin installed (npm core disabled)',
+          }
+        }
+
+        if (Object.hasOwn(config, 'npm')) {
+          return {
+            name: 'Workspace integration',
+            status: 'WARN',
+            value: 'workspaces plugin installed but npm core plugin not disabled',
+            detail: [
+              'Set top-level "npm": false (npm:false) in .release-it.json.',
+              'A local npm object/!=false keeps release-it core npm active and leaks a dirty --dry-run.',
+            ].join(' '),
+          }
+        }
+
+        return {
+          name: 'Workspace integration',
+          status: 'WARN',
+          value: 'core npm not disabled at top level',
+          detail:
+            'No top-level npm in .release-it.json. If your extended/base config sets npm:false this is fine; otherwise add top-level "npm": false so the workspaces plugin is the sole version manager.',
+        }
+      } catch {
+        // .release-it.json parse errors are reported by the config check; skip here.
+      }
+    }
+
     return { name: 'Workspace integration', status: 'PASS', value: 'plugin installed' }
   }
 

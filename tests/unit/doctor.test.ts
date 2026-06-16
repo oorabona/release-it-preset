@@ -590,6 +590,159 @@ describe('Workspace integration check', () => {
     expect(wsCheck?.value).toBe('plugin installed')
   })
 
+  it('WARN when preset extends and a local npm object keeps core npm active', () => {
+    const releaseItConfig = JSON.stringify({
+      extends: '@oorabona/release-it-preset/config/default',
+      npm: { publish: false, skipChecks: true },
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn(
+        (p: string) =>
+          p === 'pnpm-workspace.yaml' ||
+          p === 'node_modules/@release-it-plugins/workspaces/package.json' ||
+          p === '.release-it.json',
+      ),
+      readFileSync: vi.fn((p: string) => {
+        if (p === '.release-it.json') {
+          return releaseItConfig
+        }
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('WARN')
+    expect(wsCheck?.value).toBe('workspaces plugin installed but npm core plugin not disabled')
+    expect(wsCheck?.detail).toContain('npm:false')
+    expect(wsCheck?.detail).toContain('dirty --dry-run')
+  })
+
+  it('WARN when workspaces plugin is installed but npm core plugin is locally configured', () => {
+    const releaseItConfig = JSON.stringify({
+      npm: { publish: false },
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn(
+        (p: string) =>
+          p === 'pnpm-workspace.yaml' ||
+          p === 'node_modules/@release-it-plugins/workspaces/package.json' ||
+          p === '.release-it.json',
+      ),
+      readFileSync: vi.fn((p: string) => {
+        if (p === '.release-it.json') {
+          return releaseItConfig
+        }
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('WARN')
+    expect(wsCheck?.value).toBe('workspaces plugin installed but npm core plugin not disabled')
+    expect(wsCheck?.detail).toContain('npm:false')
+  })
+
+  it('WARN verify when extends is present but top-level npm key is absent', () => {
+    const releaseItConfig = JSON.stringify({
+      extends: '@oorabona/release-it-preset/config/default',
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn(
+        (p: string) =>
+          p === 'pnpm-workspace.yaml' ||
+          p === 'node_modules/@release-it-plugins/workspaces/package.json' ||
+          p === '.release-it.json',
+      ),
+      readFileSync: vi.fn((p: string) => {
+        if (p === '.release-it.json') {
+          return releaseItConfig
+        }
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('WARN')
+    expect(wsCheck?.value).toBe('core npm not disabled at top level')
+    expect(wsCheck?.detail).toContain('npm:false')
+    expect(wsCheck?.detail).toContain('extended/base config')
+  })
+
+  it('WARN verify when workspaces plugin is installed and npm:false may come from extends', () => {
+    const releaseItConfig = JSON.stringify({
+      extends: '../../.release-it-base.json',
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn(
+        (p: string) =>
+          p === 'pnpm-workspace.yaml' ||
+          p === 'node_modules/@release-it-plugins/workspaces/package.json' ||
+          p === '.release-it.json',
+      ),
+      readFileSync: vi.fn((p: string) => {
+        if (p === '.release-it.json') {
+          return releaseItConfig
+        }
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('WARN')
+    expect(wsCheck?.value).toBe('core npm not disabled at top level')
+    expect(wsCheck?.detail).toContain('npm:false')
+    expect(wsCheck?.detail).toContain('extended/base config')
+  })
+
+  it('PASS when workspaces plugin is installed and local npm:false disables core npm', () => {
+    const releaseItConfig = JSON.stringify({
+      extends: '@oorabona/release-it-preset/config/default',
+      npm: false,
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn(
+        (p: string) =>
+          p === 'pnpm-workspace.yaml' ||
+          p === 'node_modules/@release-it-plugins/workspaces/package.json' ||
+          p === '.release-it.json',
+      ),
+      readFileSync: vi.fn((p: string) => {
+        if (p === '.release-it.json') {
+          return releaseItConfig
+        }
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('PASS')
+    expect(wsCheck?.value).toBe('plugin installed (npm core disabled)')
+  })
+
+  it('PASS when workspaces plugin is installed and local npm:false is self-contained', () => {
+    const releaseItConfig = JSON.stringify({
+      npm: false,
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn(
+        (p: string) =>
+          p === 'pnpm-workspace.yaml' ||
+          p === 'node_modules/@release-it-plugins/workspaces/package.json' ||
+          p === '.release-it.json',
+      ),
+      readFileSync: vi.fn((p: string) => {
+        if (p === '.release-it.json') {
+          return releaseItConfig
+        }
+        return ''
+      }),
+    })
+    const section = validateConfiguration(deps)
+    const wsCheck = section.checks.find(c => c.name === 'Workspace integration')
+    expect(wsCheck?.status).toBe('PASS')
+    expect(wsCheck?.value).toBe('plugin installed (npm core disabled)')
+  })
+
   it('WARN when package.json has workspaces as object form {packages: [...]}', () => {
     const pkgWithWorkspacesObject = JSON.stringify({
       name: 'my-monorepo',
