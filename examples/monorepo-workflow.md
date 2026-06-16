@@ -296,6 +296,7 @@ The patterns above release each package **independently**. If instead all your w
 ```json
 {
   "extends": "@oorabona/release-it-preset/config/default",
+  "npm": false,
   "plugins": {
     "@release-it-plugins/workspaces": {
       "publish": false,
@@ -308,6 +309,8 @@ The patterns above release each package **independently**. If instead all your w
 ```bash
 pnpm add -D @oorabona/release-it-preset @release-it-plugins/workspaces release-it@^19
 ```
+
+**Dry-run / version caveat:** keep top-level `"npm": false` so the workspaces plugin is the sole version manager; otherwise `release-it --dry-run --ci` can leave the root `package.json` modified. See `docs/USAGE.md` for the full rationale.
 
 **Publishing caveat (important):** the workspaces plugin brings its **own npm publish lifecycle** for each workspace package, and it does NOT honor this preset's `NPM_PUBLISH` opt-in — with the plugin configured as bare `true`, a release attempts to publish every workspace package even though the preset's own npm publishing is disabled by default. The plugin also runs npm registry/auth preflight checks at startup unless `"skipChecks": true` is set. Keep both options as shown (the exact configuration exercised by this repo's e2e suite) until you deliberately want the plugin to publish — then remove both together, with proper npm auth.
 

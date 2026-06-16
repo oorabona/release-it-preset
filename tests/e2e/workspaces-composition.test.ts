@@ -7,6 +7,8 @@
  */
 
 import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   isWorkspacesReleaseIt20PeerMismatch,
@@ -29,19 +31,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 `
 
+const WORKSPACE_RELEASE_ARGS = ['1.0.1', '--ci']
+const WORKSPACE_DRY_RUN_ARGS = ['patch', '--ci', '--dry-run']
+
 function json(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`
 }
 
-function releaseConfig(withWorkspacesPlugin: boolean): Record<string, unknown> {
+type WorkspaceNpmMode = 'documented' | 'core-npm'
+
+function releaseConfig(
+  withWorkspacesPlugin: boolean,
+  workspaceNpmMode: WorkspaceNpmMode = 'documented',
+): Record<string, unknown> {
   return {
     extends: '@oorabona/release-it-preset/config/default',
     git: false,
     github: false,
-    npm: {
-      publish: false,
-      skipChecks: true,
-    },
+    npm:
+      withWorkspacesPlugin && workspaceNpmMode === 'documented'
+        ? false
+        : {
+            publish: false,
+            skipChecks: true,
+          },
     plugins: withWorkspacesPlugin
       ? {
           '@release-it-plugins/workspaces': {
@@ -57,11 +70,12 @@ function seedWorkspaceFixture(
   repo: TempRepo,
   withWorkspacesPlugin: boolean,
   releaseItMajor: ReleaseItMajor,
+  workspaceNpmMode: WorkspaceNpmMode = 'documented',
 ): void {
   linkReleaseItCompositionModules(repo, releaseItMajor)
 
   repo.commit('chore: initial workspace setup', {
-    '.release-it.json': json(releaseConfig(withWorkspacesPlugin)),
+    '.release-it.json': json(releaseConfig(withWorkspacesPlugin, workspaceNpmMode)),
     'CHANGELOG.md': BASE_CHANGELOG,
     'package.json': json({
       name: 'workspace-composition-demo',
@@ -104,6 +118,16 @@ function expectReleaseItSuccess(result: ReleaseItResult, label: string): void {
   expect(result.exitCode, `${label} failed:\n${releaseItOutput(result)}`).toBe(0)
 }
 
+function gitStatus(repo: TempRepo): string {
+  const result = spawnSync('git', ['status', '--short'], {
+    cwd: repo.cwd,
+    encoding: 'utf8',
+  })
+
+  expect(result.status).toBe(0)
+  return result.stdout.trim()
+}
+
 describe('E2E: @release-it-plugins/workspaces composition', () => {
   it('updates workspace versions and internal dependency ranges under release-it 19', () => {
     const positive = createTempGitRepo({ branch: 'main' })
@@ -113,16 +137,20 @@ describe('E2E: @release-it-plugins/workspaces composition', () => {
       seedWorkspaceFixture(positive, true, 19)
       seedWorkspaceFixture(negative, false, 19)
 
-      const positiveResult = runReleaseIt(positive, 19)
+      const positiveResult = runReleaseIt(positive, 19, WORKSPACE_RELEASE_ARGS)
       expectReleaseItSuccess(positiveResult, 'workspaces composition run')
 
       const negativeResult = runReleaseIt(negative, 19)
       expectReleaseItSuccess(negativeResult, 'negative control run')
 
+      expect(readPackage(positive, 'package.json').version).toBe('1.0.1')
       expect(readPackage(positive, 'packages/pkg-a/package.json').version).toBe('1.0.1')
       const positivePkgB = readPackage(positive, 'packages/pkg-b/package.json')
       expect(positivePkgB.version).toBe('1.0.1')
       expect(positivePkgB.dependencies?.['@demo/pkg-a']).toBe('^1.0.1')
+      const positiveChangelog = readFileSync(join(positive.cwd, 'CHANGELOG.md'), 'utf8')
+      expect(positiveChangelog).toContain('## [1.0.1]')
+      expect(positiveChangelog).toContain('update workspace package')
 
       expect(readPackage(negative, 'packages/pkg-a/package.json').version).toBe('1.0.0')
       const negativePkgB = readPackage(negative, 'packages/pkg-b/package.json')
@@ -131,6 +159,35 @@ describe('E2E: @release-it-plugins/workspaces composition', () => {
     } finally {
       positive.cleanup()
       negative.cleanup()
+    }
+  })
+
+  it('keeps workspaces dry-runs clean only when core npm is disabled', () => {
+    const guarded = createTempGitRepo({ branch: 'main' })
+    const leaked = createTempGitRepo({ branch: 'main' })
+
+    try {
+      seedWorkspaceFixture(guarded, true, 19)
+      seedWorkspaceFixture(leaked, true, 19, 'core-npm')
+
+      const guardedVersionBefore = readPackage(guarded, 'package.json').version
+      const leakedVersionBefore = readPackage(leaked, 'package.json').version
+
+      const guardedResult = runReleaseIt(guarded, 19, WORKSPACE_DRY_RUN_ARGS)
+      expectReleaseItSuccess(guardedResult, 'workspaces npm:false dry-run')
+
+      expect(readPackage(guarded, 'package.json').version).toBe(guardedVersionBefore)
+      expect(gitStatus(guarded)).toBe('')
+
+      const leakedResult = runReleaseIt(leaked, 19, WORKSPACE_DRY_RUN_ARGS)
+      expectReleaseItSuccess(leakedResult, 'workspaces core npm dry-run')
+
+      expect(readPackage(leaked, 'package.json').version).not.toBe(leakedVersionBefore)
+      expect(readPackage(leaked, 'package.json').version).toBe('1.0.1')
+      expect(gitStatus(leaked)).toContain('package.json')
+    } finally {
+      guarded.cleanup()
+      leaked.cleanup()
     }
   })
 
