@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **release-it 21 is supported.** The peer range becomes `^19.0.0 || ^20.0.0 || ^21.0.0`; the end-to-end suite exercises the preset under 19, 20 and 21. Node floors differ by major: release-it 19 accepts `^20.12.0 || >=22.0.0`, release-it 20 accepts `^20.19.0 || ^22.13.0 || >=24.0.0`, and release-it 21 accepts `^22.21.0 || >=24.0.0`. `engines.node` is `^20.19.0 || >=22.0.0`, preserving the Node 20.19 floor while excluding Node 21, which no supported release-it major accepts.
+
 ## [1.4.1] - 2026-06-11
 
 ### Fixed

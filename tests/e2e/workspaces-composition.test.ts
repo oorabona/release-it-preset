@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  isWorkspacesReleaseIt20PeerMismatch,
+  isWorkspacesReleaseItPeerMismatch,
   linkReleaseItCompositionModules,
   type ReleaseItMajor,
   type ReleaseItResult,
@@ -129,6 +129,18 @@ function gitStatus(repo: TempRepo): string {
 }
 
 describe('E2E: @release-it-plugins/workspaces composition', () => {
+  it('does not attribute a different unmet plugin peer to release-it', () => {
+    const result: ReleaseItResult = {
+      stdout:
+        '@release-it-plugins/workspaces has the following unmet peerDependencies\n' +
+        '- another-peer: ^1.0.0',
+      stderr: '',
+      exitCode: 1,
+    }
+
+    expect(isWorkspacesReleaseItPeerMismatch(result, 21)).toBe(false)
+  })
+
   it('updates workspace versions and internal dependency ranges under release-it 19', () => {
     const positive = createTempGitRepo({ branch: 'main' })
     const negative = createTempGitRepo({ branch: 'main' })
@@ -162,6 +174,25 @@ describe('E2E: @release-it-plugins/workspaces composition', () => {
     }
   })
 
+  it.each([
+    19, 20, 21,
+  ] as const)('runs the preset without the workspaces plugin under release-it %i', releaseItMajor => {
+    const repo = createTempGitRepo({ branch: 'main' })
+
+    try {
+      seedWorkspaceFixture(repo, false, releaseItMajor)
+
+      const result = runReleaseIt(repo, releaseItMajor)
+      expectReleaseItSuccess(result, `no-workspaces release-it ${releaseItMajor} run`)
+
+      expect(readPackage(repo, 'package.json').version).toBe('1.0.1')
+      const changelog = readFileSync(join(repo.cwd, 'CHANGELOG.md'), 'utf8')
+      expect(changelog).toContain('## [1.0.1]')
+    } finally {
+      repo.cleanup()
+    }
+  })
+
   it('keeps workspaces dry-runs clean only when core npm is disabled', () => {
     const guarded = createTempGitRepo({ branch: 'main' })
     const leaked = createTempGitRepo({ branch: 'main' })
@@ -191,20 +222,31 @@ describe('E2E: @release-it-plugins/workspaces composition', () => {
     }
   })
 
-  it('locks the release-it 20 workspaces peer incompatibility without skipping', () => {
+  it.each([
+    20, 21,
+  ] as const)('locks the unsupported workspaces peer incompatibility for release-it %i without skipping', releaseItMajor => {
     const repo = createTempGitRepo({ branch: 'main' })
 
     try {
-      seedWorkspaceFixture(repo, true, 20)
+      seedWorkspaceFixture(repo, true, releaseItMajor)
+      const manifestsBefore = [
+        'package.json',
+        'packages/pkg-a/package.json',
+        'packages/pkg-b/package.json',
+      ].map(path => readFileSync(join(repo.cwd, path), 'utf8'))
 
-      const result = runReleaseIt(repo, 20)
+      const result = runReleaseIt(repo, releaseItMajor)
 
       expect(result.exitCode).not.toBe(0)
       expect(
-        isWorkspacesReleaseIt20PeerMismatch(result),
-        `expected release-it 20 peer mismatch:\n${releaseItOutput(result)}`,
+        isWorkspacesReleaseItPeerMismatch(result, releaseItMajor),
+        `expected release-it ${releaseItMajor} peer mismatch:\n${releaseItOutput(result)}`,
       ).toBe(true)
-      expect(readPackage(repo, 'packages/pkg-a/package.json').version).toBe('1.0.0')
+      expect(
+        ['package.json', 'packages/pkg-a/package.json', 'packages/pkg-b/package.json'].map(path =>
+          readFileSync(join(repo.cwd, path), 'utf8'),
+        ),
+      ).toEqual(manifestsBefore)
     } finally {
       repo.cleanup()
     }

@@ -10,6 +10,7 @@ import {
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { rangeIncludesVersion } from '../../scripts/lib/semver-utils.js'
 import type { TempRepo } from './temp-repo.js'
 
 const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url))
@@ -23,6 +24,10 @@ const RELEASE_IT_PACKAGES = {
   20: {
     packageRoot: join(PROJECT_ROOT, 'node_modules/release-it'),
     binPath: join(PROJECT_ROOT, 'node_modules/release-it/bin/release-it.js'),
+  },
+  21: {
+    packageRoot: join(PROJECT_ROOT, 'node_modules/release-it21'),
+    binPath: join(PROJECT_ROOT, 'node_modules/release-it21/bin/release-it.js'),
   },
 } as const
 
@@ -40,7 +45,9 @@ export interface PackageJson {
 }
 
 interface PackageManifest {
+  version?: string
   dependencies?: Record<string, string>
+  peerDependencies?: Record<string, string>
 }
 
 function symlinkDir(target: string, linkPath: string): void {
@@ -152,11 +159,26 @@ export function releaseItOutput(result: ReleaseItResult): string {
   return `${result.stdout}\n${result.stderr}`
 }
 
-export function isWorkspacesReleaseIt20PeerMismatch(result: ReleaseItResult): boolean {
+export function isWorkspacesReleaseItPeerMismatch(
+  result: ReleaseItResult,
+  releaseItMajor: ReleaseItMajor,
+): boolean {
+  const releaseItManifest = JSON.parse(
+    readFileSync(join(RELEASE_IT_PACKAGES[releaseItMajor].packageRoot, 'package.json'), 'utf8'),
+  ) as PackageManifest
+  const workspacesManifest = JSON.parse(
+    readFileSync(join(PROJECT_ROOT, 'node_modules', WORKSPACES_PLUGIN, 'package.json'), 'utf8'),
+  ) as PackageManifest
+  const releaseItVersion = releaseItManifest.version
+  const workspacesPeerRange = workspacesManifest.peerDependencies?.['release-it']
   const combined = releaseItOutput(result)
+
   return (
-    combined.includes('@release-it-plugins/workspaces has the following unmet peerDependencies') &&
-    combined.includes('release-it') &&
-    combined.includes('20.')
+    typeof releaseItVersion === 'string' &&
+    typeof workspacesPeerRange === 'string' &&
+    rangeIncludesVersion(workspacesPeerRange, releaseItVersion) === false &&
+    /@release-it-plugins\/workspaces has the following unmet peerDependencies[ \t]*:?[ \t]*\r?\n(?:[ \t]*\r?\n|[ \t]*[*-][ \t]+(?!release-it\s*:)[^\r\n]*\r?\n)*[ \t]*[*-][ \t]+release-it\s*:/m.test(
+      combined,
+    )
   )
 }

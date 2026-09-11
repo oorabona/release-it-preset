@@ -171,11 +171,11 @@ await withTempGitRepo(async (repo) => {
 
 All temp directories are also cleaned up on process exit (orphan safety net).
 
-`tests/helpers/release-it-composition.ts` supports release-it/plugin composition tests that need repo-local `node_modules` entries without running an install in each temp repo. It links this preset, links either the root `release-it@20` package or the aliased `release-it19` package, and builds a small physical copy of `@release-it-plugins/workspaces` so its peer check resolves against the selected release-it major.
+`tests/helpers/release-it-composition.ts` supports release-it/plugin composition tests that need repo-local `node_modules` entries without running an install in each temp repo. It links this preset, links the root `release-it@20` package or the aliased `release-it19` / `release-it21` packages, and builds a small physical copy of `@release-it-plugins/workspaces` so its peer check resolves against the selected release-it major.
 
 The workspaces composition e2e intentionally has two non-skipped paths:
 - The composition path runs under `release-it19` and asserts workspace package versions plus internal dependency ranges are updated.
-- The `release-it@20` path asserts the current `@release-it-plugins/workspaces` peer mismatch remains visible. When that plugin widens its peer range, this lock test should fail and prompt updating the docs and helper matrix.
+- The `release-it@20` and `release-it@21` paths assert the current `@release-it-plugins/workspaces` peer mismatch remains visible. When that plugin widens its peer range, these lock tests should fail and prompt updating the docs and helper matrix.
 
 ### Safe env defaults
 
