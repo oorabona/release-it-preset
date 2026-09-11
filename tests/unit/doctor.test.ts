@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -9,6 +10,7 @@ import {
   formatHuman,
   formatJson,
   inspectRepository,
+  RELEASE_IT_INSTALL_ADVICE,
   runDoctor,
   safeExec,
   summarize,
@@ -2066,6 +2068,10 @@ const LS_OUTPUT_V21_PRERELEASE = JSON.stringify({
   dependencies: { 'release-it': { version: '21.0.0-beta.1' } },
 })
 
+const LS_OUTPUT_V21_PRERELEASE_ADMITTED = JSON.stringify({
+  dependencies: { 'release-it': { version: '21.0.0-beta.2' } },
+})
+
 const LS_OUTPUT_V18 = JSON.stringify({
   dependencies: { 'release-it': { version: '18.3.0' } },
 })
@@ -2177,7 +2183,35 @@ describe('validateReleaseItPeer', () => {
     expect(checkA?.detail).toContain('outside the supported range')
   })
 
-  it('Check A FAIL: unsupported peer grammar fails closed', () => {
+  it('Check A PASS: installed prerelease is admitted by a prerelease caret range', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') {
+          return JSON.stringify({
+            name: '@oorabona/release-it-preset',
+            peerDependencies: { 'release-it': '^21.0.0-beta.1' },
+          })
+        }
+        return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V21_PRERELEASE_ADMITTED
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '21.0.2'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('PASS')
+    expect(checkA?.value).toBe('21.0.0-beta.2')
+  })
+
+  it('Check A WARN: unsupported peer grammar is not evaluable', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
@@ -2201,8 +2235,28 @@ describe('validateReleaseItPeer', () => {
     })
     const results = validateReleaseItPeer(deps)
     const checkA = results.find(r => r.name === 'release-it peer dependency')
-    expect(checkA?.status).toBe('FAIL')
+    expect(checkA?.status).toBe('WARN')
     expect(checkA?.detail).toContain('>=21.0.0 <22.0.0')
+    expect(checkA?.detail).toContain('could not evaluate')
+    expect(checkA?.detail).not.toContain('outside the supported range')
+  })
+
+  it('gives each Node line exactly one release-it recommendation in doctor advice and the README', () => {
+    expect(RELEASE_IT_INSTALL_ADVICE).toContain(
+      'Node `^22.21.0 || >=24.0.0`: pnpm add -D release-it@^21',
+    )
+    expect(RELEASE_IT_INSTALL_ADVICE).toContain(
+      'Node `^20.19.0 || >=22.13.0 <22.21.0`: pnpm add -D release-it@^20',
+    )
+    expect(RELEASE_IT_INSTALL_ADVICE).toContain(
+      'Node `^22.0.0 <22.13.0 || ^23.0.0`, or with @release-it-plugins/workspaces: pnpm add -D release-it@^19',
+    )
+
+    const readme = readFileSync(join(process.cwd(), 'README.md'), 'utf8')
+    expect(readme).toContain('# Node `^22.21.0 || >=24.0.0`')
+    expect(readme).toContain('# Node `^20.19.0 || >=22.13.0 <22.21.0`')
+    expect(readme).toContain('# Node `^22.0.0 <22.13.0 || ^23.0.0`')
+    expect(readme).not.toContain('Node 22.21+ or 24+')
   })
 
   // --- Check A: FAIL — version outside range ---

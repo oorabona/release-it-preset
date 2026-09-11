@@ -16,17 +16,17 @@ Shareable [release-it](https://github.com/release-it/release-it) configuration a
 ## Quick Start (30 seconds)
 
 ```bash
-# Node 22.21+ or 24+
+# Node `^22.21.0 || >=24.0.0`
 pnpm add -D release-it@^21 @oorabona/release-it-preset
 ```
 
 ```bash
-# Node 20.19+ on 20.x, or Node 22.13 through 22.20
+# Node `^20.19.0 || >=22.13.0 <22.21.0`
 pnpm add -D release-it@^20 @oorabona/release-it-preset
 ```
 
 ```bash
-# Node 22.0 through 22.12, or Node 23
+# Node `^22.0.0 <22.13.0 || ^23.0.0`
 pnpm add -D release-it@^19 @oorabona/release-it-preset
 ```
 
@@ -102,7 +102,7 @@ Most release workflows fall into one of three traps: too much manual work (plain
 
 - **Node.js** `^20.19.0 || >=22.0.0` (Node 21 is not supported)
 - **Package manager:** pnpm, npm, or yarn
-- **Peer dependency:** `release-it ^19.0.0 || ^20.0.0 || ^21.0.0`. Prefer release-it 21; use release-it 20 on Node 20.19+ on 20.x or Node 22.13 through 22.20; use release-it 19 on Node 22.0 through 22.12 or Node 23, and when composing with `@release-it-plugins/workspaces`.
+- **Peer dependency:** `release-it ^19.0.0 || ^20.0.0 || ^21.0.0`. Choose release-it 21 on Node `^22.21.0 || >=24.0.0`; release-it 20 on Node `^20.19.0 || >=22.13.0 <22.21.0`; and release-it 19 on Node `^22.0.0 <22.13.0 || ^23.0.0`, and when composing with `@release-it-plugins/workspaces`.
 - **release-it runtime:**
 
   | release-it | Supported Node.js engines |
@@ -114,17 +114,17 @@ Most release workflows fall into one of three traps: too much manual work (plain
 - **TypeScript:** built with TypeScript 6; TypeScript 5+ projects are supported via the compiled ESM distribution
 
 ```bash
-# Node 22.21+ or 24+
+# Node `^22.21.0 || >=24.0.0`
 pnpm add -D release-it@^21 @oorabona/release-it-preset
 ```
 
 ```bash
-# Node 20.19+ on 20.x, or Node 22.13 through 22.20
+# Node `^20.19.0 || >=22.13.0 <22.21.0`
 pnpm add -D release-it@^20 @oorabona/release-it-preset
 ```
 
 ```bash
-# Node 22.0 through 22.12, or Node 23
+# Node `^22.0.0 <22.13.0 || ^23.0.0`
 pnpm add -D release-it@^19 @oorabona/release-it-preset
 ```
 
