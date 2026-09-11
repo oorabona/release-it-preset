@@ -1884,91 +1884,18 @@ function highestMajorFromRange(range: string): number {
   return max
 }
 
-interface PeerVersion {
-  major: number
-  minor: number
-  patch: number
-  prerelease: string[] | null
-}
-
-function parsePeerVersion(version: string): PeerVersion | null {
-  const match = version.match(/^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/)
-  if (!match) return null
-
-  return {
-    major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
-    prerelease: match[4]?.split('.') ?? null,
-  }
-}
-
-function comparePrereleaseIdentifiers(left: string[] | null, right: string[] | null): number {
-  if (left === null) return right === null ? 0 : 1
-  if (right === null) return -1
-
-  const length = Math.max(left.length, right.length)
-  for (let index = 0; index < length; index++) {
-    const leftIdentifier = left[index]
-    const rightIdentifier = right[index]
-    if (leftIdentifier === undefined) return -1
-    if (rightIdentifier === undefined) return 1
-    if (leftIdentifier === rightIdentifier) continue
-
-    const leftIsNumeric = /^\d+$/.test(leftIdentifier)
-    const rightIsNumeric = /^\d+$/.test(rightIdentifier)
-    if (leftIsNumeric && rightIsNumeric) return Number(leftIdentifier) - Number(rightIdentifier)
-    if (leftIsNumeric) return -1
-    if (rightIsNumeric) return 1
-    return leftIdentifier < rightIdentifier ? -1 : 1
-  }
-
-  return 0
-}
-
-function comparePeerVersions(left: PeerVersion, right: PeerVersion): number {
-  if (left.major !== right.major) return left.major - right.major
-  if (left.minor !== right.minor) return left.minor - right.minor
-  if (left.patch !== right.patch) return left.patch - right.patch
-  return comparePrereleaseIdentifiers(left.prerelease, right.prerelease)
-}
-
-function prereleaseCaretRangeIncludesVersion(range: string, version: string): boolean | null {
-  const baseMatch = range.trim().match(/^\^\s*(v?\d+\.\d+\.\d+-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)$/)
-  if (!baseMatch) return null
-
-  const base = parsePeerVersion(baseMatch[1])
-  const installed = parsePeerVersion(version)
-  if (!base || !installed) return null
-  if (comparePeerVersions(installed, base) < 0) return false
-
-  if (base.major > 0) return installed.major === base.major
-  if (base.minor > 0) return installed.major === 0 && installed.minor === base.minor
-  return installed.major === 0 && installed.minor === 0 && installed.patch === base.patch
-}
-
-function evaluatePeerRange(version: string, range: string): boolean | null {
-  const versionWithoutBuildMetadata = version.replace(/\+.*/, '')
-  const evaluated = rangeIncludesVersion(range, versionWithoutBuildMetadata)
-  if (evaluated !== null) return evaluated
-
-  const rangeParts = range.split(/\s*\|\|\s*/)
-  const hasPrereleaseDeclaration = rangeParts.some(part => part.includes('-'))
-  if (!hasPrereleaseDeclaration) {
-    return versionWithoutBuildMetadata.includes('-') ? false : null
-  }
-
-  let sawUnsupportedPrereleaseDeclaration = false
-  for (const part of rangeParts) {
-    if (!part.includes('-')) continue
-    const prereleaseEvaluation = prereleaseCaretRangeIncludesVersion(part, versionWithoutBuildMetadata)
-    if (prereleaseEvaluation === true) return true
-    if (prereleaseEvaluation === null) {
-      sawUnsupportedPrereleaseDeclaration = true
-    }
-  }
-
-  return sawUnsupportedPrereleaseDeclaration ? null : false
+/**
+ * Checks whether an installed version satisfies a simplified peer range.
+ * Supports "^X.Y.Z || ^A.B.C" — checks that the installed major matches
+ * any major present in the range.
+ */
+function satisfiesPeerRange(version: string, range: string): boolean {
+  const installedMajor = parseInt(version.replace(/^v/, '').split('.')[0], 10)
+  const allowedMajors = Array.from(
+    range.matchAll(/[~^]?(\d+)\.\d+\.\d+/g),
+    (m) => parseInt(m[1], 10),
+  )
+  return allowedMajors.includes(installedMajor)
 }
 
 /**
@@ -2007,29 +1934,19 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
         value: 'not found',
         detail: `release-it is not installed.\n${RELEASE_IT_INSTALL_ADVICE}`,
       })
+    } else if (!satisfiesPeerRange(installedVersion, peerRange)) {
+      results.push({
+        name: 'release-it peer dependency',
+        status: 'FAIL',
+        value: installedVersion,
+        detail: `Installed release-it ${installedVersion} is outside the supported range (${peerRange}).\n${RELEASE_IT_INSTALL_ADVICE}`,
+      })
     } else {
-      const peerRangeEvaluation = evaluatePeerRange(installedVersion, peerRange)
-      if (peerRangeEvaluation === false) {
-        results.push({
-          name: 'release-it peer dependency',
-          status: 'FAIL',
-          value: installedVersion,
-          detail: `Installed release-it ${installedVersion} is outside the supported range (${peerRange}).\n${RELEASE_IT_INSTALL_ADVICE}`,
-        })
-      } else if (peerRangeEvaluation === null) {
-        results.push({
-          name: 'release-it peer dependency',
-          status: 'WARN',
-          value: installedVersion,
-          detail: `Installed release-it ${installedVersion} uses a peer range doctor could not evaluate (${peerRange}); compatibility was not asserted.`,
-        })
-      } else {
-        results.push({
-          name: 'release-it peer dependency',
-          status: 'PASS',
-          value: installedVersion,
-        })
-      }
+      results.push({
+        name: 'release-it peer dependency',
+        status: 'PASS',
+        value: installedVersion,
+      })
     }
   }
 

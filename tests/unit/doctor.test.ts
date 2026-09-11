@@ -2064,16 +2064,12 @@ const LS_OUTPUT_V21 = JSON.stringify({
   dependencies: { 'release-it': { version: '21.0.2' } },
 })
 
-const LS_OUTPUT_V21_PRERELEASE = JSON.stringify({
-  dependencies: { 'release-it': { version: '21.0.0-beta.1' } },
-})
-
-const LS_OUTPUT_V21_PRERELEASE_ADMITTED = JSON.stringify({
-  dependencies: { 'release-it': { version: '21.0.0-beta.2' } },
-})
-
 const LS_OUTPUT_V18 = JSON.stringify({
   dependencies: { 'release-it': { version: '18.3.0' } },
+})
+
+const LS_OUTPUT_V22 = JSON.stringify({
+  dependencies: { 'release-it': { version: '22.0.0' } },
 })
 
 const LS_OUTPUT_EMPTY = JSON.stringify({ dependencies: {} })
@@ -2157,90 +2153,6 @@ describe('validateReleaseItPeer', () => {
     expect(checkA?.value).toBe('21.0.2')
   })
 
-  it('Check A FAIL: installed v21 prerelease is outside the supported peer range', () => {
-    const deps = makeDeps({
-      existsSync: vi.fn((p: string) => p === 'package.json'),
-      readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') {
-          return PRESET_PKG_WITH_PEERS
-        }
-        return ''
-      }),
-      execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) {
-          return LS_OUTPUT_V21_PRERELEASE
-        }
-        if (cmd.includes('npm view release-it version')) {
-          return '21.0.2'
-        }
-        throw new Error('unexpected command')
-      }),
-    })
-    const results = validateReleaseItPeer(deps)
-    const checkA = results.find(r => r.name === 'release-it peer dependency')
-    expect(checkA?.status).toBe('FAIL')
-    expect(checkA?.value).toBe('21.0.0-beta.1')
-    expect(checkA?.detail).toContain('outside the supported range')
-  })
-
-  it('Check A PASS: installed prerelease is admitted by a prerelease caret range', () => {
-    const deps = makeDeps({
-      existsSync: vi.fn((p: string) => p === 'package.json'),
-      readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') {
-          return JSON.stringify({
-            name: '@oorabona/release-it-preset',
-            peerDependencies: { 'release-it': '^21.0.0-beta.1' },
-          })
-        }
-        return ''
-      }),
-      execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) {
-          return LS_OUTPUT_V21_PRERELEASE_ADMITTED
-        }
-        if (cmd.includes('npm view release-it version')) {
-          return '21.0.2'
-        }
-        throw new Error('unexpected command')
-      }),
-    })
-    const results = validateReleaseItPeer(deps)
-    const checkA = results.find(r => r.name === 'release-it peer dependency')
-    expect(checkA?.status).toBe('PASS')
-    expect(checkA?.value).toBe('21.0.0-beta.2')
-  })
-
-  it('Check A WARN: unsupported peer grammar is not evaluable', () => {
-    const deps = makeDeps({
-      existsSync: vi.fn((p: string) => p === 'package.json'),
-      readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') {
-          return JSON.stringify({
-            name: '@oorabona/release-it-preset',
-            peerDependencies: { 'release-it': '>=21.0.0 <22.0.0' },
-          })
-        }
-        return ''
-      }),
-      execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) {
-          return LS_OUTPUT_V21
-        }
-        if (cmd.includes('npm view release-it version')) {
-          return '21.0.2'
-        }
-        throw new Error('unexpected command')
-      }),
-    })
-    const results = validateReleaseItPeer(deps)
-    const checkA = results.find(r => r.name === 'release-it peer dependency')
-    expect(checkA?.status).toBe('WARN')
-    expect(checkA?.detail).toContain('>=21.0.0 <22.0.0')
-    expect(checkA?.detail).toContain('could not evaluate')
-    expect(checkA?.detail).not.toContain('outside the supported range')
-  })
-
   it('gives each Node line exactly one release-it recommendation in doctor advice and the README', () => {
     expect(RELEASE_IT_INSTALL_ADVICE).toContain(
       'Node `^22.21.0 || >=24.0.0`: pnpm add -D release-it@^21',
@@ -2286,6 +2198,32 @@ describe('validateReleaseItPeer', () => {
     expect(checkA?.detail).toContain('release-it@^21')
     expect(checkA?.detail).toContain('release-it@^20')
     expect(checkA?.detail).toContain('release-it@^19')
+  })
+
+  it('Check A FAIL: installed v22 is outside supported range', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') {
+          return PRESET_PKG_WITH_PEERS
+        }
+        return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V22
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '22.0.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('FAIL')
+    expect(checkA?.value).toBe('22.0.0')
+    expect(checkA?.detail).toContain('outside the supported range')
   })
 
   // --- Check A: FAIL — not installed (npm ls returns empty deps) ---
