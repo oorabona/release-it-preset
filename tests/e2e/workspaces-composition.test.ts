@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  isWorkspacesReleaseIt20PeerMismatch,
+  isWorkspacesReleaseItPeerMismatch,
   linkReleaseItCompositionModules,
   type ReleaseItMajor,
   type ReleaseItResult,
@@ -33,6 +33,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 const WORKSPACE_RELEASE_ARGS = ['1.0.1', '--ci']
 const WORKSPACE_DRY_RUN_ARGS = ['patch', '--ci', '--dry-run']
+
+interface NodeVersion {
+  major: number
+  minor: number
+  patch: number
+}
+
+function parseNodeVersion(version: string): NodeVersion {
+  const match = version.match(/^v?(\d+)\.(\d+)\.(\d+)$/)
+  if (!match) {
+    throw new Error(`Unexpected Node version: ${version}`)
+  }
+  return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]) }
+}
+
+function compareNodeVersions(left: NodeVersion, right: NodeVersion): number {
+  if (left.major !== right.major) {
+    return left.major - right.major
+  }
+  if (left.minor !== right.minor) {
+    return left.minor - right.minor
+  }
+  return left.patch - right.patch
+}
+
+function nodeSatisfiesEngineRange(version: NodeVersion, range: string): boolean {
+  return range.split(/\s*\|\|\s*/).some(part => {
+    const match = part.trim().match(/^(\^|>=)\s*(\d+\.\d+\.\d+)$/)
+    if (!match) {
+      throw new Error(`Unsupported release-it Node engine range: ${range}`)
+    }
+
+    const base = parseNodeVersion(match[2])
+    if (match[1] === '>=') {
+      return compareNodeVersions(version, base) >= 0
+    }
+    return version.major === base.major && compareNodeVersions(version, base) >= 0
+  })
+}
+
+const RELEASE_IT_PACKAGE_ALIASES: Record<ReleaseItMajor, string> = {
+  19: 'release-it19',
+  20: 'release-it',
+  21: 'release-it21',
+}
+
+interface ReleaseItRuntime {
+  engineRange: string
+  skipReason: string | null
+}
+
+function readReleaseItRuntime(
+  releaseItMajor: ReleaseItMajor,
+  nodeVersionText = process.versions.node,
+): ReleaseItRuntime {
+  const packageAlias = RELEASE_IT_PACKAGE_ALIASES[releaseItMajor]
+  const manifest = JSON.parse(
+    readFileSync(join(process.cwd(), 'node_modules', packageAlias, 'package.json'), 'utf8'),
+  ) as { engines?: { node?: unknown } }
+  const engineRange = manifest.engines?.node
+  if (typeof engineRange !== 'string') {
+    throw new Error(`${packageAlias} package.json has no Node engine range`)
+  }
+
+  const nodeVersion = parseNodeVersion(nodeVersionText)
+  return {
+    engineRange,
+    skipReason: nodeSatisfiesEngineRange(nodeVersion, engineRange)
+      ? null
+      : `skipped: Node ${nodeVersionText} does not satisfy release-it ${releaseItMajor} engine ${engineRange}`,
+  }
+}
+
+const releaseItRuntimes: Record<ReleaseItMajor, ReleaseItRuntime> = {
+  19: readReleaseItRuntime(19),
+  20: readReleaseItRuntime(20),
+  21: readReleaseItRuntime(21),
+}
+
+function releaseItCase(releaseItMajor: ReleaseItMajor): typeof it {
+  return releaseItRuntimes[releaseItMajor].skipReason ? it.skip : it
+}
+
+function releaseItCaseName(label: string, releaseItMajor: ReleaseItMajor): string {
+  const runtime = releaseItRuntimes[releaseItMajor]
+  return runtime.skipReason
+    ? `${label} under release-it ${releaseItMajor} (${runtime.skipReason})`
+    : `${label} under release-it ${releaseItMajor}`
+}
 
 function json(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`
@@ -129,6 +218,36 @@ function gitStatus(repo: TempRepo): string {
 }
 
 describe('E2E: @release-it-plugins/workspaces composition', () => {
+  it('states why release-it 21 cases skip on an excluded Node runtime', () => {
+    const releaseIt21OnNode20 = readReleaseItRuntime(21, '20.19.0')
+    expect(releaseIt21OnNode20.skipReason).toBe(
+      `skipped: Node 20.19.0 does not satisfy release-it 21 engine ${releaseIt21OnNode20.engineRange}`,
+    )
+  })
+
+  it('skips release-it 20 on an excluded Node runtime', () => {
+    const releaseIt20OnNode220 = readReleaseItRuntime(20, '22.0.0')
+    expect(releaseIt20OnNode220.skipReason).toBe(
+      `skipped: Node 22.0.0 does not satisfy release-it 20 engine ${releaseIt20OnNode220.engineRange}`,
+    )
+  })
+
+  it('runs release-it 20 on a supported Node runtime', () => {
+    expect(readReleaseItRuntime(20, '22.13.0').skipReason).toBeNull()
+  })
+
+  it('does not attribute a different unmet plugin peer to release-it', () => {
+    const result: ReleaseItResult = {
+      stdout:
+        '@release-it-plugins/workspaces has the following unmet peerDependencies\n' +
+        '- another-peer: ^1.0.0',
+      stderr: '',
+      exitCode: 1,
+    }
+
+    expect(isWorkspacesReleaseItPeerMismatch(result, 21)).toBe(false)
+  })
+
   it('updates workspace versions and internal dependency ranges under release-it 19', () => {
     const positive = createTempGitRepo({ branch: 'main' })
     const negative = createTempGitRepo({ branch: 'main' })
@@ -162,6 +281,28 @@ describe('E2E: @release-it-plugins/workspaces composition', () => {
     }
   })
 
+  for (const releaseItMajor of [19, 20, 21] as const) {
+    releaseItCase(releaseItMajor)(
+      releaseItCaseName('runs the preset without the workspaces plugin', releaseItMajor),
+      () => {
+        const repo = createTempGitRepo({ branch: 'main' })
+
+        try {
+          seedWorkspaceFixture(repo, false, releaseItMajor)
+
+          const result = runReleaseIt(repo, releaseItMajor)
+          expectReleaseItSuccess(result, `no-workspaces release-it ${releaseItMajor} run`)
+
+          expect(readPackage(repo, 'package.json').version).toBe('1.0.1')
+          const changelog = readFileSync(join(repo.cwd, 'CHANGELOG.md'), 'utf8')
+          expect(changelog).toContain('## [1.0.1]')
+        } finally {
+          repo.cleanup()
+        }
+      },
+    )
+  }
+
   it('keeps workspaces dry-runs clean only when core npm is disabled', () => {
     const guarded = createTempGitRepo({ branch: 'main' })
     const leaked = createTempGitRepo({ branch: 'main' })
@@ -191,22 +332,39 @@ describe('E2E: @release-it-plugins/workspaces composition', () => {
     }
   })
 
-  it('locks the release-it 20 workspaces peer incompatibility without skipping', () => {
-    const repo = createTempGitRepo({ branch: 'main' })
+  for (const releaseItMajor of [20, 21] as const) {
+    releaseItCase(releaseItMajor)(
+      releaseItCaseName(
+        'locks the unsupported workspaces peer incompatibility without skipping',
+        releaseItMajor,
+      ),
+      () => {
+        const repo = createTempGitRepo({ branch: 'main' })
 
-    try {
-      seedWorkspaceFixture(repo, true, 20)
+        try {
+          seedWorkspaceFixture(repo, true, releaseItMajor)
+          const manifestsBefore = [
+            'package.json',
+            'packages/pkg-a/package.json',
+            'packages/pkg-b/package.json',
+          ].map(path => readFileSync(join(repo.cwd, path), 'utf8'))
 
-      const result = runReleaseIt(repo, 20)
+          const result = runReleaseIt(repo, releaseItMajor)
 
-      expect(result.exitCode).not.toBe(0)
-      expect(
-        isWorkspacesReleaseIt20PeerMismatch(result),
-        `expected release-it 20 peer mismatch:\n${releaseItOutput(result)}`,
-      ).toBe(true)
-      expect(readPackage(repo, 'packages/pkg-a/package.json').version).toBe('1.0.0')
-    } finally {
-      repo.cleanup()
-    }
-  })
+          expect(result.exitCode).not.toBe(0)
+          expect(
+            isWorkspacesReleaseItPeerMismatch(result, releaseItMajor),
+            `expected release-it ${releaseItMajor} peer mismatch:\n${releaseItOutput(result)}`,
+          ).toBe(true)
+          expect(
+            ['package.json', 'packages/pkg-a/package.json', 'packages/pkg-b/package.json'].map(
+              path => readFileSync(join(repo.cwd, path), 'utf8'),
+            ),
+          ).toEqual(manifestsBefore)
+        } finally {
+          repo.cleanup()
+        }
+      },
+    )
+  }
 })

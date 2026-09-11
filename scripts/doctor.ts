@@ -1842,7 +1842,7 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
  * then falls back to a hardcoded constant.
  */
 function readPresetPeerRange(deps: DoctorDeps): string {
-  const FALLBACK = '^19.0.0 || ^20.0.0'
+  const FALLBACK = '^19.0.0 || ^20.0.0 || ^21.0.0'
   const candidates = [
     'node_modules/@oorabona/release-it-preset/package.json',
     'package.json',
@@ -1863,9 +1863,16 @@ function readPresetPeerRange(deps: DoctorDeps): string {
   return FALLBACK
 }
 
+export const RELEASE_IT_INSTALL_ADVICE = [
+  'Choose the supported release-it major:',
+  '  Node `^22.21.0 || >=24.0.0`: pnpm add -D release-it@^21',
+  '  Node `^20.19.0 || >=22.13.0 <22.21.0`: pnpm add -D release-it@^20',
+  '  Node `^22.0.0 <22.13.0 || ^23.0.0`, or with @release-it-plugins/workspaces: pnpm add -D release-it@^19',
+].join('\n')
+
 /**
  * Extracts the highest major version number from a semver range string.
- * Handles OR-joined ranges like "^19.0.0 || ^20.0.0" → 20.
+ * Handles OR-joined ranges like "^19.0.0 || ^20.0.0 || ^21.0.0" → 21.
  */
 function highestMajorFromRange(range: string): number {
   const matches = range.match(/(\d+)\.\d+\.\d+/g) ?? []
@@ -1907,7 +1914,7 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
       name: 'release-it peer dependency',
       status: 'FAIL',
       value: 'not found',
-      detail: 'release-it is not installed. Run: pnpm add -D release-it@^20',
+      detail: `release-it is not installed.\n${RELEASE_IT_INSTALL_ADVICE}`,
     })
   } else {
     let installedVersion: string | undefined
@@ -1925,14 +1932,14 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
         name: 'release-it peer dependency',
         status: 'FAIL',
         value: 'not found',
-        detail: 'release-it is not installed. Run: pnpm add -D release-it@^20',
+        detail: `release-it is not installed.\n${RELEASE_IT_INSTALL_ADVICE}`,
       })
     } else if (!satisfiesPeerRange(installedVersion, peerRange)) {
       results.push({
         name: 'release-it peer dependency',
         status: 'FAIL',
         value: installedVersion,
-        detail: `Installed release-it ${installedVersion} is outside the supported range (${peerRange}). Run: pnpm add -D release-it@^20`,
+        detail: `Installed release-it ${installedVersion} is outside the supported range (${peerRange}).\n${RELEASE_IT_INSTALL_ADVICE}`,
       })
     } else {
       results.push({

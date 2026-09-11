@@ -43,8 +43,8 @@ A `commit-msg` hook rejects messages with process artifacts (review iteration ta
 ## Environment expectations
 
 - pnpm ≥ 10
-- Node ≥ 20.19.0 (the project's `engines.node` floor; matches release-it v20's minimum)
-- The published preset peer-depends on `release-it ^19.0.0 || ^20.0.0`. Tests + dev install are on v20; v19 was smoke-tested before the constraint was widened.
+- Node `^20.19.0 || >=22.0.0` (Node 21 is unsupported)
+- The published preset peer-depends on `release-it ^19.0.0 || ^20.0.0 || ^21.0.0`. The dev install remains on v20 for Node 20 coverage; the suite also exercises v19 and v21.
 
 ## When you are stuck
 

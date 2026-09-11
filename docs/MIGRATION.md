@@ -223,7 +223,7 @@ freeze in v1.0.0. To recap:
   `retry-publish-preflight`), 18 environment variables (17 in
   `ENV_VAR_CATALOG` + `CHANGELOG_TYPE_MAP`), 7 config exports under
   `@oorabona/release-it-preset/config/*`, the `publish.yml` workflow input
-  contract, and the `release-it ^19 || ^20` peer dep range.
+  contract, and the `release-it ^19 || ^20 || ^21` peer dep range.
 - **Internal** (may change without notice): `scripts/lib/*`, individual
   script exports beyond the CLI surface, `dist/types/*`, DI dependency
   interfaces, the `bin/validators.js` internals.

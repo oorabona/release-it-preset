@@ -31,9 +31,9 @@ peer.
 
 ## Decision
 
-`release-it` is listed under `peerDependencies` only. The minimum supported
-version is `^20.0.0` (updated from `^19.0.0` in v0.10.0 when development
-aligned to the release-it 20.x API).
+`release-it` is listed under `peerDependencies` only. The supported range is
+`^19.0.0 || ^20.0.0 || ^21.0.0`; it was updated from `^19.0.0` in v0.10.0 when
+development aligned to the release-it 20.x API.
 
 `@release-it/keep-a-changelog`, by contrast, is a regular `dependency`.
 It is a plugin that the preset's config files invoke directly via the
@@ -69,7 +69,8 @@ is the correct distinction: plugins invoked by the preset belong in
 
 ## References
 
-- `package.json` `peerDependencies` field (current value: `"release-it": "^20.0.0"`)
-- CHANGELOG.md v0.10.0: peer contract updated from `^19.0.0` to `^20.0.0`
-  (commit `d24df9a`)
+- `package.json` `peerDependencies` field (current value:
+  `"release-it": "^19.0.0 || ^20.0.0 || ^21.0.0"`)
+- CHANGELOG.md v0.10.0: peer contract was updated from `^19.0.0` to `^20.0.0`
+  (commit `d24df9a`); later releases widened it to the current range.
 - ESLint config authoring guide: https://eslint.org/docs/developer-guide/shareable-configs

@@ -16,7 +16,21 @@ Shareable [release-it](https://github.com/release-it/release-it) configuration a
 ## Quick Start (30 seconds)
 
 ```bash
-pnpm add -D release-it @oorabona/release-it-preset
+# Node `^22.21.0 || >=24.0.0`
+pnpm add -D release-it@^21 @oorabona/release-it-preset
+```
+
+```bash
+# Node `^20.19.0 || >=22.13.0 <22.21.0`
+pnpm add -D release-it@^20 @oorabona/release-it-preset
+```
+
+```bash
+# Node `^22.0.0 <22.13.0 || ^23.0.0`
+pnpm add -D release-it@^19 @oorabona/release-it-preset
+```
+
+```bash
 pnpm release-it-preset init --with-workflows
 ```
 
@@ -86,13 +100,32 @@ Most release workflows fall into one of three traps: too much manual work (plain
 
 ## Installation & requirements
 
-- **Node.js** >= 20.19.0
+- **Node.js** `^20.19.0 || >=22.0.0` (Node 21 is not supported)
 - **Package manager:** pnpm, npm, or yarn
-- **Peer dependency:** `release-it ^19.0.0 || ^20.0.0` (v20 recommended for OIDC publishing)
+- **Peer dependency:** `release-it ^19.0.0 || ^20.0.0 || ^21.0.0`. Choose release-it 21 on Node `^22.21.0 || >=24.0.0`; release-it 20 on Node `^20.19.0 || >=22.13.0 <22.21.0`; and release-it 19 on Node `^22.0.0 <22.13.0 || ^23.0.0`, and when composing with `@release-it-plugins/workspaces`.
+- **release-it runtime:**
+
+  | release-it | Supported Node.js engines |
+  | --- | --- |
+  | 19 | `^20.12.0 || >=22.0.0` |
+  | 20 | `^20.19.0 || ^22.13.0 || >=24.0.0` |
+  | 21 | `^22.21.0 || >=24.0.0` |
+
 - **TypeScript:** built with TypeScript 6; TypeScript 5+ projects are supported via the compiled ESM distribution
 
 ```bash
-pnpm add -D release-it @oorabona/release-it-preset
+# Node `^22.21.0 || >=24.0.0`
+pnpm add -D release-it@^21 @oorabona/release-it-preset
+```
+
+```bash
+# Node `^20.19.0 || >=22.13.0 <22.21.0`
+pnpm add -D release-it@^20 @oorabona/release-it-preset
+```
+
+```bash
+# Node `^22.0.0 <22.13.0 || ^23.0.0`
+pnpm add -D release-it@^19 @oorabona/release-it-preset
 ```
 
 **Try without installing:**

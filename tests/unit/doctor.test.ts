@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -9,6 +10,7 @@ import {
   formatHuman,
   formatJson,
   inspectRepository,
+  RELEASE_IT_INSTALL_ADVICE,
   runDoctor,
   safeExec,
   summarize,
@@ -443,7 +445,7 @@ describe('validateConfiguration', () => {
           return JSON.stringify({
             name: 'my-pkg',
             version: '0.1.0',
-            peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0' },
+            peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0 || ^21.0.0' },
           })
         }
         return ''
@@ -1782,7 +1784,7 @@ describe('Workspace dependency ranges check', () => {
       {
         name: 'root',
         version: '1.0.0',
-        peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0' },
+        peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0 || ^21.0.0' },
       },
     )
     deps.existsSync = vi.fn((p: string) => {
@@ -1817,7 +1819,7 @@ describe('Workspace dependency ranges check', () => {
         return JSON.stringify({
           name: 'root',
           version: '1.0.0',
-          peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0' },
+          peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0 || ^21.0.0' },
         })
       }
       if (p === join('/repo', 'packages', 'a', 'package.json')) {
@@ -2047,7 +2049,7 @@ describe('formatHuman', () => {
 const PRESET_PKG_WITH_PEERS = JSON.stringify({
   name: '@oorabona/release-it-preset',
   version: '1.0.0',
-  peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0' },
+  peerDependencies: { 'release-it': '^19.0.0 || ^20.0.0 || ^21.0.0' },
 })
 
 const LS_OUTPUT_V20 = JSON.stringify({
@@ -2058,15 +2060,23 @@ const LS_OUTPUT_V19 = JSON.stringify({
   dependencies: { 'release-it': { version: '19.5.2' } },
 })
 
+const LS_OUTPUT_V21 = JSON.stringify({
+  dependencies: { 'release-it': { version: '21.0.2' } },
+})
+
 const LS_OUTPUT_V18 = JSON.stringify({
   dependencies: { 'release-it': { version: '18.3.0' } },
+})
+
+const LS_OUTPUT_V22 = JSON.stringify({
+  dependencies: { 'release-it': { version: '22.0.0' } },
 })
 
 const LS_OUTPUT_EMPTY = JSON.stringify({ dependencies: {} })
 
 describe('validateReleaseItPeer', () => {
   // --- Check A: PASS ---
-  it('Check A PASS: installed v20 satisfies ^19||^20 peer range', () => {
+  it('Check A PASS: installed v20 satisfies the supported peer range', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
@@ -2092,7 +2102,7 @@ describe('validateReleaseItPeer', () => {
   })
 
   // --- Check A: PASS with v19 ---
-  it('Check A PASS: installed v19 satisfies ^19||^20 peer range', () => {
+  it('Check A PASS: installed v19 satisfies the supported peer range', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
@@ -2115,6 +2125,50 @@ describe('validateReleaseItPeer', () => {
     const checkA = results.find(r => r.name === 'release-it peer dependency')
     expect(checkA?.status).toBe('PASS')
     expect(checkA?.value).toBe('19.5.2')
+  })
+
+  // --- Check A: PASS with v21 ---
+  it('Check A PASS: installed v21 satisfies the supported peer range', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') {
+          return PRESET_PKG_WITH_PEERS
+        }
+        return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V21
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '21.0.2'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('PASS')
+    expect(checkA?.value).toBe('21.0.2')
+  })
+
+  it('gives each Node line exactly one release-it recommendation in doctor advice and the README', () => {
+    expect(RELEASE_IT_INSTALL_ADVICE).toContain(
+      'Node `^22.21.0 || >=24.0.0`: pnpm add -D release-it@^21',
+    )
+    expect(RELEASE_IT_INSTALL_ADVICE).toContain(
+      'Node `^20.19.0 || >=22.13.0 <22.21.0`: pnpm add -D release-it@^20',
+    )
+    expect(RELEASE_IT_INSTALL_ADVICE).toContain(
+      'Node `^22.0.0 <22.13.0 || ^23.0.0`, or with @release-it-plugins/workspaces: pnpm add -D release-it@^19',
+    )
+
+    const readme = readFileSync(join(process.cwd(), 'README.md'), 'utf8')
+    expect(readme).toContain('# Node `^22.21.0 || >=24.0.0`')
+    expect(readme).toContain('# Node `^20.19.0 || >=22.13.0 <22.21.0`')
+    expect(readme).toContain('# Node `^22.0.0 <22.13.0 || ^23.0.0`')
+    expect(readme).not.toContain('Node 22.21+ or 24+')
   })
 
   // --- Check A: FAIL — version outside range ---
@@ -2141,7 +2195,35 @@ describe('validateReleaseItPeer', () => {
     const checkA = results.find(r => r.name === 'release-it peer dependency')
     expect(checkA?.status).toBe('FAIL')
     expect(checkA?.value).toBe('18.3.0')
-    expect(checkA?.detail).toContain('pnpm add -D release-it@^20')
+    expect(checkA?.detail).toContain('release-it@^21')
+    expect(checkA?.detail).toContain('release-it@^20')
+    expect(checkA?.detail).toContain('release-it@^19')
+  })
+
+  it('Check A FAIL: installed v22 is outside supported range', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => {
+        if (p === 'package.json') {
+          return PRESET_PKG_WITH_PEERS
+        }
+        return ''
+      }),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V22
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '22.0.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+    const results = validateReleaseItPeer(deps)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('FAIL')
+    expect(checkA?.value).toBe('22.0.0')
+    expect(checkA?.detail).toContain('outside the supported range')
   })
 
   // --- Check A: FAIL — not installed (npm ls returns empty deps) ---
@@ -2167,7 +2249,9 @@ describe('validateReleaseItPeer', () => {
     const results = validateReleaseItPeer(deps)
     const checkA = results.find(r => r.name === 'release-it peer dependency')
     expect(checkA?.status).toBe('FAIL')
-    expect(checkA?.detail).toContain('pnpm add -D release-it@^20')
+    expect(checkA?.detail).toContain('release-it@^21')
+    expect(checkA?.detail).toContain('release-it@^20')
+    expect(checkA?.detail).toContain('release-it@^19')
   })
 
   // --- Check A: FAIL — exec throws (npm not available) ---
@@ -2186,7 +2270,7 @@ describe('validateReleaseItPeer', () => {
   })
 
   // --- Check B: WARN — newer major available ---
-  it('Check B WARN: npm reports v21 while peer range max is v20', () => {
+  it('Check B WARN: npm reports v22 while peer range max is v21', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => {
@@ -2200,7 +2284,7 @@ describe('validateReleaseItPeer', () => {
           return LS_OUTPUT_V20
         }
         if (cmd.includes('npm view release-it version')) {
-          return '21.0.5'
+          return '22.0.5'
         }
         throw new Error('unexpected command')
       }),
@@ -2208,9 +2292,9 @@ describe('validateReleaseItPeer', () => {
     const results = validateReleaseItPeer(deps)
     const checkB = results.find(r => r.name === 'release-it major version')
     expect(checkB?.status).toBe('WARN')
-    expect(checkB?.value).toBe('21.0.5')
-    expect(checkB?.detail).toContain('21.x available')
-    expect(checkB?.detail).toContain('peer range max is 20.x')
+    expect(checkB?.value).toBe('22.0.5')
+    expect(checkB?.detail).toContain('22.x available')
+    expect(checkB?.detail).toContain('peer range max is 21.x')
   })
 
   // --- Check B: PASS — latest major matches supported max ---
@@ -2283,7 +2367,7 @@ describe('validateReleaseItPeer', () => {
       }),
     })
     const results = validateReleaseItPeer(deps)
-    // Should still produce Check A PASS (v20 satisfies fallback ^19||^20)
+    // Should still produce Check A PASS (v20 satisfies the fallback peer range)
     const checkA = results.find(r => r.name === 'release-it peer dependency')
     expect(checkA?.status).toBe('PASS')
   })

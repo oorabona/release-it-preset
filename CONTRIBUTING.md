@@ -13,7 +13,7 @@ pnpm exec tsc --noEmit
 pnpm build
 ```
 
-Requirements: Node ≥ 20, pnpm ≥ 10. The project is ESM-only.
+Requirements: Node `^20.19.0 || >=22.0.0` (Node 21 is unsupported), pnpm ≥ 10. The project is ESM-only.
 
 ## Development setup
 
