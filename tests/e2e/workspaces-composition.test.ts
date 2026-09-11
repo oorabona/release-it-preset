@@ -73,16 +73,28 @@ function nodeSatisfiesEngineRange(version: NodeVersion, range: string): boolean 
   })
 }
 
-function readReleaseIt21Runtime(nodeVersionText = process.versions.node): {
+const RELEASE_IT_PACKAGE_ALIASES: Record<ReleaseItMajor, string> = {
+  19: 'release-it19',
+  20: 'release-it',
+  21: 'release-it21',
+}
+
+interface ReleaseItRuntime {
   engineRange: string
   skipReason: string | null
-} {
+}
+
+function readReleaseItRuntime(
+  releaseItMajor: ReleaseItMajor,
+  nodeVersionText = process.versions.node,
+): ReleaseItRuntime {
+  const packageAlias = RELEASE_IT_PACKAGE_ALIASES[releaseItMajor]
   const manifest = JSON.parse(
-    readFileSync(join(process.cwd(), 'node_modules', 'release-it21', 'package.json'), 'utf8'),
+    readFileSync(join(process.cwd(), 'node_modules', packageAlias, 'package.json'), 'utf8'),
   ) as { engines?: { node?: unknown } }
   const engineRange = manifest.engines?.node
   if (typeof engineRange !== 'string') {
-    throw new Error('release-it21 package.json has no Node engine range')
+    throw new Error(`${packageAlias} package.json has no Node engine range`)
   }
 
   const nodeVersion = parseNodeVersion(nodeVersionText)
@@ -90,19 +102,24 @@ function readReleaseIt21Runtime(nodeVersionText = process.versions.node): {
     engineRange,
     skipReason: nodeSatisfiesEngineRange(nodeVersion, engineRange)
       ? null
-      : `skipped: Node ${nodeVersionText} does not satisfy release-it 21 engine ${engineRange}`,
+      : `skipped: Node ${nodeVersionText} does not satisfy release-it ${releaseItMajor} engine ${engineRange}`,
   }
 }
 
-const releaseIt21Runtime = readReleaseIt21Runtime()
+const releaseItRuntimes: Record<ReleaseItMajor, ReleaseItRuntime> = {
+  19: readReleaseItRuntime(19),
+  20: readReleaseItRuntime(20),
+  21: readReleaseItRuntime(21),
+}
 
 function releaseItCase(releaseItMajor: ReleaseItMajor): typeof it {
-  return releaseItMajor === 21 && releaseIt21Runtime.skipReason ? it.skip : it
+  return releaseItRuntimes[releaseItMajor].skipReason ? it.skip : it
 }
 
 function releaseItCaseName(label: string, releaseItMajor: ReleaseItMajor): string {
-  return releaseItMajor === 21 && releaseIt21Runtime.skipReason
-    ? `${label} under release-it ${releaseItMajor} (${releaseIt21Runtime.skipReason})`
+  const runtime = releaseItRuntimes[releaseItMajor]
+  return runtime.skipReason
+    ? `${label} under release-it ${releaseItMajor} (${runtime.skipReason})`
     : `${label} under release-it ${releaseItMajor}`
 }
 
@@ -202,10 +219,21 @@ function gitStatus(repo: TempRepo): string {
 
 describe('E2E: @release-it-plugins/workspaces composition', () => {
   it('states why release-it 21 cases skip on an excluded Node runtime', () => {
-    const releaseIt21OnNode20 = readReleaseIt21Runtime('20.19.0')
+    const releaseIt21OnNode20 = readReleaseItRuntime(21, '20.19.0')
     expect(releaseIt21OnNode20.skipReason).toBe(
       `skipped: Node 20.19.0 does not satisfy release-it 21 engine ${releaseIt21OnNode20.engineRange}`,
     )
+  })
+
+  it('skips release-it 20 on an excluded Node runtime', () => {
+    const releaseIt20OnNode220 = readReleaseItRuntime(20, '22.0.0')
+    expect(releaseIt20OnNode220.skipReason).toBe(
+      `skipped: Node 22.0.0 does not satisfy release-it 20 engine ${releaseIt20OnNode220.engineRange}`,
+    )
+  })
+
+  it('runs release-it 20 on a supported Node runtime', () => {
+    expect(readReleaseItRuntime(20, '22.13.0').skipReason).toBeNull()
   })
 
   it('does not attribute a different unmet plugin peer to release-it', () => {
