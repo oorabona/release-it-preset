@@ -152,6 +152,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
     needs: [build-dist, tests, test-cli]
+    concurrency:
+      group: release-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write
       actions: write
@@ -213,16 +216,33 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="$(git describe --tags --exact-match)"
-          gh workflow run publish.yml --ref "$TAG" -f tag="$TAG"
+          EXISTING_RUN_IDS="$(gh api --paginate \
+            "/repos/${GITHUB_REPOSITORY}/actions/workflows/publish.yml/runs?event=workflow_dispatch&branch=${TAG}&per_page=100" \
+            --jq '.workflow_runs[].id')"
+          DISPATCH_OUTPUT="$(gh workflow run publish.yml --ref "$TAG" -f tag="$TAG" 2>&1)"
+          printf '%s\n' "$DISPATCH_OUTPUT"
+          RUN_ID="$(printf '%s\n' "$DISPATCH_OUTPUT" | sed -nE 's#.*\/actions\/runs\/([0-9]+).*#\1#p' | tail -n 1)"
 
-          for _ in {1..30}; do
-            RUN_ID="$(gh run list --workflow=publish.yml --event=workflow_dispatch --branch="$TAG" --limit 1 --json databaseId --jq '.[0].databaseId')"
-            if [ -n "$RUN_ID" ]; then
-              gh run watch "$RUN_ID" --exit-status
-              exit $?
-            fi
-            sleep 2
-          done
+          if [ -z "$RUN_ID" ]; then
+            for _ in {1..30}; do
+              CANDIDATE_RUN_IDS="$(gh api --paginate \
+                "/repos/${GITHUB_REPOSITORY}/actions/workflows/publish.yml/runs?event=workflow_dispatch&branch=${TAG}&per_page=100" \
+                --jq '.workflow_runs[].id')"
+              while IFS= read -r CANDIDATE_RUN_ID; do
+                if [ -n "$CANDIDATE_RUN_ID" ] && ! printf '%s\n' "$EXISTING_RUN_IDS" | grep -Fqx "$CANDIDATE_RUN_ID"; then
+                  RUN_ID="$CANDIDATE_RUN_ID"
+                  break 2
+                fi
+              done <<< "$CANDIDATE_RUN_IDS"
+
+              sleep 2
+            done
+          fi
+
+          if [ -n "$RUN_ID" ]; then
+            gh run watch "$RUN_ID" --exit-status
+            exit $?
+          fi
 
           echo "Publisher workflow dispatch did not create a run for $TAG" >&2
           exit 1

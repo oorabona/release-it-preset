@@ -229,7 +229,7 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
       return {
         name: 'npm publishing credential path',
         passed: false,
-        message: 'npm whoami failed in CI; neither an npm auth token nor a GitHub Actions OIDC token request was detected. For npm trusted publishing, grant the publishing job `permissions: id-token: write`; otherwise configure an npm automation token, such as `NPM_TOKEN`.',
+        message: 'npm whoami failed in CI and no GitHub Actions OIDC token request pair is present. This check does not infer npm authentication from token-shaped environment variables. Check npm configuration and registry reachability, or grant the publishing job `permissions: id-token: write` for trusted publishing.',
       };
     }
 

@@ -355,7 +355,7 @@ describe('validate-release (with DI)', () => {
       expect(result.message).toContain('id-token: write')
     })
 
-    it('should provide CI-specific guidance when no token is detected', () => {
+    it('should provide CI-specific guidance without claiming an npm token is absent', () => {
       vi.mocked(deps.execSync).mockImplementation(() => {
         throw new Error('whoami not available')
       })
@@ -368,6 +368,12 @@ describe('validate-release (with DI)', () => {
       expect(result.name).toBe('npm publishing credential path')
       expect(result.passed).toBe(false)
       expect(result.message).toContain('id-token: write')
+      expect(result.message).toContain('npm whoami failed in CI')
+      expect(result.message).toContain(
+        'does not infer npm authentication from token-shaped environment variables',
+      )
+      expect(result.message).not.toContain('neither an npm auth token')
+      expect(result.message).not.toContain('NPM_TOKEN')
     })
 
     it('should not treat the setup-node NODE_AUTH_TOKEN placeholder as a token', () => {
@@ -392,7 +398,7 @@ describe('validate-release (with DI)', () => {
       expect(result.name).toBe('npm publishing credential path')
       expect(result.passed).toBe(false)
       expect(result.message).toBe(
-        'npm whoami failed in CI; neither an npm auth token nor a GitHub Actions OIDC token request was detected. For npm trusted publishing, grant the publishing job `permissions: id-token: write`; otherwise configure an npm automation token, such as `NPM_TOKEN`.',
+        'npm whoami failed in CI and no GitHub Actions OIDC token request pair is present. This check does not infer npm authentication from token-shaped environment variables. Check npm configuration and registry reachability, or grant the publishing job `permissions: id-token: write` for trusted publishing.',
       )
     })
   })
