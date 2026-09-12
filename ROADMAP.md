@@ -7,7 +7,7 @@ Strategic framing for **post-v1.0 features**. Items here are deferred from the v
 **Last updated:** 2026-09-12
 **Status:** v1.4.1 published; v1.5.0 in preparation.
 
-The project's moat is: **human-curated changelogs + recovery presets + `doctor` diagnostic + OIDC zero-config**. Every candidate below is evaluated against whether it strengthens the moat or opens a defensible new axis.
+The project's moat is: **human-curated changelogs + recovery presets + `doctor` diagnostic + OIDC zero-config**. Every candidate below is evaluated against whether it strengthens the moat or opens a defensible new axis. Rows marked ✅ Done are kept for provenance and are not candidates.
 
 ---
 
@@ -15,7 +15,7 @@ The project's moat is: **human-curated changelogs + recovery presets + `doctor` 
 
 | # | Idea | Why now | Effort | Priority |
 |---|---|---|---|---|
-| A1 | ✅ **Shipped.** `doctor` extensions: publish workflow freshness, npm provenance readiness, SLSA attestation availability, workspace dependency ranges, and the `release-it` peer range check, which evaluates the declared range with `semver` as of v1.5.0. The major-version advisor ships in its first form; making it evaluate ranges rather than scrape them is [#89](https://github.com/oorabona/release-it-preset/issues/89), and the richer breaking-surface advice remains E3. | `doctor` is the signature feature. Each new check tightens the "diagnostic confidence before release" pitch. | Low | 🟢 H |
+| A1 | **`doctor` extensions** — publish workflow freshness, npm provenance readiness, SLSA attestation availability, workspace dependency ranges, peer range. Remaining advisor work: [#89](https://github.com/oorabona/release-it-preset/issues/89) and E3. | `doctor` is the signature feature. Each new check tightens the "diagnostic confidence before release" pitch. | Low | ✅ Done |
 | A2 | **Industry templates** — `release-it-preset init --template typescript-lib\|react-component\|cli-tool\|monorepo` generates a `.release-it.json` plus matching `package.json` scripts | Drops the 1st-time user friction; measurable via npm install spike post-shipped. | Medium | 🟢 H |
 | A3 | **Breaking-change auto-detection** — analyze `dist/` output or `.d.ts` exports to flag a commit as breaking when the public surface diff would justify it | Strong differentiator vs semantic-release (which infers breaking from commit message only). Aligned with Hyrum's Law: if the surface changes, semver should reflect it. | Medium-high | 🟡 M |
 
@@ -24,14 +24,14 @@ The project's moat is: **human-curated changelogs + recovery presets + `doctor` 
 | # | Idea | Why | Effort | Priority |
 |---|---|---|---|---|
 | B1 | **GitLab support** | Many references in workflows + docs are GitHub-hardcoded. GitLab also has OIDC trusted publishing toward npm since 2024; market is non-saturated and aligned with the OIDC pitch. | High | 🟡 M (post-v1.1) |
-| B2 | ✅ **Shipped in v1.4.1** — **SLSA L3 / Sigstore attestation** alongside npm provenance. SLSA Build L3 provenance and a cosign keyless signature are attached to every GitHub release; `docs/VERIFY.md` carries the verification commands. v1.4.0 is un-attested by design. | npm provenance gets us SLSA L1; L3 + cosign signing is the next supply-chain step and is becoming enterprise table-stakes. | Medium | 🟡 M |
+| B2 | **SLSA L3 / Sigstore attestation** alongside npm provenance. `docs/VERIFY.md` states which releases carry the assets and how to check them. | npm provenance gets us SLSA L1; L3 + cosign signing is the next supply-chain step and is becoming enterprise table-stakes. | Medium | ✅ Done |
 | B3 | **`@release-it-plugins/workspaces` composition tests in CI** — shipped by #61 with release-it 19 composition coverage and a release-it 20 peer-incompatibility lock test | Real monorepo users benefit from an asserted composition path instead of docs-only guidance. | Medium | ✅ Done |
 
 ## C. Quality-of-life (medium value, low-medium cost)
 
 | # | Idea | Why | Effort | Priority |
 |---|---|---|---|---|
-| C1 | ✅ **Shipped in v1.3.0** — **`release-it-preset annotate`** enriches auto-generated `[Unreleased]` entries with PR descriptions and breaking-change footers via `gh pr view`. Typed blocks, merged PRs only, fatal before writing. | Reduces manual post-`update` curation. Compatible with the "human-curated" promise — automation enriches but does not replace. | Medium | 🟢 M |
+| C1 | **`release-it-preset annotate`** — enrich auto-generated `[Unreleased]` entries with PR descriptions / breaking-change footers via `gh pr view` | Reduces manual post-`update` curation. Compatible with the "human-curated" promise — automation enriches but does not replace. | Medium | ✅ Done |
 | C2 | **`release-it-preset retro N`** — backfill changelog for the past N versions from git log when a project has none | Onboarding for projects adopting the preset without a historical changelog. | Low-medium | 🟢 M |
 | C3 | **Composite action for smart npm dist-tag selection** — see [#30](https://github.com/oorabona/release-it-preset/issues/30) | DRY across `publish.yml` and `republish.yml`. Already decided: defer until 3+ callers need it. Trigger awaited. | Low | 🟡 M (waiting trigger) |
 
@@ -66,9 +66,8 @@ These were considered and explicitly will **not** be pursued. Documented to prev
 
 ## Historical: the v1.1 / v1.2 recommendation made at v1.0
 
-Kept for provenance. Three of its four items shipped between v1.2.0 and v1.5.0: A1 (`doctor`
-extensions), C1 (`annotate`), B2 (SLSA / Sigstore). A2 (industry `init --template`) did not, and
-remains a candidate above.
+Kept for provenance. It named A1, A2, C1 and B2. Only A2 is still open; the other three are marked
+✅ Done above.
 
 ---
 
