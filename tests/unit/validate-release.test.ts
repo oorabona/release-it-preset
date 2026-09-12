@@ -275,6 +275,27 @@ describe('validate-release (with DI)', () => {
       expect(result.message).toContain('Token-based authentication')
     })
 
+    it('should pass in CI when an OIDC token request is available', () => {
+      vi.mocked(deps.execSync).mockImplementation(() => {
+        throw new Error('whoami not available')
+      })
+      vi.mocked(deps.getEnv).mockImplementation(key => {
+        if (key === 'CI') {
+          return 'true'
+        }
+        if (key === 'ACTIONS_ID_TOKEN_REQUEST_URL') {
+          return 'https://token.actions.githubusercontent.com'
+        }
+        return undefined
+      })
+
+      const result = validateNpmAuth(deps)
+
+      expect(result.passed).toBe(true)
+      expect(result.message).toContain('OIDC token request is available')
+      expect(result.message).not.toMatch(/authenticated/i)
+    })
+
     it('should provide CI-specific guidance when no token is detected', () => {
       vi.mocked(deps.execSync).mockImplementation(() => {
         throw new Error('whoami not available')
@@ -285,6 +306,28 @@ describe('validate-release (with DI)', () => {
 
       expect(result.passed).toBe(false)
       expect(result.message).toContain('Ensure NPM_TOKEN is configured')
+    })
+
+    it('should not treat the setup-node NODE_AUTH_TOKEN placeholder as a token', () => {
+      vi.mocked(deps.execSync).mockImplementation(() => {
+        throw new Error('whoami not available')
+      })
+      vi.mocked(deps.getEnv).mockImplementation(key => {
+        if (key === 'CI') {
+          return 'true'
+        }
+        if (key === 'NODE_AUTH_TOKEN') {
+          return 'XXXXX-XXXXX-XXXXX-XXXXX'
+        }
+        return undefined
+      })
+
+      const result = validateNpmAuth(deps)
+
+      expect(result.passed).toBe(false)
+      expect(result.message).toBe(
+        'npm whoami failed in CI and no auth token detected. Ensure NPM_TOKEN is configured.',
+      )
     })
   })
 

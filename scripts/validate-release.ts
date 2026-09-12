@@ -203,7 +203,7 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
       message: `Logged in as: ${username}`,
     };
   } catch (error) {
-    const tokenEnvVars = ['NPM_TOKEN', 'NPM_TOKEN', 'NPM_CONFIG__AUTH', 'NPM_CONFIG_TOKEN'];
+    const tokenEnvVars = ['NPM_TOKEN', 'NPM_CONFIG__AUTH', 'NPM_CONFIG_TOKEN'];
     const hasAutomationToken = tokenEnvVars.some((name) => {
       const value = deps.getEnv(name);
       return typeof value === 'string' && value.trim().length > 0;
@@ -214,6 +214,15 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
         name: 'npm authentication',
         passed: true,
         message: 'Token-based authentication detected (skipped npm whoami).',
+      };
+    }
+
+    const oidcTokenRequestUrl = deps.getEnv('ACTIONS_ID_TOKEN_REQUEST_URL');
+    if (typeof oidcTokenRequestUrl === 'string' && oidcTokenRequestUrl.trim().length > 0) {
+      return {
+        name: 'npm authentication',
+        passed: true,
+        message: 'OIDC token request is available (skipped npm whoami).',
       };
     }
 
