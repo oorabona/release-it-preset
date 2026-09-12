@@ -4,7 +4,23 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    testTimeout: 30_000,
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit-integration',
+          include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'e2e',
+          include: ['tests/e2e/**/*.test.ts'],
+          testTimeout: 30_000,
+        },
+      },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

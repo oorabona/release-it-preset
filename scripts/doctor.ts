@@ -1872,7 +1872,8 @@ export const RELEASE_IT_INSTALL_ADVICE = [
 ].join('\n')
 
 /**
- * Runs Check A (peer range satisfaction) and Check B (major version advisor).
+ * Runs Check A (peer range satisfaction) and Check B (latest published version
+ * against declared peer range).
  * Returns an array of CheckResult to be appended into validateConfiguration.
  * Check B is silently skipped when the npm registry is unreachable.
  */

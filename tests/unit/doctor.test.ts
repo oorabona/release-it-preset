@@ -2096,7 +2096,8 @@ describe('formatHuman', () => {
 })
 
 // ---------------------------------------------------------------------------
-// validateReleaseItPeer — Check A (peer range) + Check B (major advisor)
+// validateReleaseItPeer — Check A (peer range) + Check B (latest published
+// version against declared peer range)
 // ---------------------------------------------------------------------------
 
 const PRESET_PKG_WITH_PEERS = JSON.stringify({
@@ -2608,7 +2609,7 @@ describe('validateReleaseItPeer', () => {
     expect(checkB?.value).toBe('21.0.0')
   })
 
-  // --- Check B: PASS — latest major matches supported max ---
+  // --- Check B: PASS — latest published version satisfies declared peer range ---
   it('Check B PASS: latest npm version is within supported major range', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
