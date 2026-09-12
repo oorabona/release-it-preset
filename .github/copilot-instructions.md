@@ -34,7 +34,7 @@ These instructions orient AI coding agents contributing to `@oorabona/release-it
 ## Implementation Constraints
 - `semver` is the only runtime dependency. Use it for any new version or range comparison, and for the release-it peer check, which it already decides. Do not hand-roll a second evaluator, and do not add another parsing lib—regex + Node APIs otherwise. `release-it` is a peer dependency (consumers install it).
 - `scripts/lib/semver-utils.ts` predates that dependency. `rangeIncludesVersion` stays: it evaluates pnpm's `workspace:` protocol, which `semver.validRange` returns null for. Its `isValidSemver` and `validateAndNormalizeSemver` are legacy regex validators still called from `scripts/doctor.ts`, `scripts/extract-changelog.ts` and `scripts/republish-changelog.ts`; they accept versions `semver.valid` rejects, such as `01.0.0`. Replacing them is #88. Do not add callers.
-- Maintain Node >= 18 compatibility; avoid experimental APIs.
+- Maintain Node `^20.19.0 || >=22.0.0` compatibility; avoid experimental APIs.
 - Do not introduce circular imports; configs stay flat.
 - Preserve export map structure in `package.json` when adding files (add new explicit export if exposing new config).
 

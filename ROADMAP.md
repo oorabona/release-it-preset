@@ -24,7 +24,7 @@ The project's moat is: **human-curated changelogs + recovery presets + `doctor` 
 | # | Idea | Why | Effort | Priority |
 |---|---|---|---|---|
 | B1 | **GitLab support** | Many references in workflows + docs are GitHub-hardcoded. GitLab also has OIDC trusted publishing toward npm since 2024; market is non-saturated and aligned with the OIDC pitch. | High | 🟡 M (post-v1.1) |
-| B2 | **SLSA L3 / Sigstore attestation** alongside npm provenance. `docs/VERIFY.md` states which releases carry the assets and how to check them. | npm provenance gets us SLSA L1; L3 + cosign signing is the next supply-chain step and is becoming enterprise table-stakes. | Medium | ✅ Done |
+| B2 | **SLSA L3 / Sigstore attestation** alongside npm provenance. `docs/VERIFY.md` states which releases carry the assets and how to check them. | npm provenance gets us SLSA L2; L3 + cosign signing is the next supply-chain step and is becoming enterprise table-stakes. | Medium | ✅ Done |
 | B3 | **`@release-it-plugins/workspaces` composition tests in CI** — shipped by #61 with release-it 19 composition coverage and a release-it 20 peer-incompatibility lock test | Real monorepo users benefit from an asserted composition path instead of docs-only guidance. | Medium | ✅ Done |
 
 ## C. Quality-of-life (medium value, low-medium cost)

@@ -81,7 +81,7 @@
     "test:unit": "vitest run tests/unit/*.test.ts",
     "test:unit:watch": "vitest tests/unit/*.test.ts",
     "test:unit:coverage": "vitest run tests/unit/*.test.ts --coverage",
-    "test:e2e": "vitest run tests/e2e/*.test.ts --testTimeout=30000",
+    "test:e2e": "vitest run tests/e2e/*.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run tests/unit tests/integration --coverage",
     "test:ui": "vitest --ui",
