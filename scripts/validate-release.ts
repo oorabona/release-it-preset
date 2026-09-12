@@ -194,6 +194,14 @@ export function validateWorkingDirectoryClean(deps: ValidateReleaseDeps, options
 }
 
 export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
+  if (deps.getEnv('NPM_PUBLISH') !== 'true') {
+    return {
+      name: 'npm publishing credential path',
+      passed: true,
+      message: 'Skipped because NPM_PUBLISH is not true; this run does not publish.',
+    };
+  }
+
   try {
     const username = (deps.execSync('npm whoami', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }) as string).trim();
 
@@ -203,20 +211,6 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
       message: `Logged in as: ${username}`,
     };
   } catch (error) {
-    const tokenEnvVars = ['NPM_TOKEN', 'NPM_CONFIG__AUTH', 'NPM_CONFIG_TOKEN'];
-    const hasAutomationToken = tokenEnvVars.some((name) => {
-      const value = deps.getEnv(name);
-      return typeof value === 'string' && value.trim().length > 0;
-    });
-
-    if (hasAutomationToken) {
-      return {
-        name: 'npm publishing credential path',
-        passed: true,
-        message: 'Token-based credential path detected; npm authentication was not verified.',
-      };
-    }
-
     const oidcTokenRequestUrl = deps.getEnv('ACTIONS_ID_TOKEN_REQUEST_URL');
     const oidcTokenRequestToken = deps.getEnv('ACTIONS_ID_TOKEN_REQUEST_TOKEN');
     if (
@@ -226,7 +220,7 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
       return {
         name: 'npm publishing credential path',
         passed: true,
-        message: 'OIDC token request credential path detected; npm authentication was not verified.',
+        message: 'OIDC token request is available; a publish attempt is possible, but npm trust is unverified.',
       };
     }
 

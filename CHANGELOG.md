@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- match changelog headings only for their exact version, including prerelease and build metadata boundaries ([#95](https://github.com/oorabona/release-it-preset/issues/95))
+- hand release preparation off to the trusted publisher workflow ([#99](https://github.com/oorabona/release-it-preset/issues/99))
+- require a verified npm publishing credential path rather than ambient token variables ([#97](https://github.com/oorabona/release-it-preset/issues/97))
+
 ## [1.5.1] - 2026-09-12
 
 ### Fixed

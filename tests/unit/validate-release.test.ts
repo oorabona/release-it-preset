@@ -243,8 +243,26 @@ describe('validate-release (with DI)', () => {
   })
 
   describe('validateNpmAuth', () => {
-    it('should pass when authenticated', () => {
+    it('should skip when this run does not publish, regardless of ambient variables', () => {
+      vi.mocked(deps.execSync).mockImplementation(() => {
+        throw new Error('whoami should not run')
+      })
+      vi.mocked(deps.getEnv).mockImplementation(key =>
+        key === 'NPM_TOKEN' ? 'ambient-token' : undefined,
+      )
+
+      const result = validateNpmAuth(deps)
+
+      expect(result.passed).toBe(true)
+      expect(result.message).toBe(
+        'Skipped because NPM_PUBLISH is not true; this run does not publish.',
+      )
+      expect(deps.execSync).not.toHaveBeenCalled()
+    })
+
+    it('should pass when publishing and authenticated', () => {
       vi.mocked(deps.execSync).mockReturnValue('username')
+      vi.mocked(deps.getEnv).mockImplementation(key => (key === 'NPM_PUBLISH' ? 'true' : undefined))
 
       const result = validateNpmAuth(deps)
 
@@ -253,9 +271,28 @@ describe('validate-release (with DI)', () => {
       expect(result.message).toContain('username')
     })
 
-    it('should fail when not authenticated', () => {
+    it('should fail when publishing and not authenticated', () => {
       vi.mocked(deps.execSync).mockImplementation(() => {
         throw new Error('not authenticated')
+      })
+      vi.mocked(deps.getEnv).mockImplementation(key => (key === 'NPM_PUBLISH' ? 'true' : undefined))
+
+      const result = validateNpmAuth(deps)
+
+      expect(result.name).toBe('npm publishing credential path')
+      expect(result.passed).toBe(false)
+      expect(result.message).toContain('Not authenticated')
+    })
+
+    it('should fail when publishing with only NPM_TOKEN configured', () => {
+      vi.mocked(deps.execSync).mockImplementation(() => {
+        throw new Error('whoami not available')
+      })
+      vi.mocked(deps.getEnv).mockImplementation(key => {
+        if (key === 'NPM_PUBLISH') {
+          return 'true'
+        }
+        return key === 'NPM_TOKEN' ? 'shhh' : undefined
       })
 
       const result = validateNpmAuth(deps)
@@ -265,27 +302,15 @@ describe('validate-release (with DI)', () => {
       expect(result.message).toContain('Not authenticated')
     })
 
-    it('should pass when token-based authentication is configured', () => {
-      vi.mocked(deps.execSync).mockImplementation(() => {
-        throw new Error('whoami not available')
-      })
-      vi.mocked(deps.getEnv).mockImplementation(key => (key === 'NPM_TOKEN' ? 'shhh' : undefined))
-
-      const result = validateNpmAuth(deps)
-
-      expect(result.name).toBe('npm publishing credential path')
-      expect(result.passed).toBe(true)
-      expect(result.message).toBe(
-        'Token-based credential path detected; npm authentication was not verified.',
-      )
-    })
-
     it('should pass in CI when an OIDC token request credential path is available', () => {
       vi.mocked(deps.execSync).mockImplementation(() => {
         throw new Error('whoami not available')
       })
       vi.mocked(deps.getEnv).mockImplementation(key => {
         if (key === 'CI') {
+          return 'true'
+        }
+        if (key === 'NPM_PUBLISH') {
           return 'true'
         }
         if (key === 'ACTIONS_ID_TOKEN_REQUEST_URL') {
@@ -302,7 +327,7 @@ describe('validate-release (with DI)', () => {
       expect(result.name).toBe('npm publishing credential path')
       expect(result.passed).toBe(true)
       expect(result.message).toBe(
-        'OIDC token request credential path detected; npm authentication was not verified.',
+        'OIDC token request is available; a publish attempt is possible, but npm trust is unverified.',
       )
     })
 
@@ -312,6 +337,9 @@ describe('validate-release (with DI)', () => {
       })
       vi.mocked(deps.getEnv).mockImplementation(key => {
         if (key === 'CI') {
+          return 'true'
+        }
+        if (key === 'NPM_PUBLISH') {
           return 'true'
         }
         if (key === 'ACTIONS_ID_TOKEN_REQUEST_URL') {
@@ -331,7 +359,9 @@ describe('validate-release (with DI)', () => {
       vi.mocked(deps.execSync).mockImplementation(() => {
         throw new Error('whoami not available')
       })
-      vi.mocked(deps.getEnv).mockImplementation(key => (key === 'CI' ? 'true' : undefined))
+      vi.mocked(deps.getEnv).mockImplementation(key =>
+        key === 'CI' || key === 'NPM_PUBLISH' ? 'true' : undefined,
+      )
 
       const result = validateNpmAuth(deps)
 
@@ -346,6 +376,9 @@ describe('validate-release (with DI)', () => {
       })
       vi.mocked(deps.getEnv).mockImplementation(key => {
         if (key === 'CI') {
+          return 'true'
+        }
+        if (key === 'NPM_PUBLISH') {
           return 'true'
         }
         if (key === 'NODE_AUTH_TOKEN') {
