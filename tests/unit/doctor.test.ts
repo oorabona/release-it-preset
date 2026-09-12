@@ -2234,25 +2234,29 @@ describe('validateReleaseItPeer', () => {
       name: '@oorabona/release-it-preset',
       peerDependencies: { 'release-it': peerRange },
     })
+    const execSync = vi.fn((cmd: string) => {
+      if (cmd.includes('npm ls release-it')) {
+        return LS_OUTPUT_V20
+      }
+      if (cmd.includes('npm view release-it version')) {
+        return '20.10.0'
+      }
+      throw new Error('unexpected command')
+    })
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),
       readFileSync: vi.fn((p: string) => (p === 'package.json' ? preset : '')),
-      execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) {
-          return LS_OUTPUT_V20
-        }
-        if (cmd.includes('npm view release-it version')) {
-          return '20.10.0'
-        }
-        throw new Error('unexpected command')
-      }),
+      execSync,
     })
 
-    const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
+    const results = validateReleaseItPeer(deps)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
     expect(checkA?.status).toBe('WARN')
     expect(checkA?.detail).toContain('20.10.0')
     expect(checkA?.detail).toContain(peerRange)
     expect(checkA?.detail).toContain('Could not evaluate')
+    expect(results.find(r => r.name === 'release-it major version')).toBeUndefined()
+    expect(execSync.mock.calls.some(([cmd]) => cmd === 'npm view release-it version')).toBe(false)
   })
 
   it('Check A FAIL: an installed version that is not valid semver cannot satisfy the peer range', () => {

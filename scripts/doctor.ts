@@ -1893,6 +1893,7 @@ function highestMajorFromRange(range: string): number {
 export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
   const results: CheckResult[] = []
   const peerRange = readPresetPeerRange(deps)
+  const peerRangeIsValid = semver.validRange(peerRange) !== null
 
   // --- Check A: release-it in supported peer range ---
   const lsOutput = safeExec('npm ls release-it --depth=0 --json', deps)
@@ -1922,7 +1923,6 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
         detail: `release-it is not installed.\n${RELEASE_IT_INSTALL_ADVICE}`,
       })
     } else {
-      const peerRangeIsValid = semver.validRange(peerRange) !== null
       const installedIsValid = semver.valid(installedVersion) !== null
 
       if (!installedIsValid) {
@@ -1959,27 +1959,30 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
   }
 
   // --- Check B: release-it major version advisor ---
-  // On network failure (null), skip the check entirely — no FAIL on outage.
-  const latestOutput = safeExec('npm view release-it version', deps)
-  if (latestOutput) {
-    const latestVersion = latestOutput.trim()
-    const latestMajor = parseInt(latestVersion.replace(/^v/, '').split('.')[0], 10)
-    const supportedMaxMajor = highestMajorFromRange(peerRange)
+  // An invalid peer range is already reported by Check A, so Check B is inapplicable.
+  if (peerRangeIsValid) {
+    // On network failure (null), skip the check entirely — no FAIL on outage.
+    const latestOutput = safeExec('npm view release-it version', deps)
+    if (latestOutput) {
+      const latestVersion = latestOutput.trim()
+      const latestMajor = parseInt(latestVersion.replace(/^v/, '').split('.')[0], 10)
+      const supportedMaxMajor = highestMajorFromRange(peerRange)
 
-    if (!Number.isNaN(latestMajor) && !Number.isNaN(supportedMaxMajor)) {
-      if (latestMajor > supportedMaxMajor) {
-        results.push({
-          name: 'release-it major version',
-          status: 'WARN',
-          value: latestVersion,
-          detail: `release-it ${latestMajor}.x available; preset's peer range max is ${supportedMaxMajor}.x. Coordinate with the preset maintainer before upgrading.`,
-        })
-      } else {
-        results.push({
-          name: 'release-it major version',
-          status: 'PASS',
-          value: latestVersion,
-        })
+      if (!Number.isNaN(latestMajor) && !Number.isNaN(supportedMaxMajor)) {
+        if (latestMajor > supportedMaxMajor) {
+          results.push({
+            name: 'release-it major version',
+            status: 'WARN',
+            value: latestVersion,
+            detail: `release-it ${latestMajor}.x available; preset's peer range max is ${supportedMaxMajor}.x. Coordinate with the preset maintainer before upgrading.`,
+          })
+        } else {
+          results.push({
+            name: 'release-it major version',
+            status: 'PASS',
+            value: latestVersion,
+          })
+        }
       }
     }
   }

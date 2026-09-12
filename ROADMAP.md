@@ -15,7 +15,7 @@ The project's moat is: **human-curated changelogs + recovery presets + `doctor` 
 
 | # | Idea | Why now | Effort | Priority |
 |---|---|---|---|---|
-| A1 | **`doctor` extensions** — verify `publish.yml` is up-to-date with the reusable workflow; check Sigstore/SLSA setup; check `release-it` peer is in the supported range; advise on incoming `release-it` major releases | `doctor` is the signature feature. Each new check tightens the "diagnostic confidence before release" pitch. | Low | 🟢 H |
+| A1 | ✅ **Shipped.** `doctor` extensions: publish workflow freshness, npm provenance readiness, SLSA attestation availability, workspace dependency ranges, and the `release-it` peer range check, which evaluates the declared range with `semver` as of v1.5.0. The major-version advisor ships in its first form; making it evaluate ranges rather than scrape them is [#89](https://github.com/oorabona/release-it-preset/issues/89), and the richer breaking-surface advice remains E3. | `doctor` is the signature feature. Each new check tightens the "diagnostic confidence before release" pitch. | Low | 🟢 H |
 | A2 | **Industry templates** — `release-it-preset init --template typescript-lib\|react-component\|cli-tool\|monorepo` generates a `.release-it.json` plus matching `package.json` scripts | Drops the 1st-time user friction; measurable via npm install spike post-shipped. | Medium | 🟢 H |
 | A3 | **Breaking-change auto-detection** — analyze `dist/` output or `.d.ts` exports to flag a commit as breaking when the public surface diff would justify it | Strong differentiator vs semantic-release (which infers breaking from commit message only). Aligned with Hyrum's Law: if the surface changes, semver should reflect it. | Medium-high | 🟡 M |
 
@@ -24,14 +24,14 @@ The project's moat is: **human-curated changelogs + recovery presets + `doctor` 
 | # | Idea | Why | Effort | Priority |
 |---|---|---|---|---|
 | B1 | **GitLab support** | Many references in workflows + docs are GitHub-hardcoded. GitLab also has OIDC trusted publishing toward npm since 2024; market is non-saturated and aligned with the OIDC pitch. | High | 🟡 M (post-v1.1) |
-| B2 | **SLSA L3 / Sigstore attestation** alongside npm provenance | npm provenance gets us SLSA L1; L3 + cosign signing is the next supply-chain step and is becoming enterprise table-stakes. | Medium | 🟡 M |
+| B2 | ✅ **Shipped in v1.4.1** — **SLSA L3 / Sigstore attestation** alongside npm provenance. SLSA Build L3 provenance and a cosign keyless signature are attached to every GitHub release; `docs/VERIFY.md` carries the verification commands. v1.4.0 is un-attested by design. | npm provenance gets us SLSA L1; L3 + cosign signing is the next supply-chain step and is becoming enterprise table-stakes. | Medium | 🟡 M |
 | B3 | **`@release-it-plugins/workspaces` composition tests in CI** — shipped by #61 with release-it 19 composition coverage and a release-it 20 peer-incompatibility lock test | Real monorepo users benefit from an asserted composition path instead of docs-only guidance. | Medium | ✅ Done |
 
 ## C. Quality-of-life (medium value, low-medium cost)
 
 | # | Idea | Why | Effort | Priority |
 |---|---|---|---|---|
-| C1 | **`release-it-preset annotate`** — enrich auto-generated `[Unreleased]` entries with PR descriptions / breaking-change footers via `gh pr view` | Reduces manual post-`update` curation. Compatible with the "human-curated" promise — automation enriches but does not replace. | Medium | 🟢 M |
+| C1 | ✅ **Shipped in v1.3.0** — **`release-it-preset annotate`** enriches auto-generated `[Unreleased]` entries with PR descriptions and breaking-change footers via `gh pr view`. Typed blocks, merged PRs only, fatal before writing. | Reduces manual post-`update` curation. Compatible with the "human-curated" promise — automation enriches but does not replace. | Medium | 🟢 M |
 | C2 | **`release-it-preset retro N`** — backfill changelog for the past N versions from git log when a project has none | Onboarding for projects adopting the preset without a historical changelog. | Low-medium | 🟢 M |
 | C3 | **Composite action for smart npm dist-tag selection** — see [#30](https://github.com/oorabona/release-it-preset/issues/30) | DRY across `publish.yml` and `republish.yml`. Already decided: defer until 3+ callers need it. Trigger awaited. | Low | 🟡 M (waiting trigger) |
 
@@ -64,19 +64,22 @@ These were considered and explicitly will **not** be pursued. Documented to prev
 
 ---
 
-## Top-4 recommendation for v1.1 / v1.2 (3-6 months post-stable)
+## Historical: the v1.1 / v1.2 recommendation made at v1.0
 
-1. **A1 — `doctor` extensions** — low effort, reinforces moat, ships fastest
-2. **A2 — Industry `init --template`** — changes 1st-time UX, measurable adoption signal
-3. **C1 — `annotate` command** — reduces day-to-day workflow friction
-4. **B2 — SLSA / Sigstore** — anticipates supply-chain security becoming table-stakes for enterprise adoption
-
-Everything else: **wait for user signal** (issue opened, contributor PR, bug report).
+Kept for provenance. Three of its four items shipped between v1.2.0 and v1.5.0: A1 (`doctor`
+extensions), C1 (`annotate`), B2 (SLSA / Sigstore). A2 (industry `init --template`) did not, and
+remains a candidate above.
 
 ---
 
-## When to revisit
+## What is actually next
 
-- **v1.0 stable + 1 month**: re-prioritize based on real user feedback; promote any item where signal materialized.
-- **v1.0 stable + 3 months**: kick off the top-4 if no surprises; otherwise re-cadence.
-- **Each new release-it major**: scan for `doctor` advisor opportunities (E3).
+Nothing here is scheduled. Each item waits on a signal — an issue, a contributor PR, a bug report.
+
+- **A2 — industry `init --template`** is the largest untouched item, and the only one of the
+  original four still open.
+- [#89](https://github.com/oorabona/release-it-preset/issues/89) and
+  [#88](https://github.com/oorabona/release-it-preset/issues/88) are the open defects, both in
+  version-comparison code and both bounded.
+- **Each new release-it major**: check whether the peer range needs widening, and scan for advisor
+  opportunities (E3).
