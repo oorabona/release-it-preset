@@ -1921,26 +1921,38 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
         value: 'not found',
         detail: `release-it is not installed.\n${RELEASE_IT_INSTALL_ADVICE}`,
       })
-    } else if (!semver.valid(installedVersion) || !semver.validRange(peerRange)) {
-      results.push({
-        name: 'release-it peer dependency',
-        status: 'WARN',
-        value: installedVersion,
-        detail: `Could not evaluate installed release-it version ${installedVersion} against declared peer range (${peerRange}).`,
-      })
-    } else if (!semver.satisfies(installedVersion, peerRange)) {
-      results.push({
-        name: 'release-it peer dependency',
-        status: 'FAIL',
-        value: installedVersion,
-        detail: `Installed release-it ${installedVersion} is outside the supported range (${peerRange}).\n${RELEASE_IT_INSTALL_ADVICE}`,
-      })
     } else {
-      results.push({
-        name: 'release-it peer dependency',
-        status: 'PASS',
-        value: installedVersion,
-      })
+      const peerRangeIsValid = semver.validRange(peerRange) !== null
+      const installedIsValid = semver.valid(installedVersion) !== null
+
+      if (!peerRangeIsValid) {
+        results.push({
+          name: 'release-it peer dependency',
+          status: 'WARN',
+          value: installedVersion,
+          detail: `Could not evaluate installed release-it version ${installedVersion} against declared peer range (${peerRange}).`,
+        })
+      } else if (!installedIsValid) {
+        results.push({
+          name: 'release-it peer dependency',
+          status: 'FAIL',
+          value: installedVersion,
+          detail: `Installed release-it version ${installedVersion} is not valid semver.\n${RELEASE_IT_INSTALL_ADVICE}`,
+        })
+      } else if (!semver.satisfies(installedVersion, peerRange)) {
+        results.push({
+          name: 'release-it peer dependency',
+          status: 'FAIL',
+          value: installedVersion,
+          detail: `Installed release-it ${installedVersion} is outside the supported range (${peerRange}).\n${RELEASE_IT_INSTALL_ADVICE}`,
+        })
+      } else {
+        results.push({
+          name: 'release-it peer dependency',
+          status: 'PASS',
+          value: installedVersion,
+        })
+      }
     }
   }
 

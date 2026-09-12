@@ -139,8 +139,8 @@ E2E tests live in `tests/e2e/` and use a real temporary git repository with no m
 ### How to run
 
 ```bash
-pnpm test:e2e          # Run only E2E tests (opt-in, ~30 s timeout per test)
-pnpm test              # Unit + integration (does not include E2E)
+pnpm test:e2e          # Run only E2E tests (~30 s timeout per test)
+pnpm test              # Every suite, E2E included
 ```
 
 CI runs both:

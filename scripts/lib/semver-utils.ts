@@ -160,7 +160,9 @@ export function validateAndNormalizeSemver(version: string): string {
  * and OR-joined (`||`) combinations of those forms. Unknown syntax returns null
  * so advisory checks can skip it without producing false warnings.
  *
- * Use `semver` directly for any range that is not `workspace:`-prefixed.
+ * Callers may still pass a bare range; the `workspace:` prefix is what this
+ * function exists for. New callers with a bare range should use `semver`
+ * instead.
  *
  * @param range Dependency range string from package.json
  * @param version Concrete workspace package version
