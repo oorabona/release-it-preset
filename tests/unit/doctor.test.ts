@@ -2583,6 +2583,15 @@ describe('validateReleaseItPeer', () => {
     expect(checkB?.detail).toContain('registry response could not be read')
   })
 
+  it('Check B WARNs when npm view succeeds with whitespace-only output', () => {
+    const results = validateReleaseItPeer(makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '  \n\t  '))
+    const checkB = results.find(r => r.name === 'release-it major version')
+
+    expect(checkB?.status).toBe('WARN')
+    expect(checkB?.value).toBe('unreadable response')
+    expect(checkB?.detail).toContain('registry response could not be read')
+  })
+
   it('Check B passes clean registry output within the declared peer range', () => {
     const results = validateReleaseItPeer(makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '21.0.0'))
     const checkB = results.find(r => r.name === 'release-it major version')

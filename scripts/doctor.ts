@@ -1949,7 +1949,7 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
   if (peerRangeIsValid) {
     // On network failure (null), skip the check entirely — no FAIL on outage.
     const latestOutput = safeExec('npm view release-it version', deps)
-    if (latestOutput) {
+    if (latestOutput !== null) {
       const trimmedLatestOutput = latestOutput.trim()
       let latestVersion = semver.valid(trimmedLatestOutput)
       if (latestVersion === null) {
