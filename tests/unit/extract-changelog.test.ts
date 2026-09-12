@@ -143,5 +143,11 @@ describe('extract-changelog (with DI)', () => {
         'Invalid semantic version: "01.0.0". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
       )
     })
+
+    it('should reject padded versions with the existing error message', () => {
+      expect(() => extractChangelog(' v1.2.3 ', deps)).toThrow(
+        'Invalid semantic version: " v1.2.3 ". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
+      )
+    })
   })
 })

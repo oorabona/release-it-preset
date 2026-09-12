@@ -213,7 +213,7 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
       return {
         name: 'npm authentication',
         passed: true,
-        message: 'Token-based authentication detected (skipped npm whoami).',
+        message: 'Token-based credential path detected; npm authentication was not verified.',
       };
     }
 
@@ -222,7 +222,7 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
       return {
         name: 'npm authentication',
         passed: true,
-        message: 'OIDC token request is available (skipped npm whoami).',
+        message: 'OIDC token request credential path detected; npm authentication was not verified.',
       };
     }
 

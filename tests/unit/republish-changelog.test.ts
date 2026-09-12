@@ -170,6 +170,12 @@ describe('republish-changelog (with DI)', () => {
       )
     })
 
+    it('should reject padded versions with the existing error message', () => {
+      expect(() => republishChangelog(' v1.2.3 ', deps)).toThrow(
+        'Invalid semantic version: " v1.2.3 ". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
+      )
+    })
+
     it('should clear [Unreleased] section after moving content', () => {
       vi.mocked(deps.readFileSync).mockReturnValue(basicChangelog)
       vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')

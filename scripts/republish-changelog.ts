@@ -23,8 +23,8 @@ import type { ExecSyncOptions } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
-import semver from 'semver';
 import { getGitHubRepoUrl } from './lib/git-utils.js';
+import { isStrictSemver } from './lib/semver-utils.js';
 import { escapeRegExp } from './lib/string-utils.js';
 import { runScript } from './lib/run-script.js';
 
@@ -132,7 +132,7 @@ export function republishChangelog(version: string, deps: RepublishChangelogDeps
   deps.log(`ℹ️  Republishing version: ${version}`);
 
   // Validate semver format
-  if (semver.valid(version) === null) {
+  if (!isStrictSemver(version)) {
     throw new Error(`Invalid semantic version: "${version}". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]`);
   }
   const versionWithoutVPrefix = version.replace(/^v/, '');

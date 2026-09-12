@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { rangeIncludesVersion } from '../../scripts/lib/semver-utils'
+import { isStrictSemver, rangeIncludesVersion } from '../../scripts/lib/semver-utils'
 
 describe('semver-utils', () => {
+  it('accepts valid raw version identifiers without surrounding whitespace', () => {
+    expect(isStrictSemver('1.2.3')).toBe(true)
+    expect(isStrictSemver('v1.2.3')).toBe(true)
+    expect(isStrictSemver('1.0.0-beta.1+build.123')).toBe(true)
+  })
+
+  it('rejects padded or incomplete raw version identifiers', () => {
+    expect(isStrictSemver(' v1.2.3 ')).toBe(false)
+    expect(isStrictSemver('\n1.2.3\n')).toBe(false)
+    expect(isStrictSemver('1.0')).toBe(false)
+  })
+
   it('treats workspace protocol passthrough ranges as including the workspace version', () => {
     expect(rangeIncludesVersion('workspace:*', '1.2.3')).toBe(true)
     expect(rangeIncludesVersion('workspace:^', '1.2.3')).toBe(true)

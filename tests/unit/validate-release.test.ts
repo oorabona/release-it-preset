@@ -272,7 +272,9 @@ describe('validate-release (with DI)', () => {
       const result = validateNpmAuth(deps)
 
       expect(result.passed).toBe(true)
-      expect(result.message).toContain('Token-based authentication')
+      expect(result.message).toBe(
+        'Token-based credential path detected; npm authentication was not verified.',
+      )
     })
 
     it('should pass in CI when an OIDC token request is available', () => {
@@ -292,8 +294,9 @@ describe('validate-release (with DI)', () => {
       const result = validateNpmAuth(deps)
 
       expect(result.passed).toBe(true)
-      expect(result.message).toContain('OIDC token request is available')
-      expect(result.message).not.toMatch(/authenticated/i)
+      expect(result.message).toBe(
+        'OIDC token request credential path detected; npm authentication was not verified.',
+      )
     })
 
     it('should provide CI-specific guidance when no token is detected', () => {

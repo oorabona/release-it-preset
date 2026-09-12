@@ -18,7 +18,7 @@ import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import semver from 'semver'
-import { rangeIncludesVersion } from './lib/semver-utils.js'
+import { isStrictSemver, rangeIncludesVersion } from './lib/semver-utils.js'
 import {
   parsePnpmWorkspaceYaml,
   parseWorkspacesFromPackageJson,
@@ -1236,7 +1236,7 @@ export function validateSlsaAttestationAvailability(deps: DoctorDeps): CheckResu
   }
 
   // v-prefixed and +build-metadata versions pass here; release 404s yield null from the network probe.
-  if (!packageName || !version || semver.valid(version) === null) {
+  if (!packageName || !version || !isStrictSemver(version)) {
     return null
   }
 
@@ -1456,7 +1456,7 @@ function readWorkspacePackages(packageDirs: string[], deps: DoctorDeps): {
         unreadableManifestCount += 1
         continue
       }
-      if (semver.valid(pkg.version) === null) {
+      if (!isStrictSemver(pkg.version)) {
         unreadableManifestCount += 1
         continue
       }
@@ -1781,7 +1781,7 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
           value: 'missing',
           detail: 'Add "version" field to package.json',
         })
-      } else if (semver.valid(version) === null) {
+      } else if (!isStrictSemver(version)) {
         checks.push({
           name: 'package.json version',
           status: 'FAIL',
@@ -1944,8 +1944,8 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
     }
   }
 
-  // --- Check B: release-it major version advisor ---
-  // An invalid peer range is already reported by Check A, so Check B is inapplicable.
+  // --- Check B: latest published release-it version against the declared peer range ---
+  // The observable check name remains "release-it major version"; an invalid peer range is already reported by Check A.
   if (peerRangeIsValid) {
     // On network failure (null), skip the check entirely — no FAIL on outage.
     const latestOutput = safeExec('npm view release-it version', deps)

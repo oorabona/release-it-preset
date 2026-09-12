@@ -482,6 +482,20 @@ describe('validateConfiguration', () => {
     expect(versionCheck?.status).toBe('FAIL')
   })
 
+  it('FAIL when package.json version has surrounding whitespace', () => {
+    const paddedPkg = JSON.stringify({ name: 'my-pkg', version: ' 1.2.3 ' })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? paddedPkg : '')),
+    })
+
+    const section = validateConfiguration(deps)
+    const versionCheck = section.checks.find(c => c.name === 'package.json version')
+
+    expect(versionCheck?.status).toBe('FAIL')
+    expect(versionCheck?.value).toBe(' 1.2.3 ')
+  })
+
   it('WARN when .release-it.json does not extend preset', () => {
     const badConfig = JSON.stringify({ plugins: {} })
     const deps = makeDeps({
@@ -1477,6 +1491,19 @@ describe('SLSA attestation availability check', () => {
     expect(deps.execSync).not.toHaveBeenCalled()
   })
 
+  it('returns null for padded manifest versions before probing releases', () => {
+    const deps = makeSlsaDeps(
+      JSON.stringify({
+        name: '@oorabona/release-it-preset',
+        version: ' 1.4.1 ',
+        repository: { url: 'https://github.com/oorabona/release-it-preset' },
+      }),
+    )
+
+    expect(validateSlsaAttestationAvailability(deps)).toBeNull()
+    expect(deps.execSync).not.toHaveBeenCalled()
+  })
+
   it('parses git+https GitHub repository URLs before probing the release tag', () => {
     const deps = makeSlsaDeps(
       JSON.stringify({
@@ -1769,6 +1796,18 @@ describe('Workspace dependency ranges check', () => {
     expect(check?.status).toBe('WARN')
     expect(check?.value).toMatch(/manifests unreadable/i)
     expect(check?.detail).toMatch(/unreadable/i)
+    expect(check?.detail).toMatch(/not evaluated/i)
+  })
+
+  it('WARN when the only resolved workspace manifest version has surrounding whitespace', () => {
+    const deps = makeWorkspaceDeps({
+      a: { name: '@scope/a', version: ' 1.2.3 ' },
+    })
+
+    const check = validateWorkspaceDependencyRanges(deps)
+
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toMatch(/manifests unreadable/i)
     expect(check?.detail).toMatch(/not evaluated/i)
   })
 
@@ -2521,6 +2560,14 @@ describe('validateReleaseItPeer', () => {
 
   it('Check B passes clean registry output within the declared peer range', () => {
     const results = validateReleaseItPeer(makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '21.0.0'))
+    const checkB = results.find(r => r.name === 'release-it major version')
+
+    expect(checkB?.status).toBe('PASS')
+    expect(checkB?.value).toBe('21.0.0')
+  })
+
+  it('Check B accepts the trailing newline from npm view output', () => {
+    const results = validateReleaseItPeer(makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '21.0.0\n'))
     const checkB = results.find(r => r.name === 'release-it major version')
 
     expect(checkB?.status).toBe('PASS')
