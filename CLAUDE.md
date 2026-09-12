@@ -314,7 +314,7 @@ Extends mode:
 2. **CI (GitHub Actions):**
    - Triggered by tag push (`v*`)
    - Runs `pnpm exec release-it-preset retry-publish --ci` with `GITHUB_RELEASE=true` and `NPM_PUBLISH=true`
-   - Updates the GitHub release (using the workflow `GITHUB_TOKEN`) and publishes to npm with provenance (`NPM_TOKEN` + `id-token: write`)
+   - Updates the GitHub release (using the workflow `GITHUB_TOKEN`) and publishes to npm with provenance via OIDC trusted publishing (`id-token: write`; no `NPM_TOKEN` secret)
 
 **Why this separation?**
 - Publishing requires deliberate opt-in, so local runs stay safe by default

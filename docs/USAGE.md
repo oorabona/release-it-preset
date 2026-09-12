@@ -720,7 +720,7 @@ flowchart TD
 
 - **Single CI entry point** — Tag pushes run the `retry-publish` preset, which updates the GitHub release and publishes to npm with provenance in one command.
 - **Local runs stay safe** — Without `GITHUB_RELEASE=true` or `NPM_PUBLISH=true`, the presets only handle changelog updates, commits, and tags.
-- **Better security** — Publishing requires CI credentials (GITHUB_TOKEN + NPM_TOKEN), keeping local environments token-free by default.
+- **Better security** — Publishing happens in CI, with the workflow `GITHUB_TOKEN` and npm OIDC trusted publishing rather than a stored `NPM_TOKEN`, keeping local environments token-free by default.
 - **Predictable outputs** — Release notes are regenerated from the committed changelog, avoiding drift between local runs and CI.
 
 ---
