@@ -2280,7 +2280,7 @@ describe('validateReleaseItPeer', () => {
     expect(checkA?.detail).toContain(RELEASE_IT_INSTALL_ADVICE)
   })
 
-  it('Check A WARN: an invalid peer range takes precedence when both inputs are invalid', () => {
+  it('Check A FAIL: an invalid installed version takes precedence when both inputs are invalid', () => {
     const installedVersion = 'not-semver'
     const peerRange = 'workspace:*'
     expect(semver.valid(installedVersion)).toBeNull()
@@ -2306,9 +2306,10 @@ describe('validateReleaseItPeer', () => {
     })
 
     const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
-    expect(checkA?.status).toBe('WARN')
+    expect(checkA?.status).toBe('FAIL')
     expect(checkA?.detail).toContain(installedVersion)
     expect(checkA?.detail).toContain(peerRange)
+    expect(checkA?.detail).toContain(RELEASE_IT_INSTALL_ADVICE)
   })
 
   it('Check A PASS: a pnpm-linked install uses its valid manifest version', () => {

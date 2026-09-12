@@ -4,8 +4,8 @@ Strategic framing for **post-v1.0 features**. Items here are deferred from the v
 
 > Renamed from `BACKLOG_STUDY.md` on 2026-05-05 — content has matured from a study of "what to consider" into a curated roadmap with explicit priorities and explicit non-goals.
 
-**Last updated:** 2026-05-05
-**Status:** v1.0.0-rc.2 in soak; earliest stable cut 2026-05-11.
+**Last updated:** 2026-09-12
+**Status:** v1.4.1 published; v1.5.0 in preparation.
 
 The project's moat is: **human-curated changelogs + recovery presets + `doctor` diagnostic + OIDC zero-config**. Every candidate below is evaluated against whether it strengthens the moat or opens a defensible new axis.
 
@@ -57,7 +57,7 @@ These were considered and explicitly will **not** be pursued. Documented to prev
 
 | Item | Status |
 |---|---|
-| License & attribution audit (NOTICE file, third-party attributions) | Revisit only if new deps land. MIT-only verified at last audit. |
+| License & attribution audit (NOTICE file, third-party attributions) | Reviewed 2026-09-12 when `semver` became the single runtime dependency. It is ISC, installs as its own package carrying its own `LICENSE`, and has no transitive runtime dependencies, so npm delivers the notice with the package and no bundled NOTICE file is owed. Revisit if a dependency lands that is vendored rather than installed, or is not ISC/MIT/BSD. |
 | Video / GIF demos for release / hotfix workflows | Nice-to-have. Written examples cover the same ground today. Bundle with first marketing push if it happens. |
 | Additional `examples/` dirs (`custom-hooks/`, `ci-only-publish/`, `private-package/`) | Create on user demand. Existing `examples/monorepo-workflow.md` is the template. |
 | Tidy untracked root-level `.md` files | Bundle with next docs pass; not blocking. |

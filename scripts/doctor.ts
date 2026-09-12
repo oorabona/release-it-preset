@@ -1925,19 +1925,21 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
       const peerRangeIsValid = semver.validRange(peerRange) !== null
       const installedIsValid = semver.valid(installedVersion) !== null
 
-      if (!peerRangeIsValid) {
+      if (!installedIsValid) {
+        results.push({
+          name: 'release-it peer dependency',
+          status: 'FAIL',
+          value: installedVersion,
+          detail: `Installed release-it version ${installedVersion} is not valid semver.${
+            peerRangeIsValid ? '' : ` Declared peer range (${peerRange}) is not valid semver.`
+          }\n${RELEASE_IT_INSTALL_ADVICE}`,
+        })
+      } else if (!peerRangeIsValid) {
         results.push({
           name: 'release-it peer dependency',
           status: 'WARN',
           value: installedVersion,
           detail: `Could not evaluate installed release-it version ${installedVersion} against declared peer range (${peerRange}).`,
-        })
-      } else if (!installedIsValid) {
-        results.push({
-          name: 'release-it peer dependency',
-          status: 'FAIL',
-          value: installedVersion,
-          detail: `Installed release-it version ${installedVersion} is not valid semver.\n${RELEASE_IT_INSTALL_ADVICE}`,
         })
       } else if (!semver.satisfies(installedVersion, peerRange)) {
         results.push({
