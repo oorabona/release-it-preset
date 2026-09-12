@@ -23,7 +23,7 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      # Same for production deps (currently empty — preset has no runtime deps).
+      # Same for production deps (currently `semver` alone).
       production-dependencies:
         dependency-type: "production"
         update-types:

@@ -83,7 +83,7 @@
     "test:unit:coverage": "vitest run tests/unit/*.test.ts --coverage",
     "test:e2e": "vitest run tests/e2e/*.test.ts --testTimeout=30000",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run tests/unit tests/integration --coverage",
     "test:ui": "vitest --ui",
     "prepublishOnly": "pnpm build && echo 'Running prepublish checks...' && test -f README.md && test -f LICENSE",
     "release:patch": "node ./bin/cli.js default patch",
@@ -99,6 +99,7 @@
     "@biomejs/biome": "^2.4.13",
     "@release-it-plugins/workspaces": "^5.0.3",
     "@types/node": "^25.9.2",
+    "@types/semver": "^7.8.0",
     "@vitest/coverage-v8": "^4.1.5",
     "nano-staged": "^1.0.2",
     "release-it": "^20.0.1",
@@ -118,5 +119,8 @@
     "overrides": {
       "undici@<6.24.0": ">=6.24.0 <7"
     }
+  },
+  "dependencies": {
+    "semver": "^7.8.5"
   }
 }

@@ -153,10 +153,14 @@ export function validateAndNormalizeSemver(version: string): string {
 /**
  * Check whether a dependency range includes a concrete workspace package version.
  *
- * This intentionally supports only the small zero-dependency subset doctor needs:
- * workspace: protocol ranges, exact versions, ^, ~, >=, and OR-joined (`||`)
- * combinations of those forms. Unknown syntax returns null so advisory checks can
- * skip it without producing false warnings.
+ * This exists for pnpm's `workspace:` protocol, which `semver` does not parse —
+ * `semver.validRange('workspace:*')` is null, as it is for `workspace:^`,
+ * `workspace:~` and `workspace:<range>`. It supports the small subset the
+ * workspace check needs: workspace: protocol ranges, exact versions, ^, ~, >=,
+ * and OR-joined (`||`) combinations of those forms. Unknown syntax returns null
+ * so advisory checks can skip it without producing false warnings.
+ *
+ * Use `semver` directly for any range that is not `workspace:`-prefixed.
  *
  * @param range Dependency range string from package.json
  * @param version Concrete workspace package version

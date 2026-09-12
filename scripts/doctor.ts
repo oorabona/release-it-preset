@@ -17,6 +17,7 @@ import type { ExecSyncOptions } from 'node:child_process'
 import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import semver from 'semver'
 import { isValidSemver, rangeIncludesVersion } from './lib/semver-utils.js'
 import {
   parsePnpmWorkspaceYaml,
@@ -1885,20 +1886,6 @@ function highestMajorFromRange(range: string): number {
 }
 
 /**
- * Checks whether an installed version satisfies a simplified peer range.
- * Supports "^X.Y.Z || ^A.B.C" — checks that the installed major matches
- * any major present in the range.
- */
-function satisfiesPeerRange(version: string, range: string): boolean {
-  const installedMajor = parseInt(version.replace(/^v/, '').split('.')[0], 10)
-  const allowedMajors = Array.from(
-    range.matchAll(/[~^]?(\d+)\.\d+\.\d+/g),
-    (m) => parseInt(m[1], 10),
-  )
-  return allowedMajors.includes(installedMajor)
-}
-
-/**
  * Runs Check A (peer range satisfaction) and Check B (major version advisor).
  * Returns an array of CheckResult to be appended into validateConfiguration.
  * Check B is silently skipped when the npm registry is unreachable.
@@ -1934,7 +1921,14 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
         value: 'not found',
         detail: `release-it is not installed.\n${RELEASE_IT_INSTALL_ADVICE}`,
       })
-    } else if (!satisfiesPeerRange(installedVersion, peerRange)) {
+    } else if (!semver.valid(installedVersion) || !semver.validRange(peerRange)) {
+      results.push({
+        name: 'release-it peer dependency',
+        status: 'WARN',
+        value: installedVersion,
+        detail: `Could not evaluate installed release-it version ${installedVersion} against declared peer range (${peerRange}).`,
+      })
+    } else if (!semver.satisfies(installedVersion, peerRange)) {
       results.push({
         name: 'release-it peer dependency',
         status: 'FAIL',

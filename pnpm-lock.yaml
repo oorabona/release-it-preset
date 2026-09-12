@@ -10,6 +10,10 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.4.13
@@ -20,6 +24,9 @@ importers:
       '@types/node':
         specifier: ^25.9.2
         version: 25.9.2
+      '@types/semver':
+        specifier: ^7.8.0
+        version: 7.8.0
       '@vitest/coverage-v8':
         specifier: ^4.1.5
         version: 4.1.8(vitest@4.1.8)
@@ -772,6 +779,9 @@ packages:
   '@types/parse-path@7.1.0':
     resolution: {integrity: sha512-EULJ8LApcVEPbrfND0cRQqutIOdiIgJ1Mgrhpy755r14xMohPTEpkV/k28SJvuOs9bHRFW8x+KeDAEPiGQPB9Q==}
     deprecated: This is a stub types definition. parse-path provides its own type definitions, so you do not need this installed.
+
+  '@types/semver@7.8.0':
+    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
 
   '@vitest/coverage-v8@4.1.8':
     resolution: {integrity: sha512-lt3kovsyHwYe00wq4D1ti0Z974fWj4NLp6siqiyEufUpyFwK9Yhi7rBhac9JL5aA0zoMrJqc4vYPZRUnI7l7nw==}
@@ -1718,11 +1728,6 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  semver@7.8.1:
-    resolution: {integrity: sha512-rkVq3IXh+4FDGch+KwzX3aV9W3kO54GyEgpvBzSyctDA6Xtd7RJQV1xmXbeQp5v7+VzLOfVqiutSE6GICgPFvg==}
-    engines: {node: '>=10'}
-    hasBin: true
-
   semver@7.8.5:
     resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
     engines: {node: '>=10'}
@@ -2517,7 +2522,7 @@ snapshots:
       detect-newline: 3.1.0
       execa: 8.0.1
       release-it: 20.2.0(@types/node@25.9.2)(magicast@0.5.3)
-      semver: 7.8.1
+      semver: 7.8.5
       url-join: 4.0.1
       validate-peer-dependencies: 1.2.0
       walk-sync: 2.2.0
@@ -2601,6 +2606,8 @@ snapshots:
   '@types/parse-path@7.1.0':
     dependencies:
       parse-path: 7.1.0
+
+  '@types/semver@7.8.0': {}
 
   '@vitest/coverage-v8@4.1.8(vitest@4.1.8)':
     dependencies:
@@ -3216,7 +3223,7 @@ snapshots:
 
   make-dir@4.0.0:
     dependencies:
-      semver: 7.8.1
+      semver: 7.8.5
 
   matcher-collection@2.0.1:
     dependencies:
@@ -3667,8 +3674,6 @@ snapshots:
 
   semver@7.7.4: {}
 
-  semver@7.8.1: {}
-
   semver@7.8.5: {}
 
   shebang-command@2.0.0:
@@ -3797,7 +3802,7 @@ snapshots:
   validate-peer-dependencies@1.2.0:
     dependencies:
       resolve-package-path: 3.1.0
-      semver: 7.8.1
+      semver: 7.8.5
 
   vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0):
     dependencies:

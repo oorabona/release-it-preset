@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import semver from 'semver'
 import { describe, expect, it, vi } from 'vitest'
 import {
   type CheckResult,
@@ -2151,6 +2152,107 @@ describe('validateReleaseItPeer', () => {
     const checkA = results.find(r => r.name === 'release-it peer dependency')
     expect(checkA?.status).toBe('PASS')
     expect(checkA?.value).toBe('21.0.2')
+  })
+
+  it('Check A FAIL: installed prerelease is excluded by the shipped peer range', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? PRESET_PKG_WITH_PEERS : '')),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return JSON.stringify({
+            dependencies: { 'release-it': { version: '21.0.0-beta.1' } },
+          })
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '21.0.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+
+    const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('FAIL')
+  })
+
+  it('Check A PASS: installed prerelease satisfies its declared prerelease range', () => {
+    const prereleasePeerRange = '^21.0.0-beta.1'
+    const preset = JSON.stringify({
+      name: '@oorabona/release-it-preset',
+      peerDependencies: { 'release-it': prereleasePeerRange },
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? preset : '')),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return JSON.stringify({
+            dependencies: { 'release-it': { version: '21.0.0-beta.1' } },
+          })
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '21.0.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+
+    const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('PASS')
+  })
+
+  it('Check A FAIL: installed v19 does not satisfy a later v19 caret range', () => {
+    const peerRange = '^19.5.0'
+    const preset = JSON.stringify({
+      name: '@oorabona/release-it-preset',
+      peerDependencies: { 'release-it': peerRange },
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? preset : '')),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return JSON.stringify({
+            dependencies: { 'release-it': { version: '19.0.0' } },
+          })
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '19.0.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+
+    const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('FAIL')
+  })
+
+  it('Check A WARN: an unparseable peer range cannot be evaluated', () => {
+    const peerRange = 'workspace:*'
+    expect(semver.validRange(peerRange)).toBeNull()
+    const preset = JSON.stringify({
+      name: '@oorabona/release-it-preset',
+      peerDependencies: { 'release-it': peerRange },
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? preset : '')),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return LS_OUTPUT_V20
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '20.10.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+
+    const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('WARN')
+    expect(checkA?.detail).toContain('20.10.0')
+    expect(checkA?.detail).toContain(peerRange)
+    expect(checkA?.detail).toContain('Could not evaluate')
   })
 
   it('gives each Node line exactly one release-it recommendation in doctor advice and the README', () => {
