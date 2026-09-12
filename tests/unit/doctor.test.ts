@@ -482,6 +482,33 @@ describe('validateConfiguration', () => {
     expect(versionCheck?.status).toBe('FAIL')
   })
 
+  it('FAILs the version check, rather than parsing, when package.json version is numeric', () => {
+    const badPkg = JSON.stringify({ name: 'my-pkg', version: 1 })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? badPkg : '')),
+    })
+
+    const section = validateConfiguration(deps)
+
+    expect(section.checks.find(c => c.name === 'package.json version')?.status).toBe('FAIL')
+    expect(section.checks.find(c => c.name === 'package.json parseable')).toBeUndefined()
+  })
+
+  it('FAIL when package.json version has surrounding whitespace', () => {
+    const paddedPkg = JSON.stringify({ name: 'my-pkg', version: ' 1.2.3 ' })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? paddedPkg : '')),
+    })
+
+    const section = validateConfiguration(deps)
+    const versionCheck = section.checks.find(c => c.name === 'package.json version')
+
+    expect(versionCheck?.status).toBe('FAIL')
+    expect(versionCheck?.value).toBe(' 1.2.3 ')
+  })
+
   it('WARN when .release-it.json does not extend preset', () => {
     const badConfig = JSON.stringify({ plugins: {} })
     const deps = makeDeps({
@@ -1477,6 +1504,19 @@ describe('SLSA attestation availability check', () => {
     expect(deps.execSync).not.toHaveBeenCalled()
   })
 
+  it('returns null for padded manifest versions before probing releases', () => {
+    const deps = makeSlsaDeps(
+      JSON.stringify({
+        name: '@oorabona/release-it-preset',
+        version: ' 1.4.1 ',
+        repository: { url: 'https://github.com/oorabona/release-it-preset' },
+      }),
+    )
+
+    expect(validateSlsaAttestationAvailability(deps)).toBeNull()
+    expect(deps.execSync).not.toHaveBeenCalled()
+  })
+
   it('parses git+https GitHub repository URLs before probing the release tag', () => {
     const deps = makeSlsaDeps(
       JSON.stringify({
@@ -1772,6 +1812,18 @@ describe('Workspace dependency ranges check', () => {
     expect(check?.detail).toMatch(/not evaluated/i)
   })
 
+  it('WARN when the only resolved workspace manifest version has surrounding whitespace', () => {
+    const deps = makeWorkspaceDeps({
+      a: { name: '@scope/a', version: ' 1.2.3 ' },
+    })
+
+    const check = validateWorkspaceDependencyRanges(deps)
+
+    expect(check?.status).toBe('WARN')
+    expect(check?.value).toMatch(/manifests unreadable/i)
+    expect(check?.detail).toMatch(/not evaluated/i)
+  })
+
   it('includes the check in JSON output for workspace projects', () => {
     const deps = makeWorkspaceDeps(
       {
@@ -2044,7 +2096,8 @@ describe('formatHuman', () => {
 })
 
 // ---------------------------------------------------------------------------
-// validateReleaseItPeer — Check A (peer range) + Check B (major advisor)
+// validateReleaseItPeer — Check A (peer range) + Check B (latest published
+// version against declared peer range)
 // ---------------------------------------------------------------------------
 
 const PRESET_PKG_WITH_PEERS = JSON.stringify({
@@ -2074,6 +2127,31 @@ const LS_OUTPUT_V22 = JSON.stringify({
 })
 
 const LS_OUTPUT_EMPTY = JSON.stringify({ dependencies: {} })
+
+function makePeerDeps(peerRange: string, latestVersion: string) {
+  return makeDeps({
+    existsSync: vi.fn((p: string) => p === 'package.json'),
+    readFileSync: vi.fn((p: string) => {
+      if (p === 'package.json') {
+        return JSON.stringify({
+          name: '@oorabona/release-it-preset',
+          version: '1.0.0',
+          peerDependencies: { 'release-it': peerRange },
+        })
+      }
+      return ''
+    }),
+    execSync: vi.fn((cmd: string) => {
+      if (cmd.includes('npm ls release-it')) {
+        return LS_OUTPUT_V20
+      }
+      if (cmd.includes('npm view release-it version')) {
+        return latestVersion
+      }
+      throw new Error('unexpected command')
+    }),
+  })
+}
 
 describe('validateReleaseItPeer', () => {
   // --- Check A: PASS ---
@@ -2459,35 +2537,79 @@ describe('validateReleaseItPeer', () => {
     expect(checkA?.value).toBe('not found')
   })
 
-  // --- Check B: WARN — newer major available ---
-  it('Check B WARN: npm reports v22 while peer range max is v21', () => {
-    const deps = makeDeps({
-      existsSync: vi.fn((p: string) => p === 'package.json'),
-      readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') {
-          return PRESET_PKG_WITH_PEERS
-        }
-        return ''
-      }),
-      execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) {
-          return LS_OUTPUT_V20
-        }
-        if (cmd.includes('npm view release-it version')) {
-          return '22.0.5'
-        }
-        throw new Error('unexpected command')
-      }),
-    })
+  // --- Check B: WARN — published version is outside declared range ---
+  it('Check B WARN: npm reports v22 outside the shipped peer range', () => {
+    const deps = makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '22.0.0')
     const results = validateReleaseItPeer(deps)
     const checkB = results.find(r => r.name === 'release-it major version')
     expect(checkB?.status).toBe('WARN')
-    expect(checkB?.value).toBe('22.0.5')
-    expect(checkB?.detail).toContain('22.x available')
-    expect(checkB?.detail).toContain('peer range max is 21.x')
+    expect(checkB?.value).toBe('22.0.0')
+    expect(checkB?.detail).toContain(
+      'release-it 22.0.0 is outside the declared peer range (^19.0.0 || ^20.0.0 || ^21.0.0)',
+    )
+    expect(checkB?.detail).toContain('Coordinate with the preset maintainer before upgrading.')
+    expect(checkB?.detail).not.toMatch(/max(?:imum)?|ceiling/i)
   })
 
-  // --- Check B: PASS — latest major matches supported max ---
+  it('Check B evaluates abbreviated peer ranges against the published version', () => {
+    const passing = validateReleaseItPeer(makePeerDeps('^20', '20.5.0'))
+    const warning = validateReleaseItPeer(makePeerDeps('^20', '21.0.0'))
+
+    expect(passing.find(r => r.name === 'release-it major version')?.status).toBe('PASS')
+    expect(warning.find(r => r.name === 'release-it major version')?.status).toBe('WARN')
+  })
+
+  it('Check B passes an unbounded peer range for future majors', () => {
+    const results = validateReleaseItPeer(makePeerDeps('>=19.0.0', '99.0.0'))
+
+    expect(results.find(r => r.name === 'release-it major version')?.status).toBe('PASS')
+  })
+
+  it('Check B evaluates JSON-encoded registry output while Check A remains unaffected', () => {
+    const results = validateReleaseItPeer(makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '"21.0.0"'))
+
+    const checkB = results.find(r => r.name === 'release-it major version')
+    expect(checkB?.status).toBe('PASS')
+    expect(checkB?.value).toBe('21.0.0')
+    expect(results.find(r => r.name === 'release-it peer dependency')?.status).toBe('PASS')
+  })
+
+  it('Check B WARNs when the registry response cannot be read as a version', () => {
+    const results = validateReleaseItPeer(
+      makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', 'not-a-version'),
+    )
+    const checkB = results.find(r => r.name === 'release-it major version')
+
+    expect(checkB?.status).toBe('WARN')
+    expect(checkB?.detail).toContain('registry response could not be read')
+  })
+
+  it('Check B WARNs when npm view succeeds with whitespace-only output', () => {
+    const results = validateReleaseItPeer(makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '  \n\t  '))
+    const checkB = results.find(r => r.name === 'release-it major version')
+
+    expect(checkB?.status).toBe('WARN')
+    expect(checkB?.value).toBe('unreadable response')
+    expect(checkB?.detail).toContain('registry response could not be read')
+  })
+
+  it('Check B passes clean registry output within the declared peer range', () => {
+    const results = validateReleaseItPeer(makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '21.0.0'))
+    const checkB = results.find(r => r.name === 'release-it major version')
+
+    expect(checkB?.status).toBe('PASS')
+    expect(checkB?.value).toBe('21.0.0')
+  })
+
+  it('Check B accepts the trailing newline from npm view output', () => {
+    const results = validateReleaseItPeer(makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '21.0.0\n'))
+    const checkB = results.find(r => r.name === 'release-it major version')
+
+    expect(checkB?.status).toBe('PASS')
+    expect(checkB?.value).toBe('21.0.0')
+  })
+
+  // --- Check B: PASS — latest published version satisfies declared peer range ---
   it('Check B PASS: latest npm version is within supported major range', () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => p === 'package.json'),

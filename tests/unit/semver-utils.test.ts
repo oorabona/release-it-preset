@@ -1,26 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import {
-  isValidSemver,
-  rangeIncludesVersion,
-  validateAndNormalizeSemver,
-} from '../../scripts/lib/semver-utils'
+import { isStrictSemver, rangeIncludesVersion } from '../../scripts/lib/semver-utils'
 
 describe('semver-utils', () => {
-  it('validates semver with optional v prefix', () => {
-    expect(isValidSemver('1.0.0')).toBe(true)
-    expect(isValidSemver('v2.3.4')).toBe(true)
-    expect(isValidSemver('1.0')).toBe(false)
+  it('accepts valid raw version identifiers without surrounding whitespace', () => {
+    expect(isStrictSemver('1.2.3')).toBe(true)
+    expect(isStrictSemver('v1.2.3')).toBe(true)
+    expect(isStrictSemver('1.0.0-beta.1+build.123')).toBe(true)
   })
 
-  it('normalizes valid versions', () => {
-    expect(validateAndNormalizeSemver('1.2.3')).toBe('1.2.3')
-    expect(validateAndNormalizeSemver('v4.5.6')).toBe('4.5.6')
+  it('rejects padded or incomplete raw version identifiers', () => {
+    expect(isStrictSemver(' v1.2.3 ')).toBe(false)
+    expect(isStrictSemver('\n1.2.3\n')).toBe(false)
+    expect(isStrictSemver('1.0')).toBe(false)
   })
 
-  it('throws for invalid versions', () => {
-    expect(() => validateAndNormalizeSemver('invalid')).toThrowError(
-      'Invalid semantic version: "invalid". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
-    )
+  it('rejects non-string version values without throwing', () => {
+    expect(isStrictSemver(1)).toBe(false)
+    expect(isStrictSemver(null)).toBe(false)
+    expect(isStrictSemver({})).toBe(false)
   })
 
   it('treats workspace protocol passthrough ranges as including the workspace version', () => {
@@ -83,6 +80,7 @@ describe('semver-utils', () => {
     expect(rangeIncludesVersion('^1.0.0', '1.0.0-beta.1')).toBeNull()
     expect(rangeIncludesVersion('>=1.0.0', '1.0.0-beta.1')).toBeNull()
     expect(rangeIncludesVersion('^1.0.0', '1.0.0+build.5')).toBeNull()
+    expect(rangeIncludesVersion('^1.0.0', '01.0.0')).toBeNull()
   })
 
   it('returns null when a range operand carries prerelease metadata', () => {

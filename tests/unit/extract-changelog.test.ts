@@ -114,15 +114,16 @@ describe('extract-changelog (with DI)', () => {
       expect(result).not.toContain('v1.1.0')
     })
 
-    it('should handle special characters in version', () => {
+    it('should preserve build metadata in the generated release title and tag', () => {
       vi.mocked(deps.readFileSync).mockReturnValue(
         '# Changelog\n\n## [v1.0.0-beta.1+build.123] - 2024-01-01\n\n- Beta feature\n\n',
       )
 
       const result = extractChangelog('1.0.0-beta.1+build.123', deps)
 
-      expect(result).toContain('v1.0.0-beta.1+build.123')
-      expect(result).toContain('- Beta feature')
+      expect(result).toBe(
+        '# Release v1.0.0-beta.1+build.123\n\n## [v1.0.0-beta.1+build.123] - 2024-01-01\n\n- Beta feature',
+      )
     })
 
     it('should find version without v-prefix when requesting v-prefixed tag', () => {
@@ -135,6 +136,18 @@ describe('extract-changelog (with DI)', () => {
       expect(result).toContain('# Release v1.0.0')
       expect(result).toContain('## [1.0.0] - 2024-01-01')
       expect(result).toContain('- Entry')
+    })
+
+    it('should reject invalid versions with the existing error message', () => {
+      expect(() => extractChangelog('01.0.0', deps)).toThrow(
+        'Invalid semantic version: "01.0.0". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
+      )
+    })
+
+    it('should reject padded versions with the existing error message', () => {
+      expect(() => extractChangelog(' v1.2.3 ', deps)).toThrow(
+        'Invalid semantic version: " v1.2.3 ". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
+      )
     })
   })
 })

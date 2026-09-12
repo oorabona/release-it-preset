@@ -24,7 +24,7 @@ The project's moat is: **human-curated changelogs + recovery presets + `doctor` 
 | # | Idea | Why | Effort | Priority |
 |---|---|---|---|---|
 | B1 | **GitLab support** | Many references in workflows + docs are GitHub-hardcoded. GitLab also has OIDC trusted publishing toward npm since 2024; market is non-saturated and aligned with the OIDC pitch. | High | 🟡 M (post-v1.1) |
-| B2 | **SLSA L3 / Sigstore attestation** alongside npm provenance. `docs/VERIFY.md` states which releases carry the assets and how to check them. | npm provenance gets us SLSA L1; L3 + cosign signing is the next supply-chain step and is becoming enterprise table-stakes. | Medium | ✅ Done |
+| B2 | **SLSA L3 / Sigstore attestation** alongside npm provenance. `docs/VERIFY.md` states which releases carry the assets and how to check them. | npm provenance gets us SLSA L2; L3 + cosign signing is the next supply-chain step and is becoming enterprise table-stakes. | Medium | ✅ Done |
 | B3 | **`@release-it-plugins/workspaces` composition tests in CI** — shipped by #61 with release-it 19 composition coverage and a release-it 20 peer-incompatibility lock test | Real monorepo users benefit from an asserted composition path instead of docs-only guidance. | Medium | ✅ Done |
 
 ## C. Quality-of-life (medium value, low-medium cost)
@@ -51,7 +51,7 @@ These were considered and explicitly will **not** be pursued. Documented to prev
 |---|---|---|
 | E1 | **`release-it-preset preflight` GH composite action** — run dry-run + e2e check on ALL workflow_dispatch entry points (hotfix, republish, default) in parallel for PR validation | The rc.1 → rc.2 cycle surfaced 4 real production bugs via e2e dry-runs. Productizing this discipline is an honest differentiator. |
 | E2 | **Conventional Commits 2.0 readiness watch** | If/when the spec ships new types or footer reformatting, we want to be ready to iterate. Active watch, no work yet. |
-| E3 | **Peer-dep advisor in `doctor`** — when a release-it major outside `peerDependencies.release-it` ships, describe the breaking-change surface that affects preset users. Distinct from the existing `release-it major version` check, which only warns that a newer major exists. | Aligned with the diagnostic moat; positions the project as advisor, not just executor. |
+| E3 | **Peer-dep advisor in `doctor`** — when a release-it major outside `peerDependencies.release-it` ships, describe the breaking-change surface that affects preset users. Distinct from the existing `release-it major version` check, which evaluates whether the latest published release-it version satisfies the declared peer range. | Aligned with the diagnostic moat; positions the project as advisor, not just executor. |
 
 ## F. Carry-overs from earlier backlog (still applicable)
 

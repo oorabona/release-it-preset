@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Allow release validation to proceed when GitHub Actions OIDC is available (#94)
+- Use semver as the single version validator (#88)
+- Check whether the published release-it version is within the declared peer range (#89)
+- Configure the shared test timeout for all test commands (#91)
+- Correct the documented Node.js range and npm provenance SLSA level (#92)
+
 ## [1.5.0] - 2026-09-12
 
 ### Added

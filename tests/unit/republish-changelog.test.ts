@@ -123,6 +123,65 @@ describe('republish-changelog (with DI)', () => {
       )
     })
 
+    it('should accept a v-prefixed version', () => {
+      vi.mocked(deps.readFileSync).mockReturnValue(basicChangelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      republishChangelog('v1.1.0', deps)
+
+      const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+      expect(writtenContent).toContain('## [v1.1.0] - 2024-01-15')
+    })
+
+    it('should preserve build metadata in the heading and reference links', () => {
+      const changelog = `# Changelog
+
+## [Unreleased]
+
+### Added
+- New feature
+
+## [1.0.0] - 2024-01-01
+
+- Initial release
+`
+      vi.mocked(deps.readFileSync).mockReturnValue(changelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      republishChangelog('1.1.0-beta.1+build.123', deps)
+
+      const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+      const lines = writtenContent.split('\n')
+      expect(lines).toContain('## [1.1.0-beta.1+build.123] - 2024-01-15')
+      expect(lines).toContain(
+        '[Unreleased]: https://github.com/owner/repo/compare/v1.1.0-beta.1+build.123...HEAD',
+      )
+      expect(lines).toContain(
+        '[v1.1.0-beta.1+build.123]: https://github.com/owner/repo/releases/tag/v1.1.0-beta.1+build.123',
+      )
+      expect(lines).toContain(
+        '[1.1.0-beta.1+build.123]: https://github.com/owner/repo/releases/tag/v1.1.0-beta.1+build.123',
+      )
+    })
+
+    it('should reject invalid versions with the existing error message', () => {
+      expect(() => republishChangelog('01.1.0', deps)).toThrow(
+        'Invalid semantic version: "01.1.0". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
+      )
+    })
+
+    it('should reject a non-string version with the existing error message', () => {
+      expect(() => republishChangelog(1 as unknown as string, deps)).toThrow(
+        'Invalid semantic version: "1". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
+      )
+    })
+
+    it('should reject padded versions with the existing error message', () => {
+      expect(() => republishChangelog(' v1.2.3 ', deps)).toThrow(
+        'Invalid semantic version: " v1.2.3 ". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
+      )
+    })
+
     it('should clear [Unreleased] section after moving content', () => {
       vi.mocked(deps.readFileSync).mockReturnValue(basicChangelog)
       vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')

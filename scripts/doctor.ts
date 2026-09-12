@@ -18,7 +18,7 @@ import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import semver from 'semver'
-import { isValidSemver, rangeIncludesVersion } from './lib/semver-utils.js'
+import { isStrictSemver, rangeIncludesVersion } from './lib/semver-utils.js'
 import {
   parsePnpmWorkspaceYaml,
   parseWorkspacesFromPackageJson,
@@ -1236,7 +1236,7 @@ export function validateSlsaAttestationAvailability(deps: DoctorDeps): CheckResu
   }
 
   // v-prefixed and +build-metadata versions pass here; release 404s yield null from the network probe.
-  if (!packageName || !version || !isValidSemver(version)) {
+  if (!packageName || !version || !isStrictSemver(version)) {
     return null
   }
 
@@ -1456,7 +1456,7 @@ function readWorkspacePackages(packageDirs: string[], deps: DoctorDeps): {
         unreadableManifestCount += 1
         continue
       }
-      if (!isValidSemver(pkg.version)) {
+      if (!isStrictSemver(pkg.version)) {
         unreadableManifestCount += 1
         continue
       }
@@ -1781,7 +1781,7 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
           value: 'missing',
           detail: 'Add "version" field to package.json',
         })
-      } else if (!isValidSemver(version)) {
+      } else if (!isStrictSemver(version)) {
         checks.push({
           name: 'package.json version',
           status: 'FAIL',
@@ -1872,21 +1872,8 @@ export const RELEASE_IT_INSTALL_ADVICE = [
 ].join('\n')
 
 /**
- * Extracts the highest major version number from a semver range string.
- * Handles OR-joined ranges like "^19.0.0 || ^20.0.0 || ^21.0.0" → 21.
- */
-function highestMajorFromRange(range: string): number {
-  const matches = range.match(/(\d+)\.\d+\.\d+/g) ?? []
-  let max = 0
-  for (const m of matches) {
-    const major = parseInt(m.split('.')[0], 10)
-    if (major > max) max = major
-  }
-  return max
-}
-
-/**
- * Runs Check A (peer range satisfaction) and Check B (major version advisor).
+ * Runs Check A (peer range satisfaction) and Check B (latest published version
+ * against declared peer range).
  * Returns an array of CheckResult to be appended into validateConfiguration.
  * Check B is silently skipped when the npm registry is unreachable.
  */
@@ -1958,31 +1945,45 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
     }
   }
 
-  // --- Check B: release-it major version advisor ---
-  // An invalid peer range is already reported by Check A, so Check B is inapplicable.
+  // --- Check B: latest published release-it version against the declared peer range ---
+  // The observable check name remains "release-it major version"; an invalid peer range is already reported by Check A.
   if (peerRangeIsValid) {
     // On network failure (null), skip the check entirely — no FAIL on outage.
     const latestOutput = safeExec('npm view release-it version', deps)
-    if (latestOutput) {
-      const latestVersion = latestOutput.trim()
-      const latestMajor = parseInt(latestVersion.replace(/^v/, '').split('.')[0], 10)
-      const supportedMaxMajor = highestMajorFromRange(peerRange)
+    if (latestOutput !== null) {
+      const trimmedLatestOutput = latestOutput.trim()
+      let latestVersion = semver.valid(trimmedLatestOutput)
+      if (latestVersion === null) {
+        try {
+          const parsedOutput = JSON.parse(trimmedLatestOutput)
+          latestVersion = typeof parsedOutput === 'string' ? semver.valid(parsedOutput) : null
+        } catch {
+          // The raw registry response is not JSON.
+        }
+      }
 
-      if (!Number.isNaN(latestMajor) && !Number.isNaN(supportedMaxMajor)) {
-        if (latestMajor > supportedMaxMajor) {
-          results.push({
-            name: 'release-it major version',
-            status: 'WARN',
-            value: latestVersion,
-            detail: `release-it ${latestMajor}.x available; preset's peer range max is ${supportedMaxMajor}.x. Coordinate with the preset maintainer before upgrading.`,
-          })
-        } else {
+      if (latestVersion !== null) {
+        if (semver.satisfies(latestVersion, peerRange)) {
           results.push({
             name: 'release-it major version',
             status: 'PASS',
             value: latestVersion,
           })
+        } else {
+          results.push({
+            name: 'release-it major version',
+            status: 'WARN',
+            value: latestVersion,
+            detail: `release-it ${latestVersion} is outside the declared peer range (${peerRange}). Coordinate with the preset maintainer before upgrading.`,
+          })
         }
+      } else {
+        results.push({
+          name: 'release-it major version',
+          status: 'WARN',
+          value: 'unreadable response',
+          detail: 'The npm registry response could not be read as a release-it version.',
+        })
       }
     }
   }

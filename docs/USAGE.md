@@ -428,7 +428,7 @@ pnpm release-it-preset validate --allow-dirty
 - CHANGELOG.md exists and is well-formatted
 - `[Unreleased]` section has content
 - Working directory is clean (unless `--allow-dirty`)
-- npm authentication works (`npm whoami`)
+- an npm publishing credential path is available
 - Current branch is allowed (if `GIT_REQUIRE_BRANCH` is set)
 
 Exit code 0 if all checks pass, 2 if precondition not met (CI-friendly).
@@ -446,7 +446,7 @@ pnpm release-it-preset doctor --json
 |----------|--------|
 | Environment | Known env vars, source (env / default / unset), publish-mode consistency |
 | Repository | Git repo presence, branch vs `GIT_REQUIRE_BRANCH`, latest tag, commit count, dirty WD, upstream tracking, remote URL |
-| Configuration | `CHANGELOG.md` exists + Keep a Changelog format + `[Unreleased]` content, `.release-it.json` parseable + `extends` field, `package.json` valid semver version, workspace plugin detection, workspace dependency range coherence, generated publish workflow freshness, npm provenance readiness (`id-token: write` when `NPM_PUBLISH=true`), SLSA attestation availability for installed preset dependencies, `release-it` peer range satisfied, `release-it` major version advisor |
+| Configuration | `CHANGELOG.md` exists + Keep a Changelog format + `[Unreleased]` content, `.release-it.json` parseable + `extends` field, `package.json` valid semver version, workspace plugin detection, workspace dependency range coherence, generated publish workflow freshness, npm provenance readiness (`id-token: write` when `NPM_PUBLISH=true`), SLSA attestation availability for installed preset dependencies, `release-it` peer range satisfied, `release-it major version` (a historical identifier that evaluates the latest published release-it version against the declared peer range) |
 | Readiness Summary | `PASS`/`WARN`/`FAIL` counts, score `N/M checks passing`, status (`READY`/`WARNINGS`/`BLOCKED`), actionable recommendations |
 
 For workspace projects, `doctor` also checks internal package dependency ranges. `workspace:*`, `workspace:^`, and `workspace:~` pass automatically; explicit `workspace:` ranges are evaluated after stripping the protocol prefix. Exact, `^`, `~`, `>=`, and supported `||` ranges are compared against the current workspace package version. Stale recognized ranges produce a WARN with a fix suggestion, while unsupported range syntax is skipped to avoid false warnings. Workspace package globs support literal paths and single-level `/*` expansion; additive unsupported globs produce a partial-coverage WARN, while negated exclusion patterns produce a WARN `not evaluated` result because the package set cannot be safely approximated.
@@ -720,7 +720,7 @@ flowchart TD
 
 - **Single CI entry point** — Tag pushes run the `retry-publish` preset, which updates the GitHub release and publishes to npm with provenance in one command.
 - **Local runs stay safe** — Without `GITHUB_RELEASE=true` or `NPM_PUBLISH=true`, the presets only handle changelog updates, commits, and tags.
-- **Better security** — Publishing requires CI credentials (GITHUB_TOKEN + NPM_TOKEN), keeping local environments token-free by default.
+- **Better security** — Publishing happens in CI, with the workflow `GITHUB_TOKEN` and npm OIDC trusted publishing rather than a stored `NPM_TOKEN`, keeping local environments token-free by default.
 - **Predictable outputs** — Release notes are regenerated from the committed changelog, avoiding drift between local runs and CI.
 
 ---

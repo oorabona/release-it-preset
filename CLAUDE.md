@@ -182,7 +182,7 @@ Scripts are authored in TypeScript and compiled to ESM JavaScript in `dist/scrip
 - Validates CHANGELOG.md exists and format
 - Checks [Unreleased] has content
 - Verifies working directory is clean (unless --allow-dirty)
-- Checks npm authentication (npm whoami)
+- Checks that an npm publishing credential path is available
 - Validates current branch matches requirements
 - Exit code 0 on success, 1 on failure (CI-friendly)
 - **CLI command:** `release-it-preset validate [--allow-dirty]`
@@ -314,7 +314,7 @@ Extends mode:
 2. **CI (GitHub Actions):**
    - Triggered by tag push (`v*`)
    - Runs `pnpm exec release-it-preset retry-publish --ci` with `GITHUB_RELEASE=true` and `NPM_PUBLISH=true`
-   - Updates the GitHub release (using the workflow `GITHUB_TOKEN`) and publishes to npm with provenance (`NPM_TOKEN` + `id-token: write`)
+   - Updates the GitHub release (using the workflow `GITHUB_TOKEN`) and publishes to npm with provenance via OIDC trusted publishing (`id-token: write`; no `NPM_TOKEN` secret)
 
 **Why this separation?**
 - Publishing requires deliberate opt-in, so local runs stay safe by default
