@@ -31,8 +31,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Production deps only — this preset has no runtime dependencies of its own,
-      # so this gate stays clean unless we introduce one with known issues.
+      # Production deps only — `semver` is the preset's single runtime dependency,
+      # so this gate stays clean unless it or a future one carries a known issue.
       - name: Audit production deps (high+)
         run: pnpm audit --prod --audit-level=high
 

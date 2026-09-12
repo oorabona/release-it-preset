@@ -17,6 +17,7 @@ import type { ExecSyncOptions } from 'node:child_process'
 import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import semver from 'semver'
 import { isValidSemver, rangeIncludesVersion } from './lib/semver-utils.js'
 import {
   parsePnpmWorkspaceYaml,
@@ -1885,20 +1886,6 @@ function highestMajorFromRange(range: string): number {
 }
 
 /**
- * Checks whether an installed version satisfies a simplified peer range.
- * Supports "^X.Y.Z || ^A.B.C" — checks that the installed major matches
- * any major present in the range.
- */
-function satisfiesPeerRange(version: string, range: string): boolean {
-  const installedMajor = parseInt(version.replace(/^v/, '').split('.')[0], 10)
-  const allowedMajors = Array.from(
-    range.matchAll(/[~^]?(\d+)\.\d+\.\d+/g),
-    (m) => parseInt(m[1], 10),
-  )
-  return allowedMajors.includes(installedMajor)
-}
-
-/**
  * Runs Check A (peer range satisfaction) and Check B (major version advisor).
  * Returns an array of CheckResult to be appended into validateConfiguration.
  * Check B is silently skipped when the npm registry is unreachable.
@@ -1906,6 +1893,7 @@ function satisfiesPeerRange(version: string, range: string): boolean {
 export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
   const results: CheckResult[] = []
   const peerRange = readPresetPeerRange(deps)
+  const peerRangeIsValid = semver.validRange(peerRange) !== null
 
   // --- Check A: release-it in supported peer range ---
   const lsOutput = safeExec('npm ls release-it --depth=0 --json', deps)
@@ -1934,44 +1922,67 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
         value: 'not found',
         detail: `release-it is not installed.\n${RELEASE_IT_INSTALL_ADVICE}`,
       })
-    } else if (!satisfiesPeerRange(installedVersion, peerRange)) {
-      results.push({
-        name: 'release-it peer dependency',
-        status: 'FAIL',
-        value: installedVersion,
-        detail: `Installed release-it ${installedVersion} is outside the supported range (${peerRange}).\n${RELEASE_IT_INSTALL_ADVICE}`,
-      })
     } else {
-      results.push({
-        name: 'release-it peer dependency',
-        status: 'PASS',
-        value: installedVersion,
-      })
+      const installedIsValid = semver.valid(installedVersion) !== null
+
+      if (!installedIsValid) {
+        results.push({
+          name: 'release-it peer dependency',
+          status: 'FAIL',
+          value: installedVersion,
+          detail: `Installed release-it version ${installedVersion} is not valid semver.${
+            peerRangeIsValid ? '' : ` Declared peer range (${peerRange}) is not valid semver.`
+          }\n${RELEASE_IT_INSTALL_ADVICE}`,
+        })
+      } else if (!peerRangeIsValid) {
+        results.push({
+          name: 'release-it peer dependency',
+          status: 'WARN',
+          value: installedVersion,
+          detail: `Could not evaluate installed release-it version ${installedVersion} against declared peer range (${peerRange}).`,
+        })
+      } else if (!semver.satisfies(installedVersion, peerRange)) {
+        results.push({
+          name: 'release-it peer dependency',
+          status: 'FAIL',
+          value: installedVersion,
+          detail: `Installed release-it ${installedVersion} is outside the supported range (${peerRange}).\n${RELEASE_IT_INSTALL_ADVICE}`,
+        })
+      } else {
+        results.push({
+          name: 'release-it peer dependency',
+          status: 'PASS',
+          value: installedVersion,
+        })
+      }
     }
   }
 
   // --- Check B: release-it major version advisor ---
-  // On network failure (null), skip the check entirely — no FAIL on outage.
-  const latestOutput = safeExec('npm view release-it version', deps)
-  if (latestOutput) {
-    const latestVersion = latestOutput.trim()
-    const latestMajor = parseInt(latestVersion.replace(/^v/, '').split('.')[0], 10)
-    const supportedMaxMajor = highestMajorFromRange(peerRange)
+  // An invalid peer range is already reported by Check A, so Check B is inapplicable.
+  if (peerRangeIsValid) {
+    // On network failure (null), skip the check entirely — no FAIL on outage.
+    const latestOutput = safeExec('npm view release-it version', deps)
+    if (latestOutput) {
+      const latestVersion = latestOutput.trim()
+      const latestMajor = parseInt(latestVersion.replace(/^v/, '').split('.')[0], 10)
+      const supportedMaxMajor = highestMajorFromRange(peerRange)
 
-    if (!Number.isNaN(latestMajor) && !Number.isNaN(supportedMaxMajor)) {
-      if (latestMajor > supportedMaxMajor) {
-        results.push({
-          name: 'release-it major version',
-          status: 'WARN',
-          value: latestVersion,
-          detail: `release-it ${latestMajor}.x available; preset's peer range max is ${supportedMaxMajor}.x. Coordinate with the preset maintainer before upgrading.`,
-        })
-      } else {
-        results.push({
-          name: 'release-it major version',
-          status: 'PASS',
-          value: latestVersion,
-        })
+      if (!Number.isNaN(latestMajor) && !Number.isNaN(supportedMaxMajor)) {
+        if (latestMajor > supportedMaxMajor) {
+          results.push({
+            name: 'release-it major version',
+            status: 'WARN',
+            value: latestVersion,
+            detail: `release-it ${latestMajor}.x available; preset's peer range max is ${supportedMaxMajor}.x. Coordinate with the preset maintainer before upgrading.`,
+          })
+        } else {
+          results.push({
+            name: 'release-it major version',
+            status: 'PASS',
+            value: latestVersion,
+          })
+        }
       }
     }
   }

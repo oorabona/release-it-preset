@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import semver from 'semver'
 import { describe, expect, it, vi } from 'vitest'
 import {
   type CheckResult,
@@ -2151,6 +2152,195 @@ describe('validateReleaseItPeer', () => {
     const checkA = results.find(r => r.name === 'release-it peer dependency')
     expect(checkA?.status).toBe('PASS')
     expect(checkA?.value).toBe('21.0.2')
+  })
+
+  it('Check A FAIL: installed prerelease is excluded by the shipped peer range', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? PRESET_PKG_WITH_PEERS : '')),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return JSON.stringify({
+            dependencies: { 'release-it': { version: '21.0.0-beta.1' } },
+          })
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '21.0.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+
+    const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('FAIL')
+  })
+
+  it('Check A PASS: installed prerelease satisfies its declared prerelease range', () => {
+    const prereleasePeerRange = '^21.0.0-beta.1'
+    const preset = JSON.stringify({
+      name: '@oorabona/release-it-preset',
+      peerDependencies: { 'release-it': prereleasePeerRange },
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? preset : '')),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return JSON.stringify({
+            dependencies: { 'release-it': { version: '21.0.0-beta.1' } },
+          })
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '21.0.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+
+    const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('PASS')
+  })
+
+  it('Check A FAIL: installed v19 does not satisfy a later v19 caret range', () => {
+    const peerRange = '^19.5.0'
+    const preset = JSON.stringify({
+      name: '@oorabona/release-it-preset',
+      peerDependencies: { 'release-it': peerRange },
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? preset : '')),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return JSON.stringify({
+            dependencies: { 'release-it': { version: '19.0.0' } },
+          })
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '19.0.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+
+    const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('FAIL')
+  })
+
+  it('Check A WARN: an unparseable peer range cannot be evaluated', () => {
+    const peerRange = 'workspace:*'
+    expect(semver.validRange(peerRange)).toBeNull()
+    const preset = JSON.stringify({
+      name: '@oorabona/release-it-preset',
+      peerDependencies: { 'release-it': peerRange },
+    })
+    const execSync = vi.fn((cmd: string) => {
+      if (cmd.includes('npm ls release-it')) {
+        return LS_OUTPUT_V20
+      }
+      if (cmd.includes('npm view release-it version')) {
+        return '20.10.0'
+      }
+      throw new Error('unexpected command')
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? preset : '')),
+      execSync,
+    })
+
+    const results = validateReleaseItPeer(deps)
+    const checkA = results.find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('WARN')
+    expect(checkA?.detail).toContain('20.10.0')
+    expect(checkA?.detail).toContain(peerRange)
+    expect(checkA?.detail).toContain('Could not evaluate')
+    expect(results.find(r => r.name === 'release-it major version')).toBeUndefined()
+    expect(execSync.mock.calls.some(([cmd]) => cmd === 'npm view release-it version')).toBe(false)
+  })
+
+  it('Check A FAIL: an installed version that is not valid semver cannot satisfy the peer range', () => {
+    const installedVersion = 'not-semver'
+    expect(semver.valid(installedVersion)).toBeNull()
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? PRESET_PKG_WITH_PEERS : '')),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return JSON.stringify({
+            dependencies: { 'release-it': { version: installedVersion } },
+          })
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '20.10.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+
+    const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('FAIL')
+    expect(checkA?.detail).toContain(`${installedVersion} is not valid semver`)
+    expect(checkA?.detail).toContain(RELEASE_IT_INSTALL_ADVICE)
+  })
+
+  it('Check A FAIL: an invalid installed version takes precedence when both inputs are invalid', () => {
+    const installedVersion = 'not-semver'
+    const peerRange = 'workspace:*'
+    expect(semver.valid(installedVersion)).toBeNull()
+    expect(semver.validRange(peerRange)).toBeNull()
+    const preset = JSON.stringify({
+      name: '@oorabona/release-it-preset',
+      peerDependencies: { 'release-it': peerRange },
+    })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? preset : '')),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return JSON.stringify({
+            dependencies: { 'release-it': { version: installedVersion } },
+          })
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '20.10.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+
+    const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('FAIL')
+    expect(checkA?.detail).toContain(installedVersion)
+    expect(checkA?.detail).toContain(peerRange)
+    expect(checkA?.detail).toContain(RELEASE_IT_INSTALL_ADVICE)
+  })
+
+  it('Check A PASS: a pnpm-linked install uses its valid manifest version', () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? PRESET_PKG_WITH_PEERS : '')),
+      execSync: vi.fn((cmd: string) => {
+        if (cmd.includes('npm ls release-it')) {
+          return JSON.stringify({
+            dependencies: {
+              'release-it': {
+                version: '20.10.0',
+                resolved: 'file:.pnpm/release-it@20.10.0_node@20.19.0/node_modules/release-it',
+              },
+            },
+          })
+        }
+        if (cmd.includes('npm view release-it version')) {
+          return '20.10.0'
+        }
+        throw new Error('unexpected command')
+      }),
+    })
+
+    const checkA = validateReleaseItPeer(deps).find(r => r.name === 'release-it peer dependency')
+    expect(checkA?.status).toBe('PASS')
+    expect(checkA?.value).toBe('20.10.0')
   })
 
   it('gives each Node line exactly one release-it recommendation in doctor advice and the README', () => {
