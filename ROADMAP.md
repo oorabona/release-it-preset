@@ -15,7 +15,7 @@ The project's moat is: **human-curated changelogs + recovery presets + `doctor` 
 
 | # | Idea | Why now | Effort | Priority |
 |---|---|---|---|---|
-| A1 | **`doctor` extensions** — publish workflow freshness, npm provenance readiness, SLSA attestation availability, workspace dependency ranges, peer range. Remaining advisor work: [#89](https://github.com/oorabona/release-it-preset/issues/89) and E3. | `doctor` is the signature feature. Each new check tightens the "diagnostic confidence before release" pitch. | Low | ✅ Done |
+| A1 | **`doctor` extensions** — publish workflow freshness, npm provenance readiness, SLSA attestation availability, workspace dependency ranges, peer range. | `doctor` is the signature feature. Each new check tightens the "diagnostic confidence before release" pitch. | Low | ✅ Done |
 | A2 | **Industry templates** — `release-it-preset init --template typescript-lib\|react-component\|cli-tool\|monorepo` generates a `.release-it.json` plus matching `package.json` scripts | Drops the 1st-time user friction; measurable via npm install spike post-shipped. | Medium | 🟢 H |
 | A3 | **Breaking-change auto-detection** — analyze `dist/` output or `.d.ts` exports to flag a commit as breaking when the public surface diff would justify it | Strong differentiator vs semantic-release (which infers breaking from commit message only). Aligned with Hyrum's Law: if the surface changes, semver should reflect it. | Medium-high | 🟡 M |
 
