@@ -242,7 +242,7 @@ describe('republish-changelog (with DI)', () => {
       expect(writtenContent).toMatch(/## \[Unreleased]\n\s*\n## \[v1\.0\.0]/)
     })
 
-    it('should update only the exact stable version when a prerelease also exists', () => {
+    it('should update only the exact stable version when a prerelease comes first', () => {
       const changelog = `# Changelog
 
 ## [Unreleased]
@@ -250,13 +250,13 @@ describe('republish-changelog (with DI)', () => {
 ### Fixed
 - Stable fix
 
-## [1.6.0] - 2026-01-03
-
-- Stable release
-
 ## [1.6.0-rc.0] - 2026-01-02
 
 - Release candidate
+
+## [1.6.0] - 2026-01-03
+
+- Stable release
 `
       vi.mocked(deps.readFileSync).mockReturnValue(changelog)
       vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
@@ -271,6 +271,63 @@ describe('republish-changelog (with DI)', () => {
         prereleaseEntry,
       )
       expect(writtenContent.match(/## \[Unreleased]\n\n/g)).toHaveLength(1)
+    })
+
+    it('should ignore a suffixed Unreleased heading above the real section', () => {
+      const changelog = `# Changelog
+
+## [Unreleased-old]
+
+- Stale entry
+
+## [Unreleased]
+
+### Fixed
+- Current fix
+
+## [1.0.0] - 2024-01-01
+
+- Initial release
+`
+      vi.mocked(deps.readFileSync).mockReturnValue(changelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      republishChangelog('1.1.0', deps)
+
+      const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+      expect(writtenContent).toContain('## [Unreleased-old]\n\n- Stale entry')
+      expect(writtenContent).toContain('## [1.1.0] - 2024-01-15\n\n### Fixed\n- Current fix')
+      expect(writtenContent).not.toContain('## [1.1.0] - 2024-01-15\n\n- Stale entry')
+    })
+
+    it('should merge into an unbracketed version heading at end of file', () => {
+      const changelog = `# Changelog
+
+## [Unreleased]
+
+### Fixed
+- Stable fix
+
+## 1.6.0`
+      vi.mocked(deps.readFileSync).mockReturnValue(changelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      republishChangelog('1.6.0', deps)
+
+      const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+      expect(writtenContent).toContain('## 1.6.0\n\n### Fixed\n- Stable fix')
+      expect(writtenContent).toContain('## [Unreleased]\n\n## 1.6.0')
+    })
+
+    it('should throw when an existing heading cannot be matched as an entry', () => {
+      const changelog = '# Changelog\n\n## [Unreleased]\n\n- Fix\n\n## 1.6.0\rmalformed body'
+      vi.mocked(deps.readFileSync).mockReturnValue(changelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      expect(() => republishChangelog('1.6.0', deps)).toThrow(
+        'Found existing v1.6.0 changelog heading but could not match its entry.',
+      )
+      expect(deps.writeFileSync).not.toHaveBeenCalled()
     })
 
     it('should update an unbracketed exact version heading instead of duplicating it', () => {
