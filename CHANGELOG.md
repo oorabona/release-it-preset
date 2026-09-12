@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-12
+
 ### Added
-- **release-it 21 is supported.** The peer range becomes `^19.0.0 || ^20.0.0 || ^21.0.0`; the end-to-end suite exercises the preset under 19, 20 and 21. Node floors differ by major: release-it 19 accepts `^20.12.0 || >=22.0.0`, release-it 20 accepts `^20.19.0 || ^22.13.0 || >=24.0.0`, and release-it 21 accepts `^22.21.0 || >=24.0.0`. `engines.node` is `^20.19.0 || >=22.0.0`, preserving the Node 20.19 floor while excluding Node 21, which no supported release-it major accepts.
+- support release-it 21 (#87) ([6059c96](https://github.com/oorabona/release-it-preset/commit/6059c96))
+- SLSA attestation availability check (#70) (doctor) ([5206c8c](https://github.com/oorabona/release-it-preset/commit/5206c8c))
 
 ### Fixed
-- `doctor` now evaluates the full release-it peer range rather than the major alone, with `semver` now a runtime dependency ([#84](https://github.com/oorabona/release-it-preset/issues/84))
-- Coverage runs only the unit and integration suites, so end-to-end cases run once per CI job ([#83](https://github.com/oorabona/release-it-preset/issues/83))
+- evaluate the peer range with semver, and run the e2e suite once per CI job (#93) (doctor) ([b99fa80](https://github.com/oorabona/release-it-preset/commit/b99fa80))
+- keep release:dry read-only when composing with the workspaces plugin (#72) (workspaces) ([136d44e](https://github.com/oorabona/release-it-preset/commit/136d44e))
 
 ## [1.4.1] - 2026-06-11
 
@@ -538,7 +541,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.5.0...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -597,3 +600,6 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 [1.4.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.4.0
 [v1.4.1]: https://github.com/oorabona/release-it-preset/releases/tag/v1.4.1
 [1.4.1]: https://github.com/oorabona/release-it-preset/releases/tag/v1.4.1
+
+[v1.5.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.5.0
+[1.5.0]: https://github.com/oorabona/release-it-preset/releases/tag/v1.5.0
