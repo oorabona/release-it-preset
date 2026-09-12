@@ -242,6 +242,59 @@ describe('republish-changelog (with DI)', () => {
       expect(writtenContent).toMatch(/## \[Unreleased]\n\s*\n## \[v1\.0\.0]/)
     })
 
+    it('should update only the exact stable version when a prerelease also exists', () => {
+      const changelog = `# Changelog
+
+## [Unreleased]
+
+### Fixed
+- Stable fix
+
+## [1.6.0] - 2026-01-03
+
+- Stable release
+
+## [1.6.0-rc.0] - 2026-01-02
+
+- Release candidate
+`
+      vi.mocked(deps.readFileSync).mockReturnValue(changelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      republishChangelog('1.6.0', deps)
+
+      const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+      expect(writtenContent).toContain('## [1.6.0] - 2026-01-03\n\n### Fixed\n- Stable fix')
+      const prereleaseEntry = '## [1.6.0-rc.0] - 2026-01-02\n\n- Release candidate\n'
+      const prereleaseIndex = writtenContent.indexOf(prereleaseEntry)
+      expect(writtenContent.slice(prereleaseIndex, prereleaseIndex + prereleaseEntry.length)).toBe(
+        prereleaseEntry,
+      )
+      expect(writtenContent.match(/## \[Unreleased]\n\n/g)).toHaveLength(1)
+    })
+
+    it('should update an unbracketed exact version heading instead of duplicating it', () => {
+      const changelog = `# Changelog
+
+## [Unreleased]
+
+### Fixed
+- Stable fix
+
+## 1.6.0 - 2026-01-03
+
+- Stable release
+`
+      vi.mocked(deps.readFileSync).mockReturnValue(changelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      republishChangelog('1.6.0', deps)
+
+      const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+      expect(writtenContent).toContain('## 1.6.0 - 2026-01-03\n\n### Fixed\n- Stable fix')
+      expect(writtenContent.match(/^## (?:\[)?1\.6\.0(?:\])?(?:\s|$)/gm)).toHaveLength(1)
+    })
+
     it('should refresh existing tag link definitions', () => {
       const changelog = `# Changelog
 
