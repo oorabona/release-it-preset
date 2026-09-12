@@ -32,7 +32,6 @@ jobs:
   tests:
     name: Tests
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
     needs: build-dist
 
     steps:
@@ -79,7 +78,6 @@ jobs:
   test-cli:
     name: Test CLI
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
     needs: [build-dist, tests]
 
     steps:
@@ -138,12 +136,12 @@ jobs:
           }
           PKG
 
-          node $GITHUB_WORKSPACE/bin/cli.js init --yes
+          node "$GITHUB_WORKSPACE/bin/cli.js" init --yes
 
           test -f CHANGELOG.md
           test -f .release-it.json
 
-          NPM_TOKEN=dummy-ci-token node $GITHUB_WORKSPACE/bin/cli.js validate --allow-dirty
+          NPM_TOKEN=dummy-ci-token node "$GITHUB_WORKSPACE/bin/cli.js" validate --allow-dirty
 
           popd >/dev/null
 
@@ -153,10 +151,10 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
-    needs: build-dist
+    needs: [build-dist, tests, test-cli]
     permissions:
       contents: write
-      id-token: write
+      actions: write
 
     steps:
       - name: Checkout code
@@ -173,7 +171,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'  # Required for npm OIDC trusted publishing
 
       - name: Configure Git
         run: |
@@ -204,17 +201,35 @@ jobs:
       - name: Validate release readiness
         run: pnpm release-it-preset validate --allow-dirty
 
-      - name: Run release and publish
+      - name: Run release and push tag
         run: pnpm release-it-preset default --ci --increment ${{ inputs.increment }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_PUBLISH: 'true'      # ✅ Publish to npm via OIDC trusted publishing
-          GITHUB_RELEASE: 'true'   # ✅ Create GitHub Release
-          NPM_SKIP_CHECKS: 'true'  # npm whoami has no static identity under OIDC
+          NPM_PUBLISH: 'false'
+          GITHUB_RELEASE: 'false'
+
+      - name: Dispatch publisher and wait
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="$(git describe --tags --exact-match)"
+          gh workflow run publish.yml --ref "$TAG" -f tag="$TAG"
+
+          for _ in {1..30}; do
+            RUN_ID="$(gh run list --workflow=publish.yml --event=workflow_dispatch --branch="$TAG" --limit 1 --json databaseId --jq '.[0].databaseId')"
+            if [ -n "$RUN_ID" ]; then
+              gh run watch "$RUN_ID" --exit-status
+              exit $?
+            fi
+            sleep 2
+          done
+
+          echo "Publisher workflow dispatch did not create a run for $TAG" >&2
+          exit 1
 
       - name: Display release and publish info
         run: |
-          echo "✅ Release and publish completed successfully"
+          echo "✅ Release and publisher handoff completed successfully"
           echo "Version: $(jq -r .version package.json)"
           echo "Tag: $(git describe --tags --abbrev=0)"
           echo "npm: https://www.npmjs.com/package/@oorabona/release-it-preset"
