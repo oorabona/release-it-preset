@@ -97,8 +97,8 @@ export function updateReferenceLinks(
   };
 }
 
-function findExistingVersionHeading(changelog: string, normalizedVersion: string): string | null {
-  const escapedVersion = escapeRegExp(normalizedVersion);
+function findExistingVersionHeading(changelog: string, versionWithoutVPrefix: string): string | null {
+  const escapedVersion = escapeRegExp(versionWithoutVPrefix);
   const existingHeading = new RegExp(`^##\\s*\\[(v?${escapedVersion})\\]`, 'im').exec(changelog);
   return existingHeading?.[1] ?? null;
 }
@@ -116,13 +116,13 @@ function getFirstVersionHeading(changelog: string): string | null {
   return null;
 }
 
-function inferVersionHeadingLabel(versionInput: string, normalizedVersion: string, changelog: string): string {
+function inferVersionHeadingLabel(versionInput: string, versionWithoutVPrefix: string, changelog: string): string {
   const firstHeading = getFirstVersionHeading(changelog);
   if (firstHeading) {
-    return /^v/i.test(firstHeading) ? `v${normalizedVersion}` : normalizedVersion;
+    return /^v/i.test(firstHeading) ? `v${versionWithoutVPrefix}` : versionWithoutVPrefix;
   }
 
-  return versionInput.trim().toLowerCase().startsWith('v') ? `v${normalizedVersion}` : normalizedVersion;
+  return versionInput.trim().toLowerCase().startsWith('v') ? `v${versionWithoutVPrefix}` : versionWithoutVPrefix;
 }
 
 
@@ -132,13 +132,13 @@ export function republishChangelog(version: string, deps: RepublishChangelogDeps
   deps.log(`ℹ️  Republishing version: ${version}`);
 
   // Validate semver format
-  const normalizedVersion = semver.valid(version);
-  if (!normalizedVersion) {
+  if (semver.valid(version) === null) {
     throw new Error(`Invalid semantic version: "${version}". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]`);
   }
+  const versionWithoutVPrefix = version.replace(/^v/, '');
   const date = deps.getDate();
-  const tag = version.startsWith('v') ? version : `v${normalizedVersion}`;
-  const versionLabels = [`v${normalizedVersion}`, normalizedVersion];
+  const tag = version.startsWith('v') ? version : `v${versionWithoutVPrefix}`;
+  const versionLabels = [`v${versionWithoutVPrefix}`, versionWithoutVPrefix];
   const repoUrl = getGitHubRepoUrl({
     execSync: deps.execSync,
     getEnv: deps.getEnv,
@@ -156,10 +156,10 @@ export function republishChangelog(version: string, deps: RepublishChangelogDeps
   }
 
   const unreleasedContent = match.groups.content.trim();
-  const escapedVersion = escapeRegExp(normalizedVersion);
-  const existingHeadingLabel = findExistingVersionHeading(changelog, normalizedVersion);
+  const escapedVersion = escapeRegExp(versionWithoutVPrefix);
+  const existingHeadingLabel = findExistingVersionHeading(changelog, versionWithoutVPrefix);
   const versionExists = Boolean(existingHeadingLabel);
-  const versionHeadingLabel = existingHeadingLabel ?? inferVersionHeadingLabel(version, normalizedVersion, changelog);
+  const versionHeadingLabel = existingHeadingLabel ?? inferVersionHeadingLabel(version, versionWithoutVPrefix, changelog);
 
   if (versionExists && !unreleasedContent) {
     deps.log(`ℹ️  Version ${tag} already exists in changelog and [Unreleased] is empty. Nothing to do.`);

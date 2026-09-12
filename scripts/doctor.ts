@@ -1951,23 +1951,25 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
     const latestOutput = safeExec('npm view release-it version', deps)
     if (latestOutput) {
       const latestVersion = latestOutput.trim()
-      if (semver.satisfies(latestVersion, peerRange)) {
-        results.push({
-          name: 'release-it major version',
-          status: 'PASS',
-          value: latestVersion,
-        })
-      } else {
-        results.push({
-          name: 'release-it major version',
-          status: 'WARN',
-          value: latestVersion,
-          detail: `release-it ${latestVersion} is outside the declared peer range (${peerRange}). Coordinate with the preset maintainer before upgrading.`,
-        })
+      if (semver.valid(latestVersion) !== null) {
+        if (semver.satisfies(latestVersion, peerRange)) {
+          results.push({
+            name: 'release-it major version',
+            status: 'PASS',
+            value: latestVersion,
+          })
+        } else {
+          results.push({
+            name: 'release-it major version',
+            status: 'WARN',
+            value: latestVersion,
+            detail: `release-it ${latestVersion} is outside the declared peer range (${peerRange}). Coordinate with the preset maintainer before upgrading.`,
+          })
+        }
       }
     }
   }
-  // If latestOutput is null (network failure), push nothing for Check B.
+  // If latestOutput is null (network failure) or unparseable, push nothing for Check B.
 
   return results
 }

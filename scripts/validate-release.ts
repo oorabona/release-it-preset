@@ -231,7 +231,7 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
       return {
         name: 'npm authentication',
         passed: false,
-        message: 'npm whoami failed in CI and no auth token detected. Ensure NPM_TOKEN is configured.',
+        message: 'npm whoami failed in CI; neither an npm auth token nor a GitHub Actions OIDC token request was detected. For npm trusted publishing, grant the publishing job `permissions: id-token: write`; otherwise configure an npm automation token, such as `NPM_TOKEN`.',
       };
     }
 

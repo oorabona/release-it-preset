@@ -305,7 +305,7 @@ describe('validate-release (with DI)', () => {
       const result = validateNpmAuth(deps)
 
       expect(result.passed).toBe(false)
-      expect(result.message).toContain('Ensure NPM_TOKEN is configured')
+      expect(result.message).toContain('id-token: write')
     })
 
     it('should not treat the setup-node NODE_AUTH_TOKEN placeholder as a token', () => {
@@ -326,7 +326,7 @@ describe('validate-release (with DI)', () => {
 
       expect(result.passed).toBe(false)
       expect(result.message).toBe(
-        'npm whoami failed in CI and no auth token detected. Ensure NPM_TOKEN is configured.',
+        'npm whoami failed in CI; neither an npm auth token nor a GitHub Actions OIDC token request was detected. For npm trusted publishing, grant the publishing job `permissions: id-token: write`; otherwise configure an npm automation token, such as `NPM_TOKEN`.',
       )
     })
   })

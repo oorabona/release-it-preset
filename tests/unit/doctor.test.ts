@@ -2512,6 +2512,21 @@ describe('validateReleaseItPeer', () => {
     expect(results.find(r => r.name === 'release-it major version')?.status).toBe('PASS')
   })
 
+  it('Check B skips quoted registry output while Check A remains unaffected', () => {
+    const results = validateReleaseItPeer(makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '"21.0.0"'))
+
+    expect(results.find(r => r.name === 'release-it major version')).toBeUndefined()
+    expect(results.find(r => r.name === 'release-it peer dependency')?.status).toBe('PASS')
+  })
+
+  it('Check B passes clean registry output within the declared peer range', () => {
+    const results = validateReleaseItPeer(makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '21.0.0'))
+    const checkB = results.find(r => r.name === 'release-it major version')
+
+    expect(checkB?.status).toBe('PASS')
+    expect(checkB?.value).toBe('21.0.0')
+  })
+
   // --- Check B: PASS — latest major matches supported max ---
   it('Check B PASS: latest npm version is within supported major range', () => {
     const deps = makeDeps({

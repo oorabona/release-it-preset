@@ -28,12 +28,12 @@ export interface ExtractChangelogDeps {
 
 export function extractChangelog(version: string, deps: ExtractChangelogDeps): string {
   // Validate semver format
-  const normalizedVersion = semver.valid(version);
-  if (!normalizedVersion) {
+  if (semver.valid(version) === null) {
     throw new Error(`Invalid semantic version: "${version}". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]`);
   }
-  const versionLabels = [`v${normalizedVersion}`, normalizedVersion];
-  const tag = version.startsWith('v') ? version : `v${normalizedVersion}`;
+  const versionWithoutVPrefix = version.replace(/^v/, '');
+  const versionLabels = [`v${versionWithoutVPrefix}`, versionWithoutVPrefix];
+  const tag = version.startsWith('v') ? version : `v${versionWithoutVPrefix}`;
   const changelogFile = deps.getEnv('CHANGELOG_FILE') || 'CHANGELOG.md';
   const changelogPath = join(deps.getCwd(), changelogFile);
 
