@@ -51,7 +51,7 @@ These were considered and explicitly will **not** be pursued. Documented to prev
 |---|---|---|
 | E1 | **`release-it-preset preflight` GH composite action** — run dry-run + e2e check on ALL workflow_dispatch entry points (hotfix, republish, default) in parallel for PR validation | The rc.1 → rc.2 cycle surfaced 4 real production bugs via e2e dry-runs. Productizing this discipline is an honest differentiator. |
 | E2 | **Conventional Commits 2.0 readiness watch** | If/when the spec ships new types or footer reformatting, we want to be ready to iterate. Active watch, no work yet. |
-| E3 | **Peer-dep advisor in `doctor`** — "release-it 21 just shipped, here is the breaking-change surface that affects you" | Aligned with the diagnostic moat; positions the project as advisor, not just executor. |
+| E3 | **Peer-dep advisor in `doctor`** — when a release-it major outside `peerDependencies.release-it` ships, describe the breaking-change surface that affects preset users. Distinct from the existing `release-it major version` check, which only warns that a newer major exists. | Aligned with the diagnostic moat; positions the project as advisor, not just executor. |
 
 ## F. Carry-overs from earlier backlog (still applicable)
 
