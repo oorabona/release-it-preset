@@ -6,7 +6,7 @@
  * - CHANGELOG.md exists and is well-formatted
  * - [Unreleased] section has content
  * - Working directory is clean (unless --allow-dirty)
- * - npm authentication works (npm whoami)
+ * - npm publishing credential path is available
  * - Current branch is allowed (if GIT_REQUIRE_BRANCH is set)
  *
  * Usage:
@@ -198,7 +198,7 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
     const username = (deps.execSync('npm whoami', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }) as string).trim();
 
     return {
-      name: 'npm authentication',
+      name: 'npm publishing credential path',
       passed: true,
       message: `Logged in as: ${username}`,
     };
@@ -211,16 +211,20 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
 
     if (hasAutomationToken) {
       return {
-        name: 'npm authentication',
+        name: 'npm publishing credential path',
         passed: true,
         message: 'Token-based credential path detected; npm authentication was not verified.',
       };
     }
 
     const oidcTokenRequestUrl = deps.getEnv('ACTIONS_ID_TOKEN_REQUEST_URL');
-    if (typeof oidcTokenRequestUrl === 'string' && oidcTokenRequestUrl.trim().length > 0) {
+    const oidcTokenRequestToken = deps.getEnv('ACTIONS_ID_TOKEN_REQUEST_TOKEN');
+    if (
+      typeof oidcTokenRequestUrl === 'string' && oidcTokenRequestUrl.trim().length > 0 &&
+      typeof oidcTokenRequestToken === 'string' && oidcTokenRequestToken.trim().length > 0
+    ) {
       return {
-        name: 'npm authentication',
+        name: 'npm publishing credential path',
         passed: true,
         message: 'OIDC token request credential path detected; npm authentication was not verified.',
       };
@@ -229,14 +233,14 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
     const ciEnv = deps.getEnv('CI');
     if (ciEnv && ciEnv.toLowerCase() === 'true') {
       return {
-        name: 'npm authentication',
+        name: 'npm publishing credential path',
         passed: false,
         message: 'npm whoami failed in CI; neither an npm auth token nor a GitHub Actions OIDC token request was detected. For npm trusted publishing, grant the publishing job `permissions: id-token: write`; otherwise configure an npm automation token, such as `NPM_TOKEN`.',
       };
     }
 
     return {
-      name: 'npm authentication',
+      name: 'npm publishing credential path',
       passed: false,
       message: 'Not authenticated. Run: npm login',
     };
@@ -343,7 +347,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log();
 
     if (allPassed) {
-      console.log('✨ All validations passed! Ready to release.');
+      console.log('✨ All local release preconditions passed. Ready to attempt release.');
     } else {
       throw new ValidationError('Some validations failed. Please fix the issues above before releasing.');
     }

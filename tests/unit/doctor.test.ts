@@ -482,6 +482,19 @@ describe('validateConfiguration', () => {
     expect(versionCheck?.status).toBe('FAIL')
   })
 
+  it('FAILs the version check, rather than parsing, when package.json version is numeric', () => {
+    const badPkg = JSON.stringify({ name: 'my-pkg', version: 1 })
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p === 'package.json'),
+      readFileSync: vi.fn((p: string) => (p === 'package.json' ? badPkg : '')),
+    })
+
+    const section = validateConfiguration(deps)
+
+    expect(section.checks.find(c => c.name === 'package.json version')?.status).toBe('FAIL')
+    expect(section.checks.find(c => c.name === 'package.json parseable')).toBeUndefined()
+  })
+
   it('FAIL when package.json version has surrounding whitespace', () => {
     const paddedPkg = JSON.stringify({ name: 'my-pkg', version: ' 1.2.3 ' })
     const deps = makeDeps({
@@ -2551,11 +2564,23 @@ describe('validateReleaseItPeer', () => {
     expect(results.find(r => r.name === 'release-it major version')?.status).toBe('PASS')
   })
 
-  it('Check B skips quoted registry output while Check A remains unaffected', () => {
+  it('Check B evaluates JSON-encoded registry output while Check A remains unaffected', () => {
     const results = validateReleaseItPeer(makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '"21.0.0"'))
 
-    expect(results.find(r => r.name === 'release-it major version')).toBeUndefined()
+    const checkB = results.find(r => r.name === 'release-it major version')
+    expect(checkB?.status).toBe('PASS')
+    expect(checkB?.value).toBe('21.0.0')
     expect(results.find(r => r.name === 'release-it peer dependency')?.status).toBe('PASS')
+  })
+
+  it('Check B WARNs when the registry response cannot be read as a version', () => {
+    const results = validateReleaseItPeer(
+      makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', 'not-a-version'),
+    )
+    const checkB = results.find(r => r.name === 'release-it major version')
+
+    expect(checkB?.status).toBe('WARN')
+    expect(checkB?.detail).toContain('registry response could not be read')
   })
 
   it('Check B passes clean registry output within the declared peer range', () => {

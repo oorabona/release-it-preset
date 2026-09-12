@@ -14,6 +14,12 @@ describe('semver-utils', () => {
     expect(isStrictSemver('1.0')).toBe(false)
   })
 
+  it('rejects non-string version values without throwing', () => {
+    expect(isStrictSemver(1)).toBe(false)
+    expect(isStrictSemver(null)).toBe(false)
+    expect(isStrictSemver({})).toBe(false)
+  })
+
   it('treats workspace protocol passthrough ranges as including the workspace version', () => {
     expect(rangeIncludesVersion('workspace:*', '1.2.3')).toBe(true)
     expect(rangeIncludesVersion('workspace:^', '1.2.3')).toBe(true)

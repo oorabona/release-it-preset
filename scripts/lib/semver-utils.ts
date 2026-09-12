@@ -25,8 +25,8 @@ function hasPrereleaseOrBuildMetadata(version: string): boolean {
   return normalized.includes('-') || normalized.includes('+')
 }
 
-export function isStrictSemver(version: string): boolean {
-  return version === version.trim() && semver.valid(version) !== null
+export function isStrictSemver(version: unknown): version is string {
+  return typeof version === 'string' && version === version.trim() && semver.valid(version) !== null
 }
 
 function parseVersion(version: string): ParsedVersion | null {

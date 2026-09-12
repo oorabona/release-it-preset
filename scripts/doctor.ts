@@ -1950,8 +1950,18 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
     // On network failure (null), skip the check entirely — no FAIL on outage.
     const latestOutput = safeExec('npm view release-it version', deps)
     if (latestOutput) {
-      const latestVersion = latestOutput.trim()
-      if (semver.valid(latestVersion) !== null) {
+      const trimmedLatestOutput = latestOutput.trim()
+      let latestVersion = semver.valid(trimmedLatestOutput)
+      if (latestVersion === null) {
+        try {
+          const parsedOutput = JSON.parse(trimmedLatestOutput)
+          latestVersion = typeof parsedOutput === 'string' ? semver.valid(parsedOutput) : null
+        } catch {
+          // The raw registry response is not JSON.
+        }
+      }
+
+      if (latestVersion !== null) {
         if (semver.satisfies(latestVersion, peerRange)) {
           results.push({
             name: 'release-it major version',
@@ -1966,10 +1976,17 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
             detail: `release-it ${latestVersion} is outside the declared peer range (${peerRange}). Coordinate with the preset maintainer before upgrading.`,
           })
         }
+      } else {
+        results.push({
+          name: 'release-it major version',
+          status: 'WARN',
+          value: 'unreadable response',
+          detail: 'The npm registry response could not be read as a release-it version.',
+        })
       }
     }
   }
-  // If latestOutput is null (network failure) or unparseable, push nothing for Check B.
+  // If latestOutput is null (network failure), push nothing for Check B.
 
   return results
 }

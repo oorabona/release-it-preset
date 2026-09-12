@@ -248,6 +248,7 @@ describe('validate-release (with DI)', () => {
 
       const result = validateNpmAuth(deps)
 
+      expect(result.name).toBe('npm publishing credential path')
       expect(result.passed).toBe(true)
       expect(result.message).toContain('username')
     })
@@ -259,6 +260,7 @@ describe('validate-release (with DI)', () => {
 
       const result = validateNpmAuth(deps)
 
+      expect(result.name).toBe('npm publishing credential path')
       expect(result.passed).toBe(false)
       expect(result.message).toContain('Not authenticated')
     })
@@ -271,13 +273,40 @@ describe('validate-release (with DI)', () => {
 
       const result = validateNpmAuth(deps)
 
+      expect(result.name).toBe('npm publishing credential path')
       expect(result.passed).toBe(true)
       expect(result.message).toBe(
         'Token-based credential path detected; npm authentication was not verified.',
       )
     })
 
-    it('should pass in CI when an OIDC token request is available', () => {
+    it('should pass in CI when an OIDC token request credential path is available', () => {
+      vi.mocked(deps.execSync).mockImplementation(() => {
+        throw new Error('whoami not available')
+      })
+      vi.mocked(deps.getEnv).mockImplementation(key => {
+        if (key === 'CI') {
+          return 'true'
+        }
+        if (key === 'ACTIONS_ID_TOKEN_REQUEST_URL') {
+          return 'https://token.actions.githubusercontent.com'
+        }
+        if (key === 'ACTIONS_ID_TOKEN_REQUEST_TOKEN') {
+          return 'oidc-request-token'
+        }
+        return undefined
+      })
+
+      const result = validateNpmAuth(deps)
+
+      expect(result.name).toBe('npm publishing credential path')
+      expect(result.passed).toBe(true)
+      expect(result.message).toBe(
+        'OIDC token request credential path detected; npm authentication was not verified.',
+      )
+    })
+
+    it('should fail in CI when only the OIDC token request URL is available', () => {
       vi.mocked(deps.execSync).mockImplementation(() => {
         throw new Error('whoami not available')
       })
@@ -293,10 +322,9 @@ describe('validate-release (with DI)', () => {
 
       const result = validateNpmAuth(deps)
 
-      expect(result.passed).toBe(true)
-      expect(result.message).toBe(
-        'OIDC token request credential path detected; npm authentication was not verified.',
-      )
+      expect(result.name).toBe('npm publishing credential path')
+      expect(result.passed).toBe(false)
+      expect(result.message).toContain('id-token: write')
     })
 
     it('should provide CI-specific guidance when no token is detected', () => {
@@ -307,6 +335,7 @@ describe('validate-release (with DI)', () => {
 
       const result = validateNpmAuth(deps)
 
+      expect(result.name).toBe('npm publishing credential path')
       expect(result.passed).toBe(false)
       expect(result.message).toContain('id-token: write')
     })
@@ -327,6 +356,7 @@ describe('validate-release (with DI)', () => {
 
       const result = validateNpmAuth(deps)
 
+      expect(result.name).toBe('npm publishing credential path')
       expect(result.passed).toBe(false)
       expect(result.message).toBe(
         'npm whoami failed in CI; neither an npm auth token nor a GitHub Actions OIDC token request was detected. For npm trusted publishing, grant the publishing job `permissions: id-token: write`; otherwise configure an npm automation token, such as `NPM_TOKEN`.',
@@ -401,7 +431,7 @@ describe('validate-release (with DI)', () => {
       expect(results[3].name).toBe('[Unreleased] has content')
       expect(results[4].name).toBe('Working directory clean')
       expect(results[5].name).toBe('Branch check')
-      expect(results[6].name).toBe('npm authentication')
+      expect(results[6].name).toBe('npm publishing credential path')
     })
 
     it('should pass all validations when everything is correct', () => {

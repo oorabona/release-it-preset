@@ -170,6 +170,12 @@ describe('republish-changelog (with DI)', () => {
       )
     })
 
+    it('should reject a non-string version with the existing error message', () => {
+      expect(() => republishChangelog(1 as unknown as string, deps)).toThrow(
+        'Invalid semantic version: "1". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
+      )
+    })
+
     it('should reject padded versions with the existing error message', () => {
       expect(() => republishChangelog(' v1.2.3 ', deps)).toThrow(
         'Invalid semantic version: " v1.2.3 ". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',

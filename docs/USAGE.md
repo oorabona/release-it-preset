@@ -428,7 +428,7 @@ pnpm release-it-preset validate --allow-dirty
 - CHANGELOG.md exists and is well-formatted
 - `[Unreleased]` section has content
 - Working directory is clean (unless `--allow-dirty`)
-- npm authentication works (`npm whoami`)
+- an npm publishing credential path is available
 - Current branch is allowed (if `GIT_REQUIRE_BRANCH` is set)
 
 Exit code 0 if all checks pass, 2 if precondition not met (CI-friendly).
