@@ -2,6 +2,8 @@
  * Semantic versioning utility functions
  */
 
+import semver from 'semver'
+
 type RangeEvaluation = boolean | null
 
 const SEMVER_PATTERN = String.raw`v?\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?`
@@ -24,11 +26,11 @@ function hasPrereleaseOrBuildMetadata(version: string): boolean {
 }
 
 function parseVersion(version: string): ParsedVersion | null {
-  if (!isValidSemver(version)) {
+  const normalized = semver.valid(version)
+  if (!normalized) {
     return null
   }
 
-  const normalized = version.replace(/^v/, '')
   const [major, minor, patch] = normalized.split(/[+-]/)[0].split('.').map(Number)
   return { major, minor, patch, normalized }
 }
@@ -94,7 +96,7 @@ function evaluateRangePart(range: string, version: ParsedVersion): RangeEvaluati
   }
 
   const semverOperand = normalizedRange.replace(/^(?:=|\^|~|>=)\s*/, '')
-  if (isValidSemver(semverOperand) && hasPrereleaseOrBuildMetadata(semverOperand)) {
+  if (semver.valid(semverOperand) !== null && hasPrereleaseOrBuildMetadata(semverOperand)) {
     return null
   }
 
@@ -123,31 +125,6 @@ function evaluateRangePart(range: string, version: ParsedVersion): RangeEvaluati
   }
 
   return null
-}
-
-/**
- * Validate if a string is a valid semantic version
- *
- * @param version Version string to validate (can have optional 'v' prefix)
- * @returns true if valid semver, false otherwise
- */
-export function isValidSemver(version: string): boolean {
-  const semverRegex = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
-  return semverRegex.test(version);
-}
-
-/**
- * Validate and normalize a semantic version string
- *
- * @param version Version string to validate
- * @throws Error if version is not valid semver
- * @returns Normalized version without 'v' prefix
- */
-export function validateAndNormalizeSemver(version: string): string {
-  if (!isValidSemver(version)) {
-    throw new Error(`Invalid semantic version: "${version}". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]`);
-  }
-  return version.replace(/^v/, '');
 }
 
 /**

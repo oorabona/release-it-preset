@@ -2075,6 +2075,31 @@ const LS_OUTPUT_V22 = JSON.stringify({
 
 const LS_OUTPUT_EMPTY = JSON.stringify({ dependencies: {} })
 
+function makePeerDeps(peerRange: string, latestVersion: string) {
+  return makeDeps({
+    existsSync: vi.fn((p: string) => p === 'package.json'),
+    readFileSync: vi.fn((p: string) => {
+      if (p === 'package.json') {
+        return JSON.stringify({
+          name: '@oorabona/release-it-preset',
+          version: '1.0.0',
+          peerDependencies: { 'release-it': peerRange },
+        })
+      }
+      return ''
+    }),
+    execSync: vi.fn((cmd: string) => {
+      if (cmd.includes('npm ls release-it')) {
+        return LS_OUTPUT_V20
+      }
+      if (cmd.includes('npm view release-it version')) {
+        return latestVersion
+      }
+      throw new Error('unexpected command')
+    }),
+  })
+}
+
 describe('validateReleaseItPeer', () => {
   // --- Check A: PASS ---
   it('Check A PASS: installed v20 satisfies the supported peer range', () => {
@@ -2459,32 +2484,32 @@ describe('validateReleaseItPeer', () => {
     expect(checkA?.value).toBe('not found')
   })
 
-  // --- Check B: WARN — newer major available ---
-  it('Check B WARN: npm reports v22 while peer range max is v21', () => {
-    const deps = makeDeps({
-      existsSync: vi.fn((p: string) => p === 'package.json'),
-      readFileSync: vi.fn((p: string) => {
-        if (p === 'package.json') {
-          return PRESET_PKG_WITH_PEERS
-        }
-        return ''
-      }),
-      execSync: vi.fn((cmd: string) => {
-        if (cmd.includes('npm ls release-it')) {
-          return LS_OUTPUT_V20
-        }
-        if (cmd.includes('npm view release-it version')) {
-          return '22.0.5'
-        }
-        throw new Error('unexpected command')
-      }),
-    })
+  // --- Check B: WARN — published version is outside declared range ---
+  it('Check B WARN: npm reports v22 outside the shipped peer range', () => {
+    const deps = makePeerDeps('^19.0.0 || ^20.0.0 || ^21.0.0', '22.0.0')
     const results = validateReleaseItPeer(deps)
     const checkB = results.find(r => r.name === 'release-it major version')
     expect(checkB?.status).toBe('WARN')
-    expect(checkB?.value).toBe('22.0.5')
-    expect(checkB?.detail).toContain('22.x available')
-    expect(checkB?.detail).toContain('peer range max is 21.x')
+    expect(checkB?.value).toBe('22.0.0')
+    expect(checkB?.detail).toContain(
+      'release-it 22.0.0 is outside the declared peer range (^19.0.0 || ^20.0.0 || ^21.0.0)',
+    )
+    expect(checkB?.detail).toContain('Coordinate with the preset maintainer before upgrading.')
+    expect(checkB?.detail).not.toMatch(/max(?:imum)?|ceiling/i)
+  })
+
+  it('Check B evaluates abbreviated peer ranges against the published version', () => {
+    const passing = validateReleaseItPeer(makePeerDeps('^20', '20.5.0'))
+    const warning = validateReleaseItPeer(makePeerDeps('^20', '21.0.0'))
+
+    expect(passing.find(r => r.name === 'release-it major version')?.status).toBe('PASS')
+    expect(warning.find(r => r.name === 'release-it major version')?.status).toBe('WARN')
+  })
+
+  it('Check B passes an unbounded peer range for future majors', () => {
+    const results = validateReleaseItPeer(makePeerDeps('>=19.0.0', '99.0.0'))
+
+    expect(results.find(r => r.name === 'release-it major version')?.status).toBe('PASS')
   })
 
   // --- Check B: PASS — latest major matches supported max ---

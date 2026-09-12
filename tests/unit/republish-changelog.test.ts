@@ -123,6 +123,22 @@ describe('republish-changelog (with DI)', () => {
       )
     })
 
+    it('should accept a v-prefixed version', () => {
+      vi.mocked(deps.readFileSync).mockReturnValue(basicChangelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      republishChangelog('v1.1.0', deps)
+
+      const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+      expect(writtenContent).toContain('## [v1.1.0] - 2024-01-15')
+    })
+
+    it('should reject invalid versions with the existing error message', () => {
+      expect(() => republishChangelog('01.1.0', deps)).toThrow(
+        'Invalid semantic version: "01.1.0". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
+      )
+    })
+
     it('should clear [Unreleased] section after moving content', () => {
       vi.mocked(deps.readFileSync).mockReturnValue(basicChangelog)
       vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')

@@ -16,7 +16,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { validateAndNormalizeSemver } from './lib/semver-utils.js';
+import semver from 'semver';
 import { escapeRegExp } from './lib/string-utils.js';
 import { runScript } from './lib/run-script.js';
 
@@ -28,7 +28,10 @@ export interface ExtractChangelogDeps {
 
 export function extractChangelog(version: string, deps: ExtractChangelogDeps): string {
   // Validate semver format
-  const normalizedVersion = validateAndNormalizeSemver(version);
+  const normalizedVersion = semver.valid(version);
+  if (!normalizedVersion) {
+    throw new Error(`Invalid semantic version: "${version}". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]`);
+  }
   const versionLabels = [`v${normalizedVersion}`, normalizedVersion];
   const tag = version.startsWith('v') ? version : `v${normalizedVersion}`;
   const changelogFile = deps.getEnv('CHANGELOG_FILE') || 'CHANGELOG.md';

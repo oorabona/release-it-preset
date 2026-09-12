@@ -18,7 +18,7 @@ import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import semver from 'semver'
-import { isValidSemver, rangeIncludesVersion } from './lib/semver-utils.js'
+import { rangeIncludesVersion } from './lib/semver-utils.js'
 import {
   parsePnpmWorkspaceYaml,
   parseWorkspacesFromPackageJson,
@@ -1236,7 +1236,7 @@ export function validateSlsaAttestationAvailability(deps: DoctorDeps): CheckResu
   }
 
   // v-prefixed and +build-metadata versions pass here; release 404s yield null from the network probe.
-  if (!packageName || !version || !isValidSemver(version)) {
+  if (!packageName || !version || semver.valid(version) === null) {
     return null
   }
 
@@ -1456,7 +1456,7 @@ function readWorkspacePackages(packageDirs: string[], deps: DoctorDeps): {
         unreadableManifestCount += 1
         continue
       }
-      if (!isValidSemver(pkg.version)) {
+      if (semver.valid(pkg.version) === null) {
         unreadableManifestCount += 1
         continue
       }
@@ -1781,7 +1781,7 @@ export function validateConfiguration(deps: DoctorDeps): ConfigurationSection {
           value: 'missing',
           detail: 'Add "version" field to package.json',
         })
-      } else if (!isValidSemver(version)) {
+      } else if (semver.valid(version) === null) {
         checks.push({
           name: 'package.json version',
           status: 'FAIL',
@@ -1872,20 +1872,6 @@ export const RELEASE_IT_INSTALL_ADVICE = [
 ].join('\n')
 
 /**
- * Extracts the highest major version number from a semver range string.
- * Handles OR-joined ranges like "^19.0.0 || ^20.0.0 || ^21.0.0" → 21.
- */
-function highestMajorFromRange(range: string): number {
-  const matches = range.match(/(\d+)\.\d+\.\d+/g) ?? []
-  let max = 0
-  for (const m of matches) {
-    const major = parseInt(m.split('.')[0], 10)
-    if (major > max) max = major
-  }
-  return max
-}
-
-/**
  * Runs Check A (peer range satisfaction) and Check B (major version advisor).
  * Returns an array of CheckResult to be appended into validateConfiguration.
  * Check B is silently skipped when the npm registry is unreachable.
@@ -1965,24 +1951,19 @@ export function validateReleaseItPeer(deps: DoctorDeps): CheckResult[] {
     const latestOutput = safeExec('npm view release-it version', deps)
     if (latestOutput) {
       const latestVersion = latestOutput.trim()
-      const latestMajor = parseInt(latestVersion.replace(/^v/, '').split('.')[0], 10)
-      const supportedMaxMajor = highestMajorFromRange(peerRange)
-
-      if (!Number.isNaN(latestMajor) && !Number.isNaN(supportedMaxMajor)) {
-        if (latestMajor > supportedMaxMajor) {
-          results.push({
-            name: 'release-it major version',
-            status: 'WARN',
-            value: latestVersion,
-            detail: `release-it ${latestMajor}.x available; preset's peer range max is ${supportedMaxMajor}.x. Coordinate with the preset maintainer before upgrading.`,
-          })
-        } else {
-          results.push({
-            name: 'release-it major version',
-            status: 'PASS',
-            value: latestVersion,
-          })
-        }
+      if (semver.satisfies(latestVersion, peerRange)) {
+        results.push({
+          name: 'release-it major version',
+          status: 'PASS',
+          value: latestVersion,
+        })
+      } else {
+        results.push({
+          name: 'release-it major version',
+          status: 'WARN',
+          value: latestVersion,
+          detail: `release-it ${latestVersion} is outside the declared peer range (${peerRange}). Coordinate with the preset maintainer before upgrading.`,
+        })
       }
     }
   }

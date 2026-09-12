@@ -136,5 +136,11 @@ describe('extract-changelog (with DI)', () => {
       expect(result).toContain('## [1.0.0] - 2024-01-01')
       expect(result).toContain('- Entry')
     })
+
+    it('should reject invalid versions with the existing error message', () => {
+      expect(() => extractChangelog('01.0.0', deps)).toThrow(
+        'Invalid semantic version: "01.0.0". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]',
+      )
+    })
   })
 })

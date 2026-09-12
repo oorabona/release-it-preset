@@ -23,9 +23,9 @@ import type { ExecSyncOptions } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
+import semver from 'semver';
 import { getGitHubRepoUrl } from './lib/git-utils.js';
 import { escapeRegExp } from './lib/string-utils.js';
-import { validateAndNormalizeSemver } from './lib/semver-utils.js';
 import { runScript } from './lib/run-script.js';
 
 export interface RepublishChangelogDeps {
@@ -132,7 +132,10 @@ export function republishChangelog(version: string, deps: RepublishChangelogDeps
   deps.log(`ℹ️  Republishing version: ${version}`);
 
   // Validate semver format
-  const normalizedVersion = validateAndNormalizeSemver(version);
+  const normalizedVersion = semver.valid(version);
+  if (!normalizedVersion) {
+    throw new Error(`Invalid semantic version: "${version}". Expected format: [v]MAJOR.MINOR.PATCH[-prerelease][+buildmetadata]`);
+  }
   const date = deps.getDate();
   const tag = version.startsWith('v') ? version : `v${normalizedVersion}`;
   const versionLabels = [`v${normalizedVersion}`, normalizedVersion];
