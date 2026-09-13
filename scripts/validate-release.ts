@@ -6,7 +6,7 @@
  * - CHANGELOG.md exists and is well-formatted
  * - [Unreleased] section has content
  * - Working directory is clean (unless --allow-dirty)
- * - npm publishing credential path is available
+ * - When NPM_PUBLISH=true, an npm publishing credential path or GitHub Actions OIDC token-request is available
  * - Current branch is allowed (if GIT_REQUIRE_BRANCH is set)
  *
  * Usage:
@@ -194,6 +194,14 @@ export function validateWorkingDirectoryClean(deps: ValidateReleaseDeps, options
 }
 
 export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
+  if (deps.getEnv('NPM_PUBLISH') !== 'true') {
+    return {
+      name: 'npm publishing credential path',
+      passed: true,
+      message: 'Skipped because NPM_PUBLISH is not true. This check does not resolve release-it configuration or plugin behavior, so a release configured to publish by other means is not covered.',
+    };
+  }
+
   try {
     const username = (deps.execSync('npm whoami', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }) as string).trim();
 
@@ -203,20 +211,6 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
       message: `Logged in as: ${username}`,
     };
   } catch (error) {
-    const tokenEnvVars = ['NPM_TOKEN', 'NPM_CONFIG__AUTH', 'NPM_CONFIG_TOKEN'];
-    const hasAutomationToken = tokenEnvVars.some((name) => {
-      const value = deps.getEnv(name);
-      return typeof value === 'string' && value.trim().length > 0;
-    });
-
-    if (hasAutomationToken) {
-      return {
-        name: 'npm publishing credential path',
-        passed: true,
-        message: 'Token-based credential path detected; npm authentication was not verified.',
-      };
-    }
-
     const oidcTokenRequestUrl = deps.getEnv('ACTIONS_ID_TOKEN_REQUEST_URL');
     const oidcTokenRequestToken = deps.getEnv('ACTIONS_ID_TOKEN_REQUEST_TOKEN');
     if (
@@ -226,7 +220,7 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
       return {
         name: 'npm publishing credential path',
         passed: true,
-        message: 'OIDC token request credential path detected; npm authentication was not verified.',
+        message: 'OIDC token request is available; a publish attempt is possible, but npm trust is unverified.',
       };
     }
 
@@ -235,7 +229,7 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
       return {
         name: 'npm publishing credential path',
         passed: false,
-        message: 'npm whoami failed in CI; neither an npm auth token nor a GitHub Actions OIDC token request was detected. For npm trusted publishing, grant the publishing job `permissions: id-token: write`; otherwise configure an npm automation token, such as `NPM_TOKEN`.',
+        message: 'npm whoami failed in CI and no GitHub Actions OIDC token request pair is present. This check does not infer npm authentication from token-shaped environment variables. Check npm configuration and registry reachability, or grant the publishing job `permissions: id-token: write` for trusted publishing.',
       };
     }
 

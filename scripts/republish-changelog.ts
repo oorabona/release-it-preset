@@ -99,8 +99,11 @@ export function updateReferenceLinks(
 
 function findExistingVersionHeading(changelog: string, versionWithoutVPrefix: string): string | null {
   const escapedVersion = escapeRegExp(versionWithoutVPrefix);
-  const existingHeading = new RegExp(`^##\\s*\\[(v?${escapedVersion})\\]`, 'im').exec(changelog);
-  return existingHeading?.[1] ?? null;
+  const existingHeading = new RegExp(
+    `^##\\s*(?:\\[([vV]?${escapedVersion})\\]|([vV]?${escapedVersion})(?=\\s|$))`,
+    'm',
+  ).exec(changelog);
+  return existingHeading?.[1] ?? existingHeading?.[2] ?? null;
 }
 
 function getFirstVersionHeading(changelog: string): string | null {
@@ -148,7 +151,7 @@ export function republishChangelog(version: string, deps: RepublishChangelogDeps
   let changelog = deps.readFileSync(changelogPath, 'utf8') as string;
 
   const unreleasedBlock =
-    /^(?<prefix>[^\n]*?##\s*\[?Unreleased\]?[^\n]*\n)(?<content>[\s\S]*?)(?=^##\s|^\s*---\s*$|$(?![\s\S]))/im;
+    /^(?<prefix>[^\r\n]*?##\s*\[Unreleased\][^\r\n]*\r?\n)(?<content>[\s\S]*?)(?=^##\s|^\s*---\s*$|$(?![\s\S]))/im;
   const match = changelog.match(unreleasedBlock);
 
   if (!match || !match.groups) {
@@ -171,16 +174,19 @@ export function republishChangelog(version: string, deps: RepublishChangelogDeps
     deps.log(`ℹ️  Updating existing ${tag} entry with unreleased content...`);
 
     const versionEntryRegex = new RegExp(
-      `(^##\\s*\\[?(?:v?${escapedVersion})\\]?[^\\n]*\\n)((?:[\\s\\S]*?)(?=^##\\s|^\\s*---\\s*$|$(?![\\s\\S])))`,
-      'im'
+      `(^##\\s*(?:\\[(?:[vV]?${escapedVersion})\\]|(?:[vV]?${escapedVersion})(?=\\s|$))[^\\r\\n]*(?:\\r?\\n|$(?![\\s\\S])))((?:[\\s\\S]*?)(?=^##\\s|^\\s*---\\s*$|$(?![\\s\\S])))`,
+      'm',
     );
 
     const versionMatch = changelog.match(versionEntryRegex);
-    if (versionMatch) {
-      const newVersionContent = `${versionMatch[1]}\n${unreleasedContent}\n\n`;
-      changelog = changelog.replace(versionEntryRegex, newVersionContent);
-      changelog = changelog.replace(unreleasedBlock, `${match.groups.prefix}\n`);
+    if (!versionMatch) {
+      throw new Error(`Found existing ${tag} changelog heading but could not match its entry.`);
     }
+
+    const normalizedHeading = versionMatch[1].replace(/\r?\n$/, '');
+    const newVersionContent = `${normalizedHeading}\n\n${unreleasedContent}\n\n`;
+    changelog = changelog.replace(versionEntryRegex, newVersionContent);
+    changelog = changelog.replace(unreleasedBlock, `${match.groups.prefix}\n`);
   } else {
     if (!unreleasedContent) {
       throw new Error('[Unreleased] section is empty. Use populate-unreleased-changelog.ts first or add content manually.');

@@ -41,7 +41,7 @@ export function extractChangelog(version: string, deps: ExtractChangelogDeps): s
 
   const labelPattern = versionLabels.map(escapeRegExp).join('|');
   const versionBlock = new RegExp(
-    `^(?<prefix>[^\n]*?##\\s*\\[?(?:${labelPattern})\\]?[^\n]*\r?\n)(?<content>[\\s\\S]*?)(?=^##\\s|^\\s*---\\s*$|$(?![\\s\\S]))`,
+    `^(?<prefix>[^\n]*?##\\s*(?:\\[(?:${labelPattern})\\]|(?:${labelPattern})(?=\\s|$))[^\n]*\r?\n)(?<content>[\\s\\S]*?)(?=^##\\s|^\\s*---\\s*$|$(?![\\s\\S]))`,
     'm',
   );
 

@@ -182,7 +182,7 @@ Scripts are authored in TypeScript and compiled to ESM JavaScript in `dist/scrip
 - Validates CHANGELOG.md exists and format
 - Checks [Unreleased] has content
 - Verifies working directory is clean (unless --allow-dirty)
-- Checks that an npm publishing credential path is available
+- When `NPM_PUBLISH=true`, checks that an npm publishing credential path or GitHub Actions OIDC token-request is available
 - Validates current branch matches requirements
 - Exit code 0 on success, 1 on failure (CI-friendly)
 - **CLI command:** `release-it-preset validate [--allow-dirty]`

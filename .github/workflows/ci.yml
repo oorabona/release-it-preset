@@ -32,7 +32,6 @@ jobs:
   tests:
     name: Tests
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
     needs: build-dist
 
     steps:
@@ -79,7 +78,6 @@ jobs:
   test-cli:
     name: Test CLI
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
     needs: [build-dist, tests]
 
     steps:
@@ -138,25 +136,27 @@ jobs:
           }
           PKG
 
-          node $GITHUB_WORKSPACE/bin/cli.js init --yes
+          node "$GITHUB_WORKSPACE/bin/cli.js" init --yes
 
           test -f CHANGELOG.md
           test -f .release-it.json
 
-          NPM_TOKEN=dummy-ci-token node $GITHUB_WORKSPACE/bin/cli.js validate --allow-dirty
+          node "$GITHUB_WORKSPACE/bin/cli.js" validate --allow-dirty
 
           popd >/dev/null
 
           echo "✅ Init and validate commands succeeded in temp project"
 
   release:
-    name: Release
+    name: Prepare release
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
-    needs: build-dist
+    needs: [build-dist, tests, test-cli]
+    concurrency:
+      group: release-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write
-      id-token: write
 
     steps:
       - name: Checkout code
@@ -164,6 +164,16 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Refuse stale release snapshot
+        run: |
+          checked_out_sha="$(git rev-parse HEAD)"
+          git fetch --no-tags origin "$GITHUB_REF"
+          remote_tip_sha="$(git rev-parse FETCH_HEAD)"
+          if [ "$checked_out_sha" != "$remote_tip_sha" ]; then
+            echo "::error::Checked-out SHA $checked_out_sha is stale; remote tip is $remote_tip_sha. The dispatched branch advanced while this run waited, so dispatch this workflow again."
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -173,7 +183,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'  # Required for npm OIDC trusted publishing
 
       - name: Configure Git
         run: |
@@ -204,18 +213,16 @@ jobs:
       - name: Validate release readiness
         run: pnpm release-it-preset validate --allow-dirty
 
-      - name: Run release and publish
+      - name: Run release and push tag
         run: pnpm release-it-preset default --ci --increment ${{ inputs.increment }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_PUBLISH: 'true'      # ✅ Publish to npm via OIDC trusted publishing
-          GITHUB_RELEASE: 'true'   # ✅ Create GitHub Release
-          NPM_SKIP_CHECKS: 'true'  # npm whoami has no static identity under OIDC
+          NPM_PUBLISH: 'false'
+          GITHUB_RELEASE: 'false'
 
-      - name: Display release and publish info
+      - name: Display prepared release info
         run: |
-          echo "✅ Release and publish completed successfully"
+          echo "✅ Release prepared successfully"
           echo "Version: $(jq -r .version package.json)"
           echo "Tag: $(git describe --tags --abbrev=0)"
-          echo "npm: https://www.npmjs.com/package/@oorabona/release-it-preset"
-          echo "GitHub: https://github.com/${{ github.repository }}/releases/tag/$(git describe --tags --abbrev=0)"
+          echo "To publish: dispatch publish.yml at tag $(git describe --tags --abbrev=0)"

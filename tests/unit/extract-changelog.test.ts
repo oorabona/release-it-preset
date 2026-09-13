@@ -62,6 +62,43 @@ describe('extract-changelog (with DI)', () => {
       expect(result).not.toContain('v0.9.0')
     })
 
+    it('should not extract a prerelease section for its stable version', () => {
+      vi.mocked(deps.readFileSync).mockReturnValue(
+        '# Changelog\n\n## [1.6.0-rc.0] - 2026-01-02\n\n- Release candidate\n',
+      )
+
+      expect(() => extractChangelog('1.6.0', deps)).toThrow('No [v1.6.0] or [1.6.0] section found')
+    })
+
+    it('should extract the stable section when a prerelease heading comes first', () => {
+      vi.mocked(deps.readFileSync).mockReturnValue(
+        '# Changelog\n\n## [1.6.0-rc.0] - 2026-01-02\n\n- Release candidate\n\n## [1.6.0] - 2026-01-03\n\n- Stable release\n',
+      )
+
+      const result = extractChangelog('1.6.0', deps)
+
+      expect(result).toContain('- Stable release')
+      expect(result).not.toContain('- Release candidate')
+    })
+
+    it('should not extract a build-metadata section for its stable version', () => {
+      vi.mocked(deps.readFileSync).mockReturnValue(
+        '# Changelog\n\n## [1.6.0+build.1] - 2026-01-02\n\n- Build metadata release\n',
+      )
+
+      expect(() => extractChangelog('1.6.0', deps)).toThrow('No [v1.6.0] or [1.6.0] section found')
+    })
+
+    it('should extract an unbracketed exact version heading', () => {
+      vi.mocked(deps.readFileSync).mockReturnValue(
+        '# Changelog\n\n## 1.6.0 - 2026-01-02\n\n- Stable release\n',
+      )
+
+      const result = extractChangelog('1.6.0', deps)
+
+      expect(result).toContain('## 1.6.0 - 2026-01-02')
+    })
+
     it('should throw error when version not found', () => {
       vi.mocked(deps.readFileSync).mockReturnValue(
         '# Changelog\n\n## [v0.9.0] - 2023-12-01\n\n- Initial release\n',
