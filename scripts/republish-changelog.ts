@@ -100,7 +100,7 @@ export function updateReferenceLinks(
 function findExistingVersionHeading(changelog: string, versionWithoutVPrefix: string): string | null {
   const escapedVersion = escapeRegExp(versionWithoutVPrefix);
   const existingHeading = new RegExp(
-    `^##\\s*(?:\\[(v?${escapedVersion})\\]|(v?${escapedVersion})(?=\\s|$))`,
+    `^##\\s*(?:\\[([vV]?${escapedVersion})\\]|([vV]?${escapedVersion})(?=\\s|$))`,
     'm',
   ).exec(changelog);
   return existingHeading?.[1] ?? existingHeading?.[2] ?? null;
@@ -174,7 +174,7 @@ export function republishChangelog(version: string, deps: RepublishChangelogDeps
     deps.log(`ℹ️  Updating existing ${tag} entry with unreleased content...`);
 
     const versionEntryRegex = new RegExp(
-      `(^##\\s*(?:\\[(?:v?${escapedVersion})\\]|(?:v?${escapedVersion})(?=\\s|$))[^\\r\\n]*(?:\\r?\\n|$(?![\\s\\S])))((?:[\\s\\S]*?)(?=^##\\s|^\\s*---\\s*$|$(?![\\s\\S])))`,
+      `(^##\\s*(?:\\[(?:[vV]?${escapedVersion})\\]|(?:[vV]?${escapedVersion})(?=\\s|$))[^\\r\\n]*(?:\\r?\\n|$(?![\\s\\S])))((?:[\\s\\S]*?)(?=^##\\s|^\\s*---\\s*$|$(?![\\s\\S])))`,
       'm',
     );
 

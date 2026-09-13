@@ -7,7 +7,6 @@
  * Safe env defaults injected by runCli():
  *   GITHUB_RELEASE=false  NPM_PUBLISH=false  NPM_SKIP_CHECKS=true
  *   GIT_REQUIRE_UPSTREAM=false  GIT_REQUIRE_CLEAN=false  CI=true
- *   NPM_TOKEN=dummy-e2e-token (bypasses `npm whoami` via the CI auth-token path)
  */
 
 import {
@@ -118,8 +117,7 @@ export function createTempGitRepo(opts: TempRepoOpts = {}): TempRepo {
   })
 
   // Default safe environment for CLI invocations.
-  // NPM_TOKEN=dummy bypasses `npm whoami` in validate-release (CI auth token path).
-  // CI=true (not '1') matches the validate-release ciEnv check (toLowerCase() === 'true').
+  // CI=true makes CLI invocations use CI environment semantics.
   // GITHUB_REPOSITORY is forced empty so getGitHubRepoUrl() falls back to the temp
   // repo's `origin` remote (https://github.com/example/demo-e2e.git). Without this,
   // CI runners leak GITHUB_REPOSITORY=<owner>/<repo> into the test environment and
@@ -132,7 +130,6 @@ export function createTempGitRepo(opts: TempRepoOpts = {}): TempRepo {
     GIT_REQUIRE_UPSTREAM: 'false',
     GIT_REQUIRE_CLEAN: 'false',
     CI: 'true',
-    NPM_TOKEN: 'dummy-e2e-token',
     GITHUB_REPOSITORY: '',
   }
 

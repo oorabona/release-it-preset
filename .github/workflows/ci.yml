@@ -141,7 +141,7 @@ jobs:
           test -f CHANGELOG.md
           test -f .release-it.json
 
-          NPM_TOKEN=dummy-ci-token node "$GITHUB_WORKSPACE/bin/cli.js" validate --allow-dirty
+          node "$GITHUB_WORKSPACE/bin/cli.js" validate --allow-dirty
 
           popd >/dev/null
 

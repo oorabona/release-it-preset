@@ -191,7 +191,6 @@ A path is skipped, with a reason naming the release-it major and the runtime, wh
 | `GIT_REQUIRE_UPSTREAM` | `false` | Don't require an upstream-tracking branch |
 | `GIT_REQUIRE_CLEAN` | `false` | Allow runs against repos with pending changes |
 | `CI` | `true` | Take the CI auth-token branch in `validate-release` |
-| `NPM_TOKEN` | `dummy-e2e-token` | Satisfies the CI auth-token check without contacting the registry |
 | `GITHUB_REPOSITORY` | `''` (empty) | Forces `getGitHubRepoUrl()` to fall back to the temp repo's `origin` remote rather than the CI runner's own value (`<owner>/<repo>`) |
 
 Pass an `env` object to `runCli()` to override any of these on a per-call basis.

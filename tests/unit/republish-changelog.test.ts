@@ -242,6 +242,96 @@ describe('republish-changelog (with DI)', () => {
       expect(writtenContent).toMatch(/## \[Unreleased]\n\s*\n## \[v1\.0\.0]/)
     })
 
+    it('should update an uppercase V-prefixed version heading without duplicating it', () => {
+      const changelog = `# Changelog
+
+## [Unreleased]
+
+### Fixed
+- Stable fix
+
+## [V1.6.0] - 2026-01-03
+
+- Existing release
+`
+      vi.mocked(deps.readFileSync).mockReturnValue(changelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      republishChangelog('1.6.0', deps)
+
+      const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+      expect(writtenContent).toContain('## [V1.6.0] - 2026-01-03\n\n### Fixed\n- Stable fix')
+      expect(writtenContent.match(/^## \[V1\.6\.0\](?:\s|$)/gm)).toHaveLength(1)
+    })
+
+    it('should do nothing for an uppercase V-prefixed version when Unreleased is empty', () => {
+      const changelog = `# Changelog
+
+## [Unreleased]
+
+## [V1.6.0] - 2026-01-03
+
+- Existing release
+`
+      vi.mocked(deps.readFileSync).mockReturnValue(changelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      republishChangelog('1.6.0', deps)
+
+      expect(deps.writeFileSync).not.toHaveBeenCalled()
+      expect(deps.log).toHaveBeenCalledWith(
+        expect.stringContaining('already exists in changelog and [Unreleased] is empty'),
+      )
+    })
+
+    it('should merge into an unbracketed uppercase V-prefixed version heading', () => {
+      const changelog = `# Changelog
+
+## [Unreleased]
+
+### Fixed
+- Stable fix
+
+## V1.6.0 - 2026-01-03
+
+- Existing release
+`
+      vi.mocked(deps.readFileSync).mockReturnValue(changelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      republishChangelog('1.6.0', deps)
+
+      const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+      expect(writtenContent).toContain('## V1.6.0 - 2026-01-03\n\n### Fixed\n- Stable fix')
+      expect(writtenContent.match(/^## V1\.6\.0(?:\s|$)/gm)).toHaveLength(1)
+    })
+
+    it('should not match an uppercase prerelease identifier for a lowercase request', () => {
+      const changelog = `# Changelog
+
+## [Unreleased]
+
+### Fixed
+- Lowercase release candidate fix
+
+## [V1.6.0-RC.0] - 2026-01-03
+
+- Uppercase release candidate
+`
+      vi.mocked(deps.readFileSync).mockReturnValue(changelog)
+      vi.mocked(deps.execSync).mockReturnValue('https://github.com/owner/repo.git')
+
+      republishChangelog('1.6.0-rc.0', deps)
+
+      const writtenContent = vi.mocked(deps.writeFileSync).mock.calls[0][1] as string
+      expect(writtenContent).toContain(
+        '## [V1.6.0-RC.0] - 2026-01-03\n\n- Uppercase release candidate',
+      )
+      expect(writtenContent).toContain(
+        '## [v1.6.0-rc.0] - 2024-01-15\n\n### Fixed\n- Lowercase release candidate fix',
+      )
+    })
+
     it('should update only the exact stable version when a prerelease comes first', () => {
       const changelog = `# Changelog
 

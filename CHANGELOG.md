@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- recognize uppercase `V` changelog headings when republishing without making prerelease identifiers case-insensitive
 - match changelog headings only for their exact version, including prerelease and build metadata boundaries ([#95](https://github.com/oorabona/release-it-preset/issues/95))
 - release workflow now prepares and tags releases; dispatch `publish.yml` at the tag to publish ([#99](https://github.com/oorabona/release-it-preset/issues/99))
 - report npm publishing credential paths without inferring npm authentication from token-shaped environment variables ([#97](https://github.com/oorabona/release-it-preset/issues/97))
