@@ -7,12 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-09-13
+
 ### Fixed
-- recognize uppercase `V` changelog headings when republishing without making prerelease identifiers case-insensitive
-- match changelog headings only for their exact version, including prerelease and build metadata boundaries ([#95](https://github.com/oorabona/release-it-preset/issues/95))
-- release workflow now prepares and tags releases; dispatch `publish.yml` at the tag to publish ([#99](https://github.com/oorabona/release-it-preset/issues/99))
-- report npm publishing credential paths without inferring npm authentication from token-shaped environment variables ([#97](https://github.com/oorabona/release-it-preset/issues/97))
-- scope skipped credential validation to `NPM_PUBLISH` and refuse stale release snapshots
+- match changelog headings exactly, and stop the release job claiming it publishes (#101) ([a7368fc](https://github.com/oorabona/release-it-preset/commit/a7368fc))
 
 ## [1.5.1] - 2026-09-12
 
@@ -553,7 +551,7 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 
 
-[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/oorabona/release-it-preset/compare/v1.5.2...HEAD
 [v0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [0.9.0]: https://github.com/oorabona/release-it-preset/releases/tag/v0.9.0
 [v0.8.1]: https://github.com/oorabona/release-it-preset/releases/tag/v0.8.1
@@ -618,3 +616,6 @@ Without `extends`, release-it/c12 has no way to know which preset to load and me
 
 [v1.5.1]: https://github.com/oorabona/release-it-preset/releases/tag/v1.5.1
 [1.5.1]: https://github.com/oorabona/release-it-preset/releases/tag/v1.5.1
+
+[v1.5.2]: https://github.com/oorabona/release-it-preset/releases/tag/v1.5.2
+[1.5.2]: https://github.com/oorabona/release-it-preset/releases/tag/v1.5.2
