@@ -198,7 +198,7 @@ export function validateNpmAuth(deps: ValidateReleaseDeps): ValidationResult {
     return {
       name: 'npm publishing credential path',
       passed: true,
-      message: 'Skipped because NPM_PUBLISH is not true; this run does not publish.',
+      message: 'Skipped because NPM_PUBLISH is not true. This check does not resolve release-it configuration or plugin behavior, so a release configured to publish by other means is not covered.',
     };
   }
 

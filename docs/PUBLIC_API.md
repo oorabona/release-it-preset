@@ -43,6 +43,8 @@ The `release-it-preset` binary (or `pnpm release-it-preset`) accepts these comma
 | `annotate` | `annotate-changelog` | Regenerate resolvable `[Unreleased]` entries from typed merged-PR changelog blocks (`<!-- changelog:<type> -->` / `<!-- /changelog -->`); PR-number bullets use `gh pr view`, SHA-only bullets use GitHub's commit PR association endpoint, unmapped bullets are preserved, and GitHub CLI failures stop before writing. |
 | `retry-publish-preflight` | `retry-publish` (preflight mode) | Pre-flight checks before retry-publish runs |
 
+When `NPM_PUBLISH` is not `true`, `validate`'s credential check does not resolve release-it configuration or plugin behavior, so a release configured to publish by other means is not covered.
+
 All commands accept `--ci`, `--dry-run`, `--increment <patch\|minor\|major>`, `--preRelease <id>` flags pass-through to `release-it` (release commands) or interpreted by the script (utility commands).
 
 ---

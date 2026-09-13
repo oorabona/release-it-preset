@@ -243,7 +243,7 @@ describe('validate-release (with DI)', () => {
   })
 
   describe('validateNpmAuth', () => {
-    it('should skip when this run does not publish, regardless of ambient variables', () => {
+    it('should skip when NPM_PUBLISH is not true, regardless of ambient variables', () => {
       vi.mocked(deps.execSync).mockImplementation(() => {
         throw new Error('whoami should not run')
       })
@@ -254,9 +254,12 @@ describe('validate-release (with DI)', () => {
       const result = validateNpmAuth(deps)
 
       expect(result.passed).toBe(true)
-      expect(result.message).toBe(
-        'Skipped because NPM_PUBLISH is not true; this run does not publish.',
+      expect(result.message).toContain('Skipped because NPM_PUBLISH is not true')
+      expect(result.message).toContain(
+        'does not resolve release-it configuration or plugin behavior',
       )
+      expect(result.message).toContain('configured to publish by other means is not covered')
+      expect(result.message).not.toContain('this run does not publish')
       expect(deps.execSync).not.toHaveBeenCalled()
     })
 
