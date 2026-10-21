@@ -78,7 +78,7 @@ jobs:
       id-token: write  # Required for npm OIDC trusted publishing
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ inputs.tag || github.ref }}
@@ -218,7 +218,7 @@ jobs:
       should_attest: ${{ steps.pack.outputs.should_attest }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
 
